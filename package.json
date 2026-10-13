@@ -1,0 +1,24 @@
+{
+  "name": "prehistoric",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PREHISTORIC — a co-op survival, dinosaur taming and base building game. Your homemade time-machine van crashed millions of years ago.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server/server.js",
+    "serve": "npm run build && node server/server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "three": "0.186.1",
+    "vite": "^7.3.7",
+    "@fontsource/pixelify-sans": "^5.3.0",
+    "@fontsource/vt323": "^5.3.0",
+    "@fontsource/silkscreen": "^5.3.0"
+  }
+}
