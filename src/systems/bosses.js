@@ -115,6 +115,8 @@ export class Bosses {
       }
     }
   }
+  // debug / tests: bring an alpha to a spot
+  summon(id, x, z) { this.spawn(id, ALPHAS[id], { x, z, radius: 10 }); return this.live.get(id); }
   callPack(d, T) {
     const g = this.g, herd = d.herd;
     if (!herd) return;
