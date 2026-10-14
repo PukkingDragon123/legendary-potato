@@ -18,6 +18,7 @@ export const EFFECTS = {
   sleepy: { name: 'Sleepy', icon: 'zzz', color: '#9090d0', desc: 'Get some rest.' },
   warm: { name: 'Toasty', icon: 'flame', color: '#ffb060', desc: 'Near a fire.' },
   blind: { name: 'Spat On', icon: 'drop', color: '#9ad040', desc: 'Dilophosaurus spit. Everything is blurry.' },
+  terrified: { name: 'Terrified', icon: 'exclaim', color: '#e05050', desc: 'An alpha roared at you. Legs are jelly.' },
 };
 
 export class Vitals {
@@ -48,6 +49,8 @@ export class Vitals {
     if (this.god || this.dead || amount <= 0) return;
     const p = this.game.local;
     if (p.downed) return;
+    // nothing one-shots you from full health: even a T. rex bite leaves a sliver
+    if (src.kind === 'dino' && this.hp > 30) amount = Math.min(amount, this.hp - 8, 62);
     this.hp -= amount;
     this.regenDelay = 6;
     this.damageFlash = Math.min(1, this.damageFlash + amount / 25 + 0.25);
@@ -162,7 +165,7 @@ export class Vitals {
       if (nv <= 0) this.effects.delete(k); else this.effects.set(k, nv);
     }
     if (this.energy < 12) this.effects.set('sleepy', Math.max(this.effects.get('sleepy') ?? 0, 2));
-    this.speedMul = (this.effects.has('broken') ? 0.7 : 1) * (this.energy < 5 ? 0.8 : 1) * (this.wetness > 0.6 ? 0.95 : 1);
+    this.speedMul = (this.effects.has('broken') ? 0.7 : 1) * (this.effects.has('terrified') ? 0.55 : 1) * (this.energy < 5 ? 0.8 : 1) * (this.wetness > 0.6 ? 0.95 : 1);
     // ---- post effects
     const post = g.engine.post.compMat.uniforms;
     this.damageFlash = Math.max(0, this.damageFlash - dt * 1.5);

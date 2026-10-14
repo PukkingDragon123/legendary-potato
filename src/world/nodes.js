@@ -38,24 +38,25 @@ export const NODE_TYPES = {
   obsidian: { name: 'Obsidian', tool: 'pick', hp: 90, drops: [['obsidian', 2, 3], ['stone', 0, 1]], regrow: 2400, model: 'obsidian', solid: true, size: [0.8, 1.5] },
   crystal: { name: 'Chrono Crystals', tool: 'pick', hp: 150, drops: [['crystal', 1, 1], ['mineral', 1, 2]], regrow: 7200, model: 'crystal', solid: true, size: [0.9, 1.4], tier: 2 },
   clay: { name: 'Clay Bank', tool: 'hand', hp: 10, drops: [['clay', 2, 4]], regrow: 900, model: 'clay', size: [0.9, 1.3], shovelBonus: 2 },
-  fossil: { name: 'Fossil Rock', tool: 'pick', hp: 60, drops: [['fossil', 1, 2], ['bone', 1, 3], ['amber', 0, 1, 0.3], ['amber_bug', 0, 1, 0.08]], regrow: 3600, model: 'fossil', solid: true, size: [0.9, 1.5] },
+  fossil: { name: 'Fossil Rock', tool: 'pick', hp: 60, drops: [['fossil', 1, 2], ['bone', 1, 3], ['amber', 0, 1, 0.3], ['amber_bug', 0, 1, 0.08], ['coprolite', 0, 1, 0.3]], regrow: 3600, model: 'fossil', solid: true, size: [0.9, 1.5] },
   tar: { name: 'Tar Seep', tool: 'hand', hp: 1, drops: [['tar', 2, 4]], regrow: 600, model: 'tar', size: [1.2, 1.8], pickup: true },
   salt: { name: 'Salt Crust', tool: 'hand', hp: 1, drops: [['salt', 1, 3]], regrow: 900, model: 'salt', size: [0.8, 1.2], pickup: true },
   driftwood: { name: 'Driftwood', tool: 'hand', hp: 1, drops: [['stick', 2, 4], ['log', 0, 1, 0.5]], regrow: 900, model: 'driftwood', size: [1, 1.4], pickup: true },
   hive: { name: 'Wild Beehive', tool: 'hand', hp: 1, drops: [['honey', 1, 2], ['resin', 0, 1, 0.5]], regrow: 1200, model: 'hive', size: [0.8, 1.1], stings: true },
   sand: { name: 'Sand', tool: 'hand', hp: 1, drops: [['sand', 2, 3]], regrow: 400, model: 'sandpile', size: [0.8, 1.2], pickup: true },
+  dung: { name: 'Dino Dung', tool: 'hand', hp: 1, drops: [['dung', 1, 2]], regrow: 900, model: 'dung', size: [0.7, 1.15], pickup: true },
 };
 
 // per-biome spawn weights per 32 m cell (expected count)
 const SPAWN = {
-  [BIOME.JUNGLE]: { boulder: 2.2, boulder_big: 0.35, rock_small: 3, sticks: 4, flint: 0.5, fiber: 4, fern: 4, bush_red: 2.2, bush_blue: 0.8, bush_sun: 0.4, bush_snooze: 0.6, herb: 0.7, mushrooms: 1.0, hive: 0.15 },
-  [BIOME.RIVER]: { boulder: 3.2, rock_small: 3, sticks: 2, flint: 0.6, fiber: 3, fern: 2, clay: 1.6, bush_red: 0.8, herb: 0.5, bush_blue: 0.6 },
-  [BIOME.PRAIRIE]: { boulder: 0.8, rock_small: 2, sticks: 1, fiber: 5, fern: 1, bush_red: 1.2, bush_sun: 1.4, bush_blue: 0.8, herb: 0.6, flint: 0.4, hive: 0.05 },
-  [BIOME.REDWOOD]: { boulder: 1.2, rock_small: 1.5, sticks: 4, fern: 5, fiber: 2, mushrooms: 2.2, bush_snooze: 0.8, bush_blue: 0.8, herb: 0.6, hive: 0.15 },
-  [BIOME.SWAMP]: { rock_small: 1, sticks: 3, fiber: 4, fern: 3, mushrooms: 1.6, bush_snooze: 1.4, herb: 1.0, clay: 1.0 },
-  [BIOME.NESTING]: { boulder: 1.4, rock_small: 2, sticks: 2, fiber: 3, bush_red: 0.6, bush_sun: 0.6, flint: 0.6 },
+  [BIOME.JUNGLE]: { boulder: 2.2, boulder_big: 0.35, rock_small: 3, sticks: 4, flint: 0.5, fiber: 4, fern: 4, bush_red: 2.2, bush_blue: 0.8, bush_sun: 0.4, bush_snooze: 0.6, herb: 0.7, mushrooms: 1.0, hive: 0.15, dung: 0.4 },
+  [BIOME.RIVER]: { boulder: 3.2, rock_small: 3, sticks: 2, flint: 0.6, fiber: 3, fern: 2, clay: 1.6, bush_red: 0.8, herb: 0.5, bush_blue: 0.6, dung: 0.35 },
+  [BIOME.PRAIRIE]: { boulder: 0.8, rock_small: 2, sticks: 1, fiber: 5, fern: 1, bush_red: 1.2, bush_sun: 1.4, bush_blue: 0.8, herb: 0.6, flint: 0.4, hive: 0.05, dung: 0.9 },
+  [BIOME.REDWOOD]: { boulder: 1.2, rock_small: 1.5, sticks: 4, fern: 5, fiber: 2, mushrooms: 2.2, bush_snooze: 0.8, bush_blue: 0.8, herb: 0.6, hive: 0.15, dung: 0.35 },
+  [BIOME.SWAMP]: { rock_small: 1, sticks: 3, fiber: 4, fern: 3, mushrooms: 1.6, bush_snooze: 1.4, herb: 1.0, clay: 1.0, dung: 0.5 },
+  [BIOME.NESTING]: { boulder: 1.4, rock_small: 2, sticks: 2, fiber: 3, bush_red: 0.6, bush_sun: 0.6, flint: 0.6, dung: 1.2 },
   [BIOME.BEACH]: { rock_small: 2, driftwood: 1.2, salt: 0.8, sand: 1.2, fiber: 1 },
-  [BIOME.HIGHLAND]: { boulder: 1.8, boulder_big: 0.25, rock_small: 2, fiber: 4, bush_red: 0.8, bush_blue: 1.2, bush_sun: 0.8, flint: 0.6, herb: 0.6 },
+  [BIOME.HIGHLAND]: { boulder: 1.8, boulder_big: 0.25, rock_small: 2, fiber: 4, bush_red: 0.8, bush_blue: 1.2, bush_sun: 0.8, flint: 0.6, herb: 0.6, dung: 0.5 },
   [BIOME.BADLANDS]: { boulder: 2.2, boulder_big: 0.5, rock_small: 3, fossil: 1.2, flint: 0.8, fiber: 0.4 },
   [BIOME.MOUNTAIN]: { boulder: 2.6, boulder_big: 0.6, rock_small: 2, ore_copper: 0.6, flint: 0.7, fiber: 0.6, herb: 0.3 },
   [BIOME.SNOW]: { boulder: 1, boulder_big: 0.4, ore_copper: 0.3 },
@@ -283,6 +284,8 @@ export class Nodes {
     mk('crate', new THREE.BoxGeometry(0.7, 0.45, 0.5).translate(0, 0.225, 0), simpleMat(0x3a6ab0, { rough: 0.5 }), 60);
     mk('crateLid', new THREE.BoxGeometry(0.72, 0.06, 0.52).translate(0, 0.47, 0), simpleMat(0xd8d0c0, { rough: 0.6 }), 60);
     mk('hive', new THREE.SphereGeometry(0.3, 8, 6).scale(1, 1.4, 1).translate(0, 0.2, 0), simpleMat(0xb89050, { rough: 0.8, flat: true }), 150);
+    // a cartoon swirl of dino dung, still glossy
+    mk('dung', mergeSimple([[0.26, 0.09], [0.19, 0.2], [0.12, 0.29], [0.06, 0.35]].map(([r, y], k) => new THREE.SphereGeometry(r, 9, 6).scale(1, 0.62, 1).translate(k * 0.02, y, -k * 0.015))), simpleMat(0x5a3e24, { rough: 0.42 }), 500);
   }
 
   key(i, j) { return i * 10000 + j; }
@@ -456,6 +459,7 @@ export class Nodes {
         case 'debris': put('debris', x, y, z, rot, size); break;
         case 'crate': put('crate', x, y, z, rot, size); put('crateLid', x, y, z, rot, size); break;
         case 'hive': put('hive', x, y + 2.8, z, rot, size); break;
+        case 'dung': put('dung', x, y - 0.03, z, rot, size); break;
         default: break;
       }
     }

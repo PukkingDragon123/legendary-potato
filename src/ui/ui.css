@@ -308,3 +308,16 @@ img.icon, canvas.icon { image-rendering: pixelated; image-rendering: crisp-edges
 .scancard .sc-title { font-size: 18px; color: var(--lcd-text); margin-bottom: 4px; }
 .scancard .sc-fact { font-size: 13px; line-height: 17px; color: var(--lcd-dim); }
 .scancard .sc-rp { margin-top: 8px; font-family: var(--font-small); font-size: 12px; color: var(--sun); }
+
+/* ---------------------------------------------------------- alpha boss bar */
+#bossbar { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); width: min(440px, calc(100% - 32px)); text-align: center; }
+#bossbar .bb-name { font-size: 26px; color: var(--cream); letter-spacing: 2px; line-height: 26px; }
+#bossbar .bb-title { font-family: var(--font-small); font-size: 10px; letter-spacing: 3px; color: #ffb39a; margin: 2px 0 6px; text-shadow: 0 2px 0 var(--ink); }
+#bossbar .bb-bar { position: relative; height: 14px; background: #1a0c0c; box-shadow: 0 0 0 3px var(--ink), 0 4px 0 3px rgba(0, 0, 0, 0.35); overflow: hidden; }
+#bossbar .bb-bar i { position: absolute; left: 0; top: 0; bottom: 0; }
+#bossbar .bb-hp { background: linear-gradient(#ff6a50, #c8302a 60%, #8a1a14); z-index: 2; }
+#bossbar .bb-lag { background: #f3ead2; opacity: 0.75; z-index: 1; }
+#bossbar .bb-bar::after { content: ''; position: absolute; inset: 0; z-index: 3; background: repeating-linear-gradient(90deg, transparent 0 11px, rgba(0, 0, 0, 0.45) 11px 13px); }
+#bossbar .bb-tor { position: relative; height: 6px; margin: 6px auto 0; width: 70%; background: #120c1a; box-shadow: 0 0 0 2px var(--ink); overflow: hidden; }
+#bossbar .bb-tor i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--purple); }
+#bossbar.ko .bb-name::after { content: ' (ZZZ)'; color: var(--purple); font-size: 18px; }

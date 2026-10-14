@@ -81,6 +81,7 @@ export class Coop {
   nightRaid() {
     const g = this.g;
     if (!g.isHost || !g.dinos || !g.time.isNight || g.time.day < 2 || this.raidDay === g.time.day) return;
+    if (g.bosses?.isDown('razor')) return; // the packs lost their alpha
     const hour = g.time.hour;
     if (!(hour > 21.5 || hour < 3)) return;
     if (Math.random() > 0.002) return;

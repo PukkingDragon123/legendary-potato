@@ -72,7 +72,7 @@ function partPainter(L, seed) {
   return p;
 }
 function speciesMats(sp) {
-  const key = sp.id;
+  const key = sp.matKey ?? sp.id;
   if (matCache.has(key)) return matCache.get(key);
   const L = sp.look;
   const seed = [...sp.id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0;
@@ -400,6 +400,11 @@ function buildHead(head, H, s, M, parts, sp, sc) {
       if (H.crests) for (const sx of [-1, 1]) { const g = new THREE.CircleGeometry(len * 0.32, 10, 0, Math.PI); const c = mesh(g, M.accent); c.material = M.accent; c.rotation.y = Math.PI / 2; c.position.set(sx * w * 0.18, h * 0.42, -len * 0.25); c.scale.set(1, 0.7, 1); skull.add(c); const c2 = c.clone(); c2.rotation.y = -Math.PI / 2; skull.add(c2); }
       if (H.frillNeck) { const g = new THREE.CircleGeometry(h * 1.3, 14, Math.PI * 0.15, Math.PI * 1.7); const fr = mesh(g, patchMaterial(new THREE.MeshStandardMaterial({ color: sp.look.accent, roughness: 0.6, side: THREE.DoubleSide }), {})); fr.position.set(0, -h * 0.05, len * 0.25); fr.scale.setScalar(0.15); skull.add(fr); parts.neckFrill = fr; }
       eyeY = h * 0.28; eyeZ = -len * 0.2; eyeX = w * 0.5;
+      if (sp.alpha) {
+        // alphas wear a crown of horns and old claw scars on the snout
+        for (let i = 0; i < 5; i++) { const t = i / 4 - 0.5; const hrn = cone(w * 0.09, h * (0.55 - Math.abs(t) * 0.3), M.horn, 5); hrn.position.set(t * w * 0.82, h * 0.62, -len * 0.06 + Math.abs(t) * len * 0.05); hrn.rotation.set(0.45, 0, -t * 0.9); skull.add(hrn); }
+        for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) { const scar = rbox(w * 0.03, h * 0.34, len * 0.022, w * 0.008, M.horn); scar.position.set(sx * w * (type === 'croc' ? 0.26 : 0.41), -h * 0.06, -len * (0.36 + k * 0.05)); scar.rotation.x = 0.55; skull.add(scar); }
+      }
       if (sp.look.feathers) { const fm = patchMaterial(new THREE.MeshStandardMaterial({ color: sp.look.accent, roughness: 0.8, side: THREE.DoubleSide }), {}); for (let i = 0; i < 4; i++) { const g = new THREE.PlaneGeometry(h * 0.3, h * 0.8); g.translate(0, h * 0.4, 0); const f = mesh(g, fm, false); f.position.set(0, h * 0.45, len * 0.05 + i * h * 0.12); f.rotation.set(-0.9 - i * 0.15, Math.PI / 2, 0); skull.add(f); } }
       break;
     }
@@ -627,6 +632,20 @@ export class DinoRig {
         case 'shake': hips.rotation.z += Math.sin(t * 30) * 0.12 * k; break;
         case 'happy': hips.position.y += Math.abs(Math.sin(t * 10)) * 0.08 * R.br * 2 * k; headPitch = -0.2 * k; jaw = 0.25 * k; break;
         case 'spit': neckLift = 0.2 * k; headPitch = -0.2 * k; jaw = 0.7 * k; if (P.neckFrill) P.neckFrill.scale.setScalar(0.15 + 0.85 * k); break;
+        case 'stomp': {
+          // rear up, then slam the front down
+          const up = p < 0.55 ? Math.sin((p / 0.55) * Math.PI / 2) : Math.max(0, 1 - (p - 0.55) / 0.12);
+          hips.position.y += up * R.br * 0.8; hips.rotation.x += up * 0.32;
+          neckLift = 0.35 * k; headPitch = -0.3 * up; jaw = 0.7 * k; tailLift = -0.3 * up;
+          break;
+        }
+        case 'pounce': {
+          // crouch, then spring forward claws first
+          const c = p < 0.35 ? Math.sin((p / 0.35) * Math.PI / 2) : 0;
+          hips.position.y -= c * R.br * 0.55; hips.rotation.x += -c * 0.18 + (p > 0.35 ? 0.25 * k : 0);
+          headPitch = 0.15 * k; jaw = p > 0.35 ? 0.85 * k : 0; tailLift = 0.35 * k;
+          break;
+        }
         default: break;
       }
     }

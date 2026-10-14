@@ -23,6 +23,7 @@ export const STYPES = {
   forge: { name: 'Forge', station: 'forge', fuel: { max: 900, start: 120 }, light: { color: 0xff8030, intensity: 2.6, range: 7, flicker: 0.3 }, warmth: 5 },
   smoker: { name: 'Smoker', station: 'smoker', fuel: { max: 900, start: 120 } },
   crop_plot: { name: 'Crop Plot', crop: true },
+  greenhouse: { name: 'Greenhouse', crop: true, greenhouse: true },
   water_collector: { name: 'Rain Catcher', collector: true },
   torch_stand: { name: 'Torch Stand', light: FIRE_LIGHT, autoNight: true, scare: 8 },
   feed_trough: { name: 'Feeding Trough', storage: 12, accept: 'food' },
@@ -44,6 +45,13 @@ export const STYPES = {
   dino_bed: { name: 'Dino Nest Bed' },
   fridge: { name: 'Cooler Box', storage: 16, accept: 'food', spoil: 0.33 },
   table: { name: 'Table' }, chair: { name: 'Chair', seat: true }, rug: { name: 'Rug', flat: true }, planter: { name: 'Planter' }, skull_trophy: { name: 'Skull Trophy' },
+  // alpha trophies: predators keep away from a camp that displays one
+  trophy_gnasher: { name: 'Gnasher\'s Tooth', trophy: true, scare: 34 },
+  trophy_momma: { name: 'Big Momma\'s Scale', trophy: true, scare: 20, cropBoost: 16 },
+  trophy_razor: { name: 'Razor\'s Claw', trophy: true, scare: 22 },
+  // traps: bait them, wait, and the catch is held (tangled + drowsy) for you
+  trap_snare: { name: 'Snare Trap', trap: { max: 2.4, r: 0.75, lure: 26, hold: 30, torpor: 0.4 } },
+  trap_net: { name: 'Spring Net Trap', trap: { max: 6.5, r: 1.4, lure: 34, hold: 26, torpor: 0.55 } },
 };
 export const CROPS = {
   seed_berry: { name: 'Redberries', out: 'redberry', n: [4, 7], seed: 'seed_berry', time: 480, color: 0xd8302a },
@@ -94,6 +102,7 @@ export class Structures {
     if (def.collector) D.level = D.level ?? 0;
     if (def.incubator) { D.egg = D.egg ?? null; D.heat = D.heat ?? 0; D.prog = D.prog ?? 0; }
     if (def.power) { D.on = D.on ?? true; D.store = D.store ?? 0; D.fuel = D.fuel ?? 0; }
+    if (def.trap) { D.sprung = D.sprung ?? false; D.bait = D.bait ?? null; }
     if (def.light && this.g.lightPool) {
       const a = s.anchors.fire ?? s.anchors.light ?? new THREE.Vector3(0, 1, 0);
       s.light = this.g.lightPool.add({ pos: s.group.localToWorld(a.clone()), color: def.light.color, intensity: 0, range: def.light.range, flicker: def.light.flicker ?? 0, on: false, priority: 1 });
@@ -126,6 +135,11 @@ export class Structures {
   }
   all(type) { return [...this.list.values()].filter((s) => s.type === type); }
   isLit(s) { return s.def.fuel ? s.data.lit && s.data.fuel > 0 : true; }
+  // crops near Big Momma's lucky scale grow faster
+  boosted(s) {
+    if (!this.boostT || this.t - this.boostT > 5) { this.boostT = this.t || 1e-3; this.boosters = [...this.list.values()].filter((o) => o.def.cropBoost); }
+    return this.boosters.some((o) => Math.hypot(o.x - s.x, o.z - s.z) < o.def.cropBoost);
+  }
 
   // ======================================================================== actions
   registerActions() {
@@ -171,7 +185,7 @@ export class Structures {
     A.st_harvest = ({ id, by }) => {
       const s = this.list.get(id); if (!s || !s.data.crop || s.data.grow < 1) return;
       const C = CROPS[s.data.crop];
-      const n = C.n[0] + Math.floor(Math.random() * (C.n[1] - C.n[0] + 1)) + (s.data.fert > 0 ? 2 : 0);
+      const n = C.n[0] + Math.floor(Math.random() * (C.n[1] - C.n[0] + 1)) + (s.data.fert > 0 ? 2 : 0) + (s.def.greenhouse ? 2 : 0);
       const items = [[C.out, n]]; if (Math.random() < 0.6) items.push([C.seed, 1 + (Math.random() < 0.3 ? 1 : 0)]);
       s.data.crop = null; s.data.grow = 0; s.data.fert = Math.max(0, s.data.fert - 1);
       this.applyVisual(s); this.sync(s);
@@ -192,6 +206,18 @@ export class Structures {
       if (by === g.local.id && !g.inventory.remove(egg, 1)) return;
       s.data.egg = egg; s.data.prog = 0; this.applyVisual(s); this.sync(s);
       g.events.emit('eggIncubating', { s, egg, by });
+    };
+    A.st_bait = ({ id, item, by }) => {
+      const s = this.list.get(id); if (!s || !s.def.trap || s.data.bait) return;
+      if (by === g.local.id && !g.inventory.remove(item, 1)) return;
+      s.data.bait = item; this.applyVisual(s); this.sync(s);
+      g.audio?.play('pluck', { pos: _v.set(s.x, s.y + 0.2, s.z) });
+    };
+    A.st_rearm = ({ id }) => {
+      const s = this.list.get(id); if (!s || !s.def.trap) return;
+      const d = s.data.caught && g.dinos?.list.get(s.data.caught); if (d && d.state !== 'ko') d.tangled = 0;
+      s.data.sprung = false; s.data.caught = null; this.applyVisual(s); this.sync(s);
+      g.audio?.play('ratchet', { pos: _v.set(s.x, s.y + 0.3, s.z) });
     };
     A.st_brew = ({ id, by }) => {
       const s = this.list.get(id); if (!s) return;
@@ -323,6 +349,11 @@ export class Structures {
     if (s.type === 'generator') { if (g.inventory.count('biofuel')) { prompt = { text: 'Refuel with Dung-o-Diesel' }; act = () => { if (g.inventory.remove('biofuel', 1)) { g.act('st_gfuel', { id: s.id }); g.audio?.play('fill', { pos: _v.set(s.x, s.y + 0.5, s.z) }); } }; } else { prompt = { text: D.on ? 'Switch off' : 'Switch on' }; act = () => g.act('st_toggle', { id: s.id }); } }
     if (s.type === 'coffee_machine') { if (g.inventory.count('water_clean')) { prompt = { text: 'Brew Van Coffee' }; act = () => { if (this.powered(s)) g.act('st_brew', { id: s.id }); else g.ui?.toast('No power! Connect a generator or solar panel nearby.', 'warn'); }; } else prompt = { text: 'Coffee Machine', key: '-', warn: 'Needs Clean Water' }; }
     if (s.type === 'torch_stand') { prompt = { text: D.off ? 'Light torch' : 'Put out torch' }; act = () => { D.off = !D.off; this.applyVisual(s); this.sync(s); g.audio?.play(D.off ? 'sizzle' : 'fire_whoosh', { pos: _v.set(s.x, s.y + 1.6, s.z), vol: 0.5 }); }; }
+    if (def.trap) {
+      if (D.sprung) { const d = D.caught && g.dinos?.list.get(D.caught); prompt = { text: d && !d.tamed && d.state !== 'dead' ? 'Re-arm (let it go)' : 'Re-arm the trap' }; act = () => { g.local.startAction('hammer', 0.6, () => g.act('st_rearm', { id: s.id }), 0.8); }; }
+      else if (!D.bait) { const food = hdef?.cat === 'food' ? held.id : null; if (food) { prompt = { text: `Bait with ${hdef.name}` }; act = () => g.act('st_bait', { id: s.id, item: food }); } else prompt = { text: 'Armed', key: '-', warn: 'Hold food to bait it' }; }
+      else prompt = { text: 'Armed and baited', key: '-' };
+    }
     if (def.research) { prompt = { text: 'Study specimens' }; act = () => (g.computer ? g.computer.open(null, 0, 'lab') : this.openStation(s)); }
     if (hammer) prompt = { ...(prompt ?? { text: def.name, key: '-' }), alt: { key: 'RMB', text: 'Hold to pick up' } };
     t.prompt = prompt ? { key: prompt.key ?? key, text: prompt.text, warn: prompt.warn ?? null, alt: prompt.alt ?? null, progress: this.demo?.s === s ? this.demo.t / 1.0 : null } : null;
@@ -334,6 +365,7 @@ export class Structures {
     if (def.fuel) return D.lit && D.fuel > 0 ? `Burning · ${Math.ceil(D.fuel / 60)} min of fuel` : D.fuel > 0 ? 'Not lit' : 'Out of fuel';
     if (def.crop) return D.crop ? `${CROPS[D.crop].name} · ${Math.min(100, Math.floor(D.grow * 100))}% · water ${Math.round(D.water * 100)}%${D.fert ? ' · fertilised' : ''}` : 'Empty';
     if (def.collector) return `Water: ${Math.floor(D.level)} / 5`;
+    if (def.trap) return D.sprung ? (D.caught && this.g.dinos?.list.get(D.caught) ? `Caught: ${this.g.dinos.list.get(D.caught).displayName}! Bonk it or feed it` : 'Sprung') : D.bait ? `Baited with ${ITEMS[D.bait]?.name}` : `Catches dinos up to ${def.trap.max} m · bait it with food`;
     if (def.power?.store) return `Stored ${Math.round(D.store)} / ${def.power.store}`;
     if (def.power) return this.powered(s) ? 'Powered' : def.power.draw ? 'No power' : (def.power.gen ? 'Generating' : '');
     if (def.storage) { const n = s.inv.slots.filter(Boolean).length; return `${n} / ${def.storage} slots used`; }
@@ -467,6 +499,7 @@ export class Structures {
     if (this.powerT <= 0) { this.powerT = 1; this.updatePower(1); }
     for (const s of this.list.values()) {
       const D = s.data, def = s.def;
+      if (def.trap && host && g.dinos) this.updateTrap(s, dt);
       if (def.fuel && D.lit && D.fuel > 0) {
         D.fuel -= dt * (rain > 0.5 && s.type === 'campfire' && !this.sheltered(s) ? 2 : 1);
         if (D.fuel <= 0) { D.fuel = 0; D.lit = false; this.applyVisual(s); if (host) this.sync(s); g.audio?.play('sizzle', { pos: _v.set(s.x, s.y + 0.3, s.z), vol: 0.5 }); }
@@ -475,9 +508,10 @@ export class Structures {
       }
       if (def.crop && D.crop) {
         const C = CROPS[D.crop];
-        if (rain > 0.2) D.water = Math.min(1, D.water + dt * 0.02 * rain);
-        D.water = Math.max(0, D.water - dt / 900);
-        const rate = (D.water > 0.05 ? 1 : 0.25) * (D.fert > 0 ? 1.8 : 1) * (night ? 0.6 : 1);
+        const gh = !!def.greenhouse;
+        if (rain > 0.2 && !gh) D.water = Math.min(1, D.water + dt * 0.02 * rain);
+        D.water = Math.max(gh ? 0.35 : 0, D.water - dt / 900); // greenhouses keep their own damp air
+        const rate = (D.water > 0.05 ? 1 : 0.25) * (D.fert > 0 ? 1.8 : 1) * (night && !gh ? 0.6 : 1) * (gh ? 1.8 : 1) * (this.boosted(s) ? 1.5 : 1);
         const before = D.grow;
         D.grow = Math.min(1, D.grow + (dt / C.time) * rate);
         if (Math.floor(before * 3) !== Math.floor(D.grow * 3) || (before < 1 && D.grow >= 1)) { this.applyVisual(s); if (D.grow >= 1) g.events.emit('cropReady', { s }); }
@@ -538,6 +572,50 @@ export class Structures {
     if (g.weather) g.weather.flash = 1;
   }
 
+  updateTrap(s, dt) {
+    const g = this.g, D = s.data, T = s.def.trap;
+    if (D.sprung) {
+      // hold the catch in place
+      const d = D.caught && g.dinos.list.get(D.caught);
+      if (d && !d.tamed && d.state !== 'dead' && D.holdT > 0) {
+        D.holdT -= dt;
+        if (d.state !== 'ko') {
+          d.tangled = Math.max(d.tangled ?? 0, 0.3); d.pos.x += (s.x - d.pos.x) * Math.min(1, dt * 3); d.pos.z += (s.z - d.pos.z) * Math.min(1, dt * 3);
+          // it struggles, and stays drowsy while it is held, so bonking it works
+          if (d.state !== 'idle') d.setState('idle', 1);
+          if (!d.action && Math.random() < dt * 1.2) d.act('shake', 0.8);
+          d.torpor = Math.max(d.torpor, d.maxTorpor * T.torpor * (D.holdT / T.hold));
+        }
+      } else if (D.caught) { if (d && !d.tamed && d.state !== 'dead' && d.state !== 'ko') g.dinos.flee(d, { x: s.x, z: s.z }, 6); D.caught = null; this.sync(s); }
+      return;
+    }
+    s.trapT = (s.trapT ?? Math.random() * 0.3) - dt;
+    if (s.trapT > 0) return;
+    s.trapT = 0.25;
+    for (const d of g.dinos.list.values()) {
+      if (d.tamed || d.state === 'dead' || d.state === 'ko' || d.flying || d.hidden || d.swim || d.sp.size > T.max) continue;
+      const dd = Math.hypot(d.pos.x - s.x, d.pos.z - s.z);
+      if (dd > T.lure + 2) continue;
+      if (dd < T.r + d.radius * (d.sizeK ?? 1) * 0.5) { this.spring(s, d); return; }
+      // bait lures dinos that like it, unless they are busy being scared or angry
+      if (D.bait && d.sp.foods?.includes(D.bait) && !['flee', 'chase', 'stalk', 'charge', 'warn', 'steal'].includes(d.state)) d.lure = { x: s.x, z: s.z, until: g.time.elapsed + 3 };
+    }
+  }
+  spring(s, d) {
+    const g = this.g, D = s.data, T = s.def.trap;
+    D.sprung = true; D.caught = d.id; D.holdT = T.hold; D.bait = null; d.lure = null;
+    d.tangled = T.hold; d.torpor = Math.min(d.maxTorpor * 0.95, d.torpor + d.maxTorpor * T.torpor);
+    d.setState('idle', 3); d.alert = 1; d.mood = 'angry'; d.action = null; d.act('shake', 1);
+    if (d.carry) { g.drops?.spawn(d.carry.id, d.carry.n, d.pos.clone().add(new THREE.Vector3(0, 0.5, 0))); d.carry = null; }
+    g.audio?.play('bola', { pos: _v.set(s.x, s.y + 0.4, s.z), vol: 1.1 });
+    g.audio?.play(d.sp.call ?? 'grunt', { pos: d.pos, vol: 0.9, rate: 1.2 });
+    g.fx.stars(_v.set(d.pos.x, d.pos.y + d.rig.height * d.sizeK, d.pos.z), 5);
+    g.fx.dust(_v.set(s.x, s.y + 0.2, s.z), 6, 0xb8a080, 1);
+    this.applyVisual(s); this.sync(s);
+    g.events.emit('trapped', { s, d });
+    g.toastNear?.({ x: s.x, z: s.z }, 80, `SNAP! Your ${s.def.name} caught a ${d.sp.short}! Bonk it to knock it out, or feed it.`, '', 'dino', 5500);
+  }
+
   applyVisual(s) {
     const D = s.data, P = s.parts, def = s.def;
     const lit = def.fuel ? this.isLit(s) : s.type === 'torch_stand' ? !D.off : def.power ? this.powered(s) : false;
@@ -555,6 +633,7 @@ export class Structures {
     if (P.water) { P.water.position.y = 0.1 + Math.min(1, (D.level ?? 0) / 5) * 0.55; P.water.visible = (D.level ?? 0) > 0.05; }
     if (P.food && s.inv) P.food.visible = s.inv.slots.some(Boolean);
     if (def.crop) this.buildCrops(s);
+    if (def.trap) { if (P.armed) P.armed.visible = !D.sprung; if (P.sprung) P.sprung.visible = !!D.sprung; if (P.bait) P.bait.visible = !!D.bait && !D.sprung; }
     if (def.incubator) {
       if (D.egg && !P.eggMesh) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.6 })); m.scale.set(1, 1.3, 1); m.position.copy(P.eggAt); m.castShadow = true; s.group.add(m); P.eggMesh = m; }
       if (!D.egg && P.eggMesh) { P.eggMesh.removeFromParent(); P.eggMesh = null; }
@@ -653,6 +732,6 @@ export async function install(g) {
   g.netHandlers.wake = (m) => { g.time.elapsed = m.elapsed; g.local.sleeping = false; };
   g.structures.surfaceAt = () => 'step_wood';
   // dinos and the journal can ask what is around
-  g.scareSources = (pos, r = 20) => [...S.list.values()].filter((s) => s.def.scare && s.isLit && Math.hypot(s.x - pos.x, s.z - pos.z) < r + s.def.scare);
+  g.scareSources = (pos, r = 20) => [...S.list.values()].filter((s) => s.def.scare && (s.isLit || s.def.trophy) && Math.hypot(s.x - pos.x, s.z - pos.z) < r + s.def.scare);
   return S;
 }

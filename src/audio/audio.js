@@ -232,6 +232,27 @@ export class Audio {
     // little generative music cues when calm
     this.nextMusic -= dt;
     if (this.nextMusic <= 0) { this.nextMusic = 70 + Math.random() * 90; if (!g.danger) this.motif(night ? 'night' : 'day'); }
+    // war drums while something big is hunting you (fade in fast, out slow)
+    const want = g.danger ?? 0, cur = this.dangerLvl ?? 0;
+    this.dangerLvl = cur + (want - cur) * Math.min(1, dt * (want > cur ? 1.5 : 0.25));
+    if (this.dangerLvl > 0.04) this.drums();
+    else this.beatT = 0;
+  }
+  // tribal drums + a stalking bass line, scheduled a little ahead of time
+  drums() {
+    const c = this.ctx, bus = this.bus.music, L = this.dangerLvl;
+    const BEAT = 0.42;
+    if (!this.beatT || this.beatT < c.currentTime) { this.beatT = c.currentTime + 0.05; this.beatN = 0; }
+    const BASS = [110, 110, 130.8, 110, 82.4, 110, 98, 87.3];
+    while (this.beatT < c.currentTime + 0.25) {
+      const t = this.beatT, n = this.beatN++, k = n % 4;
+      if (k === 0 || k === 2 || (L > 0.7 && n % 8 === 7)) { this.osc(bus, 'sine', 130, 38, t, 0.32, 0.42 * L, { sweepFrac: 0.6 }); this.noise(bus, t, 0.05, 0.12 * L, { type: 'lowpass', f: 900 }); }
+      if (k === 1 || k === 3) this.osc(bus, 'triangle', 196 * (k === 3 ? 0.89 : 1), 120, t, 0.22, 0.28 * L, { sweepFrac: 0.5 });
+      if (L > 0.45) { this.noise(bus, t + BEAT / 2, 0.04, 0.06 * L, { type: 'highpass', f: 5200 }); this.noise(bus, t, 0.03, 0.04 * L, { type: 'highpass', f: 6500 }); }
+      const f = BASS[n % 8];
+      this.osc(bus, 'sawtooth', f, f, t, BEAT * 0.9, 0.07 * L, { a: 0.01, filter: { type: 'lowpass', f: 420, q: 4 } });
+      this.beatT += BEAT;
+    }
   }
 
   motif(kind) {
@@ -263,6 +284,7 @@ export class Audio {
       fail: [[392, 0], [349.2, 0.18], [311.1, 0.36], [261.6, 0.6]],
       night: [[220, 0], [207.7, 0.6], [164.8, 1.2]],
       dawn: [[392, 0], [493.9, 0.3], [587.3, 0.6], [784, 1.0]],
+      boss: [[146.8, 0], [155.6, 0.22], [146.8, 0.44], [196, 0.7], [185, 0.95], [138.6, 1.25]],
     };
     for (const [f, dt] of seqs[kind] ?? seqs.discover) { this.osc(bus, 'square', f, f, t + dt, 0.18, 0.18, { filter: { type: 'lowpass', f: 2600 } }); this.osc(bus, 'triangle', f / 2, f / 2, t + dt, 0.3, 0.3); }
   }
@@ -316,6 +338,7 @@ S.sizzle = (A, o, t) => { A.noise(o, t, 0.9, 0.35, { f: 5000, type: 'highpass', 
 S.crackle = (A, o, t) => { for (let i = 0; i < 3; i++) A.noise(o, t + Math.random() * 0.3, 0.015, 0.5, { f: 1500 + Math.random() * 3000, q: 2 }); };
 S.fire_whoosh = (A, o, t) => A.noise(o, t, 0.8, 0.6, { f: 300, f1: 900, q: 0.7, a: 0.1, color: 'pink' });
 S.creak = (A, o, t, r) => { A.osc(o, 'sawtooth', 90 * r, 55 * r, t, 1.3, 0.28, { a: 0.2, filter: { type: 'bandpass', f: 600, q: 6 }, vibrato: [7, 9] }); A.osc(o, 'sawtooth', 130 * r, 70, t + 0.2, 1.0, 0.18, { a: 0.2, filter: { type: 'bandpass', f: 900, q: 8 }, vibrato: [11, 6] }); };
+S.quake = (A, o, t) => { A.osc(o, 'sine', 60, 24, t, 0.9, 1.6); A.osc(o, 'triangle', 90, 40, t, 0.35, 0.8); A.noise(o, t, 1.6, 1.3, { color: 'brown', type: 'lowpass', f: 380, f1: 90 }); for (let i = 0; i < 8; i++) A.noise(o, t + 0.05 + Math.random() * 0.6, 0.06, 0.35, { f: 900 + Math.random() * 1600, q: 1.2 }); };
 S.tree_crash = (A, o, t) => { A.osc(o, 'sine', 70, 30, t, 0.7, 1.6); A.noise(o, t, 1.4, 1.2, { color: 'brown', type: 'lowpass', f: 700, f1: 200 }); for (let i = 0; i < 10; i++) A.noise(o, t + Math.random() * 0.8, 0.05, 0.4, { f: 1500 + Math.random() * 2500, q: 1.5 }); };
 S.timber = (A, o, t) => { A.osc(o, 'sawtooth', 300, 220, t, 0.35, 0.3, { filter: { type: 'bandpass', f: 900, q: 3 } }); A.osc(o, 'sawtooth', 340, 250, t + 0.32, 0.5, 0.3, { filter: { type: 'bandpass', f: 900, q: 3 } }); };
 S.scan = (A, o, t) => { A.osc(o, 'square', 1200, 1200, t, 0.04, 0.12, { filter: { type: 'lowpass', f: 4000 } }); };

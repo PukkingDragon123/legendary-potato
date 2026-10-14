@@ -114,7 +114,7 @@ export class Dinos {
     for (const p of g.world.pois) {
       const dp = Math.hypot(x - p.x, z - p.z);
       if (dp > p.radius + 60) continue;
-      if (p.id === 'rexnest') opts.push([SPECIES.rex, 4]);
+      if (p.id === 'rexnest') opts.push([SPECIES.rex, 1.5]);
       if (p.id === 'raptorden') opts.push([SPECIES.raptor, 5]);
       if (p.id === 'ptera') opts.push([SPECIES.ptera, 5]);
       if (p.id === 'tarpits') opts.push([SPECIES.ankylo, 1]);
@@ -138,7 +138,7 @@ export class Dinos {
     const now = g.time.elapsed;
     // despawn far wild dinos
     for (const d of [...this.list.values()]) {
-      if (d.tamed || d.state === 'ko' && d.tame.progress > 0) continue;
+      if (d.tamed || d.sp.alpha || d.state === 'ko' && d.tame.progress > 0) continue;
       let near = Infinity; for (const p of players) near = Math.min(near, d.dist2(p.pos));
       if (near > DESPAWN_R * DESPAWN_R) { const c = this.cells.get(d.cell); if (c) c.spawned = Math.max(0, c.spawned - 1); this.despawn(d); }
     }
@@ -241,6 +241,7 @@ export class Dinos {
     d.food = Math.max(0, d.food - dt * 0.02);
     if (d.herd?.alarm) d.herd.alarm = Math.max(0, d.herd.alarm - dt);
     if (d.state === 'dead') { d.wantSpeed = 0; return; }
+    if (d.hold > 0) { d.hold -= dt; d.wantSpeed = 0; return; } // scripted (alpha dive)
     // torpor + knockouts
     if (d.torpor > 0 && d.state !== 'ko') d.torpor = Math.max(0, d.torpor - dt * d.maxTorpor * 0.02);
     if (d.state === 'ko') {
@@ -274,7 +275,7 @@ export class Dinos {
         if (B.predator) {
           if (scare && d.state !== 'flee') { const s = scare.pos ?? scare; this.flee(d, s, 3); d.mood = 'angry'; }
           else if (d.seen && (d.food < 85 || B.boss || d.dist2(d.seen.pos) < 100)) {
-            if (d.state !== 'chase' && d.state !== 'attack') { d.setState('stalk', 4 + Math.random() * 4); if (B.boss || sp.stats.roar) { d.act('roar', 1.6); g.audio?.play('roar', { pos: d.pos, vol: 1.3, ref: 25 }); g.rig.addTrauma(0.25 * Math.max(0, 1 - d.pos.distanceTo(g.local.pos) / 40)); this.noise(d.pos, 60, 0.7); } else g.audio?.play(sp.call ?? 'growl', { pos: d.pos, vol: 0.9 }); }
+            if (!['stalk', 'chase', 'attack', 'charge', 'backoff', 'hunt'].includes(d.state)) { d.setState('stalk', 4 + Math.random() * 4); if (B.boss || sp.stats.roar) { d.act('roar', 1.6); g.audio?.play('roar', { pos: d.pos, vol: 1.3, ref: 25 }); g.rig.addTrauma(0.25 * Math.max(0, 1 - d.pos.distanceTo(g.local.pos) / 40)); this.noise(d.pos, 60, 0.7); } else g.audio?.play(sp.call ?? 'growl', { pos: d.pos, vol: 0.9 }); }
             d.target = d.seen;
           } else if (d.food < 40 && Math.random() < 0.05) {
             // hunt the nearest smaller wild herbivore
@@ -305,6 +306,8 @@ export class Dinos {
     const away = (p, k = 1) => { yaw = Math.atan2(-(d.pos.x - p.x), -(d.pos.z - p.z)); speed = k; };
     switch (d.state) {
       case 'wander': {
+        // a baited trap smells too good to ignore
+        if (d.lure && d.lure.until > g.time.elapsed) { toward(d.lure, st.speed * 0.9); if (d.dist2(d.lure) < 2) speed *= 0.5; break; }
         // herd cohesion around the leader, else meander near home
         if (!d.goal || d.dist2(d.goal) < 4 || Math.random() < dt * 0.05) {
           const base = d.herd?.leader && d.herd.leader !== d && d.herd.leader.state !== 'dead' ? d.herd.leader.pos : d.home;
@@ -579,15 +582,23 @@ export class Dinos {
     }
     if (d.tangled > 0) { d.tangled -= dt; d.wantSpeed = 0; d.speed *= Math.max(0, 1 - dt * 8); if (Math.random() < dt * 2) d.act('shake', 0.6); }
     d.yaw += Math.max(-turnRate * dt, Math.min(turnRate * dt, dy));
-    const acc = d.wantSpeed > d.speed ? (sp.size > 8 ? 3 : 8) : 10;
-    d.speed += Math.max(-acc * dt, Math.min(acc * dt, d.wantSpeed - d.speed));
+    const want = d.wantSpeed * (d.speedMul ?? 1);
+    const acc = want > d.speed ? (sp.size > 8 ? 3 : 8) * (d.speedMul ?? 1) : 10;
+    d.speed += Math.max(-acc * dt, Math.min(acc * dt, want - d.speed));
     if (d.action && ['eat', 'drink', 'roar', 'call', 'tailwhip'].includes(d.action.name)) d.speed *= Math.max(0, 1 - dt * 6);
     const fx = -Math.sin(d.yaw), fz = -Math.cos(d.yaw);
     d.pos.x += fx * d.speed * dt; d.pos.z += fz * d.speed * dt;
     // push out of solid stuff (trees, rocks, buildings, van)
     if (d.speed > 0.05 || d.state === 'charge') {
       const p = { x: d.pos.x, y: d.pos.y, z: d.pos.z };
-      g.physics.pushCircle(p, d.radius * d.sizeK, d.pos.y, d.pos.y + d.rig.height * d.sizeK * 0.7, { step: 0.5, skipSmall: true, onHit: (sh) => { if (sh.tree && sp.size > 6 && d.state === 'charge' && sh.tree.radius < 0.5) g.act('hitTree', { i: sh.tree.i, dmg: 999, dirX: fx, dirZ: fz }); } });
+      g.physics.pushCircle(p, d.radius * d.sizeK, d.pos.y, d.pos.y + d.rig.height * d.sizeK * 0.7, { step: 0.5, skipSmall: true, onHit: (sh) => {
+        if (sh.tree && sp.size > 6 && d.state === 'charge' && sh.tree.radius < 0.5) g.act('hitTree', { i: sh.tree.i, dmg: 999, dirX: fx, dirZ: fz });
+        // big dinos that are charging, chasing or stampeding go straight through your walls
+        if (sh.kind === 'build' && sh.ref && sp.size >= 4 && !d.tamed && ['charge', 'flee', 'chase'].includes(d.state) && d.speed > 2.5 && g.isHost) {
+          const now = g.time.elapsed;
+          if ((d.smashT ?? 0) < now - 0.6) { d.smashT = now; g.building?.damagePiece(sh.ref, sp.size * d.speed * 2.2 * (d.sp.alpha ? 2 : 1) * (d.state === 'flee' ? 0.5 : 1), d.sp.alpha ? d.displayName : `A ${sp.short}`); }
+        }
+      } });
       d.pos.x = p.x; d.pos.z = p.z;
     }
     // vertical: terrain / water / flight
@@ -629,7 +640,7 @@ export class Dinos {
   animate(d, dt) {
     const cam = this.g.engine.camera.position;
     const dist2 = (d.pos.x - cam.x) ** 2 + (d.pos.z - cam.z) ** 2;
-    d.root.visible = dist2 < 360 * 360;
+    d.root.visible = !d.hidden && dist2 < 360 * 360;
     if (!d.root.visible) return;
     // cheaper animation far away
     const skip = dist2 > 120 * 120 ? 3 : dist2 > 60 * 60 ? 1 : 0;
@@ -649,6 +660,7 @@ export class Dinos {
   raycast(o, dir, reach) {
     let best = null;
     for (const d of this.list.values()) {
+      if (d.hidden) continue;
       const r = d.radius * d.sizeK * 1.1 + 0.2;
       const cy = d.pos.y + Math.min(d.rig.height * 0.6, 2.5) * d.sizeK;
       // test a few spheres along the body
@@ -678,6 +690,14 @@ export class Dinos {
       else this.netInterp(d, dt);
       this.animate(d, dt);
     }
+    // danger level for the music: something is hunting YOU
+    let danger = 0;
+    for (const d of this.list.values()) {
+      if (d.tamed || d.state === 'dead' || d.hidden || !d.sp.predator) continue;
+      if (!['chase', 'stalk', 'charge', 'hunt'].includes(d.state) || d.dist2(g.local.pos) > 45 * 45) continue;
+      if (d.target === g.local || !g.isHost) danger = Math.max(danger, d.sp.alpha ? 1 : d.sp.size > 6 ? 0.85 : 0.6);
+    }
+    g.danger = Math.max(danger, g.bosses?.barFor ? 1 : 0);
     // grass + fern pushers: the nearest dinos bend the vegetation they walk through
     let pi = g.pusherBase ?? 3;
     const cam = g.engine.camera.position;
@@ -690,6 +710,28 @@ export class Dinos {
     this.netT -= dt;
     if (g.net?.isHost && this.netT <= 0) { this.netT = 0.1; this.broadcast(); }
     this.updateCorpses(dt);
+    // the circle of life: dinos leave dung around (fertiliser + Dung-o-Diesel)
+    this.poopT = (this.poopT ?? 3) - dt;
+    if (g.isHost && this.poopT <= 0) { this.poopT = 1; this.poop(); }
+  }
+  poop() {
+    const g = this.g;
+    if (!g.drops) return;
+    let n = 0;
+    for (const l of g.drops.list.values()) if (l.id === 'dung') n++;
+    if (n >= 24) return;
+    for (const d of this.list.values()) {
+      if (d.sp.size < 1.5 || d.flying || d.swim || d.hidden || d.state === 'dead' || d.state === 'ko') continue;
+      if (Math.random() > (d.tamed ? 1 / 240 : 1 / 600) * Math.min(2, Math.max(0.6, d.sp.size / 4))) continue;
+      let near = false;
+      for (const p of g.players.values()) if (d.dist2(p.pos) < 90 * 90) { near = true; break; }
+      if (!near) continue;
+      const back = d.rig.len * d.sizeK * 0.42;
+      const pos = new THREE.Vector3(d.pos.x + Math.sin(d.yaw) * back, d.pos.y + Math.max(0.4, d.rig.height * d.sizeK * 0.45), d.pos.z + Math.cos(d.yaw) * back);
+      g.drops.spawn('dung', d.sp.size > 6 ? 2 : 1, pos, new THREE.Vector3(Math.sin(d.yaw) * 0.6, 0, Math.cos(d.yaw) * 0.6));
+      g.audio?.play('thud', { pos, vol: 0.35, rate: 1.4 });
+      if (!this.toldPoop && d.dist2(g.local.pos) < 30 * 30) { this.toldPoop = true; g.ui?.toast(`The ${d.displayName} just left you a present. Dino Dung: fertiliser AND fuel!`, '', 'dino', 5000); }
+    }
   }
   updateCorpses() { for (const c of this.corpses) if (this.g.time.elapsed - c.at > 900) { this.despawn(c.d); c.gone = true; } this.corpses = this.corpses.filter((c) => !c.gone); }
 
@@ -699,7 +741,7 @@ export class Dinos {
     for (const d of this.list.values()) {
       let near = false; for (const p of g.players.values()) if (d.dist2(p.pos) < 220 * 220) { near = true; break; }
       if (!near) continue;
-      arr.push([d.id, d.sp.id, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), +d.yaw.toFixed(3), d.state, +d.speed.toFixed(2), d.action?.name ?? '', +(d.hp / d.maxHp).toFixed(2), +(d.torpor / d.maxTorpor).toFixed(2), d.tamed ? 1 : 0, d.name ?? '', d.baby ? +d.growth.toFixed(2) : 1, d.owner ?? '', +(d.tame.progress).toFixed(2)]);
+      arr.push([d.id, d.sp.id, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), +d.yaw.toFixed(3), d.state, +d.speed.toFixed(2), d.action?.name ?? '', +(d.hp / d.maxHp).toFixed(2), +(d.torpor / d.maxTorpor).toFixed(2), d.tamed ? 1 : 0, d.name ?? '', d.baby ? +d.growth.toFixed(2) : 1, d.owner ?? '', +(d.tame.progress).toFixed(2), d.sp.alpha ?? '']);
     }
     g.net.broadcast('dinos', arr);
   }
@@ -707,10 +749,10 @@ export class Dinos {
     const seen = new Set();
     const now = performance.now() / 1000;
     for (const a of arr) {
-      const [id, sid, x, y, z, yaw, state, speed, act, hp, tor, tamed, name, growth, owner, tp] = a;
+      const [id, sid, x, y, z, yaw, state, speed, act, hp, tor, tamed, name, growth, owner, tp, alpha] = a;
       seen.add(id);
       let d = this.list.get(id);
-      if (!d) { d = new Dino(this, SPECIES[sid], { id, x, y, z, yaw, baby: growth < 1, growth, tamed: !!tamed, name: name || null, owner: owner || null }); this.list.set(id, d); }
+      if (!d) { d = new Dino(this, this.speciesOf(sid, alpha), { id, x, y, z, yaw, baby: growth < 1, growth, tamed: !!tamed, name: name || null, owner: owner || null }); this.list.set(id, d); }
       d.netBuf = d.netBuf || [];
       d.netBuf.push({ at: now, x, y, z, yaw }); if (d.netBuf.length > 10) d.netBuf.shift();
       d.state = state; d.speed = speed; d.hp = hp * d.maxHp; d.torpor = tor * d.maxTorpor; d.tamed = !!tamed; d.name = name || null; d.owner = owner || null; d.tame.progress = tp;
@@ -741,11 +783,12 @@ export class Dinos {
   }
   command(d, order) { this.g.taming?.command(d, order); }
   rename(d, name) { d.name = name; this.g.net?.broadcast?.('dinoName', { id: d.id, name }); }
-  serialize() { return this.tamed().map((d) => ({ id: d.id, sp: d.sp.id, x: d.pos.x, y: d.pos.y, z: d.pos.z, yaw: d.yaw, name: d.name, owner: d.owner, personality: d.personality, order: d.order, happy: d.happy, level: d.level, xp: d.xp, hp: d.hp, food: d.food, baby: d.baby, growth: d.growth, saddle: d.saddle, job: d.job ? { id: d.job.id, x: d.job.anchor.x, z: d.job.anchor.z } : null })); }
+  speciesOf(id, alpha) { return (alpha && this.g.bosses?.species(alpha)) || SPECIES[id]; }
+  serialize() { return this.tamed().map((d) => ({ id: d.id, sp: d.sp.id, alpha: d.sp.alpha, x: d.pos.x, y: d.pos.y, z: d.pos.z, yaw: d.yaw, name: d.name, owner: d.owner, personality: d.personality, order: d.order, happy: d.happy, level: d.level, xp: d.xp, hp: d.hp, food: d.food, baby: d.baby, growth: d.growth, saddle: d.saddle, job: d.job ? { id: d.job.id, x: d.job.anchor.x, z: d.job.anchor.z } : null })); }
   load(arr) {
     for (const d of this.tamed()) this.despawn(d);
     for (const r of arr ?? []) {
-      const d = this.spawn(r.sp, r.x, r.z, { id: r.id, tamed: true, name: r.name, owner: r.owner, personality: r.personality, order: r.order, happy: r.happy, level: r.level, xp: r.xp, hp: r.hp, food: r.food, baby: r.baby, growth: r.growth, saddle: r.saddle, yaw: r.yaw });
+      const d = this.spawn(this.speciesOf(r.sp, r.alpha), r.x, r.z, { id: r.id, tamed: true, name: r.name, owner: r.owner, personality: r.personality, order: r.order, happy: r.happy, level: r.level, xp: r.xp, hp: r.hp, food: r.food, baby: r.baby, growth: r.growth, saddle: r.saddle, yaw: r.yaw });
       d.state = r.order === 'stay' ? 'stay' : 'follow';
       if (r.job) d.job = { id: r.job.id, anchor: new THREE.Vector3(r.job.x, 0, r.job.z), t: 0 };
       this.g.taming?.onTamedLoaded?.(d);

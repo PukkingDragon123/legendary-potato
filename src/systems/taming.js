@@ -43,7 +43,7 @@ export class Taming {
     const held = g.inventory.held(), hid = held?.id ?? null, hdef = hid ? ITEMS[hid] : null;
     const t = { dist, kind: 'dino', dino: d, label: d.tamed ? `${d.displayName} (${sp.short})` : `${sp.short}${d.baby ? ' (baby)' : ''}`, hp: d.hp / d.maxHp, hpColor: d.tamed ? '#7bc86c' : sp.predator ? '#e04a3a' : '#e8a040' };
     if (d.state === 'dead') {
-      t.label = `${sp.short} carcass`; t.hp = null; t.info = 'Harvest meat, hide, bones and DNA';
+      t.label = d.sp.alpha ? `${d.displayName}'s carcass` : `${sp.short} carcass`; t.hp = null; t.info = 'Harvest meat, hide, bones and DNA';
       const c = g.dinos.corpses.find((x) => x.d === d);
       if (c) { t.prompt = { key, text: 'Harvest' }; t.onInteract = () => g.local.startAction('chop', 0.6, () => g.act('dino_harvest', { id: d.id }), 0.5, { faceCam: true }); }
       return t;
@@ -174,7 +174,7 @@ export class Taming {
   completeTame(d, by) {
     const g = this.g;
     d.tamed = true; d.owner = by ?? g.local.id;
-    d.name = g.dinos.randomName();
+    d.name = d.sp.alphaName ?? g.dinos.randomName();
     d.personality = PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)].id;
     d.order = 'follow'; d.happy = 80; d.food = Math.max(d.food, 60);
     d.torpor = 0; d.state = 'follow'; d.mood = 'happy'; d.netted = false;

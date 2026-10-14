@@ -75,6 +75,7 @@ const TREE_FACTS = {
   dead: ['Dead Tree', 'Deceased. Good firewood though.'],
 };
 const NODE_FACTS = {
+  dung: ['zoo', 'Dino Dung', 'Fresh-ish. Rich in methane. Could power a van, honestly. Also great for crops.', 'dung'],
   boulder: ['geo', 'Granite boulder', 'A rock. You scanned a rock. The scanner is unimpressed.'],
   boulder_big: ['geo', 'Glacial erratic', 'A very big rock, dropped here by something very big.'],
   rock_small: ['geo', 'River stones', 'Smooth, throwable, emotionally supportive.'],
@@ -173,7 +174,7 @@ export class Research {
       case 'tree': { const k = tgt.tree.key; const f = TREE_FACTS[k] ?? [SPECIES[k]?.name ?? k, 'A tree.']; return { key: 'tree:' + k, title: f[0], fact: f[1], cat: 'bio', rp: 2 }; }
       case 'node': { const id = tgt.node.type ?? tgt.node.def?.id; const f = NODE_FACTS[id] ?? ['geo', tgt.node.def?.name ?? 'Thing', 'Interesting.']; return { key: 'node:' + id, title: f[1], fact: f[2], cat: f[0], rp: f[0] ? (id === 'crystal' || id === 'ore_iron' ? 4 : 2) : 0, insight: f[3] }; }
       case 'dino': { const d = tgt.dino, sp = d.sp; const info = g.dinos?.scanInfo?.(d) ?? { fact: sp.blurb ?? '', insight: null }; return { key: 'dino:' + sp.id, title: sp.name, fact: info.fact, cat: 'zoo', rp: sp.rp ?? 4, insight: info.insight, dino: d }; }
-      case 'track': return { key: 'track:' + tgt.species, title: 'Footprints: ' + (tgt.label ?? tgt.species), fact: tgt.fact ?? 'Fresh tracks. Something big walked here.', cat: 'paleo', rp: 2 };
+      case 'track': return { key: 'track:' + tgt.species, title: tgt.label ?? 'Footprints', fact: tgt.fact ?? 'Fresh tracks. Something big walked here.', cat: 'paleo', rp: 2, trail: tgt.trail };
       case 'nest': return { key: 'nest:' + tgt.species, title: tgt.label, fact: tgt.fact ?? 'A nest! The parents are probably nearby. Probably watching. Probably hungry.', cat: 'paleo', rp: 3 };
       case 'dung': return { key: 'dung:' + (tgt.species ?? 'x'), title: 'Dino Dung', fact: 'Fresh. Rich in methane. Could power a van, honestly.', cat: 'zoo', rp: 2, insight: 'dung' };
       case 'water': return { key: 'water', title: 'Water', fact: 'H2O, 3% tadpole. Boil before drinking.', cat: 'bio', rp: 1 };

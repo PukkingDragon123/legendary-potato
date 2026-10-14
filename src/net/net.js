@@ -171,7 +171,7 @@ export class Net {
   snapshot() {
     const g = this.g;
     const sys = {};
-    for (const k of ['van', 'structures', 'building', 'research']) { try { sys[k] = g.saveables[k]?.save(); } catch (e) { console.warn(e); } }
+    for (const k of ['van', 'structures', 'building', 'research', 'bosses', 'story']) { try { sys[k] = g.saveables[k]?.save(); } catch (e) { console.warn(e); } }
     return {
       time: { e: g.time.elapsed, s: g.time.startTod }, weather: g.weather.kind,
       trees: g.flora.trees.filter((t) => !t.alive).map((t) => t.i),
@@ -187,7 +187,7 @@ export class Net {
     for (const i of s.trees ?? []) { const t = g.flora.trees[i]; if (t?.alive) { t.alive = false; g.flora.detach(t); } }
     g.nodes.load(s.nodes);
     for (const d of s.drops ?? []) g.drops?.spawn(d.id, d.n, new THREE.Vector3(d.x, d.y, d.z), new THREE.Vector3(), { nid: d.nid, fromNet: true });
-    for (const k of ['research', 'structures', 'building', 'van']) { const sv = g.saveables[k]; if (sv && s.sys?.[k] !== undefined) { try { sv.load(s.sys[k]); } catch (e) { console.warn('welcome load', k, e); } } }
+    for (const k of ['research', 'structures', 'building', 'van', 'bosses', 'story']) { const sv = g.saveables[k]; if (sv && s.sys?.[k] !== undefined) { try { sv.load(s.sys[k]); } catch (e) { console.warn('welcome load', k, e); } } }
     g.discovered = new Set(s.discovered ?? ['crash']);
     if (s.spawn) g.local.teleport(s.spawn.x, s.spawn.y, s.spawn.z);
   }
@@ -221,6 +221,7 @@ function prepay(g, type, data) {
     case 'st_place': return inv.remove(data.item ?? data.type, 1);
     case 'st_plant': return inv.remove(data.seed, 1);
     case 'st_egg': return inv.remove(data.egg, 1);
+    case 'st_bait': return inv.remove(data.item, 1);
     case 'b_place': return take(COSTS[data.kind][data.mat]);
     case 'van_repair': { const R = REPAIRS[data.id]; return take(R.cost ?? { [R.item]: 1 }); }
     case 'van_socket': return inv.remove(data.id, 1);

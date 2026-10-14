@@ -159,6 +159,12 @@ P('rug', 'Patchwork Rug', { desc: 'Ties the room together.' });
 P('planter', 'Planter', { desc: 'A potted fern. Very homey.' });
 P('hammock', 'Hammock', { desc: 'Sleep swinging between two posts.' });
 P('skull_trophy', 'Skull Trophy', { desc: 'A big skull on a stick. Tells raptors who is boss.' });
+P('greenhouse', 'Greenhouse', { desc: 'A glass hut around one big crop bed. Plants grow faster, day AND night, and never dry out.' });
+P('trap_snare', 'Snare Trap', { desc: 'A bent sapling and a rope loop. Bait it with food a dino likes and wait. Holds dinos up to Gallimimus size.' });
+P('trap_net', 'Spring Net Trap', { desc: 'Four posts and a heavy net. Bait it and it catches anything up to Dilophosaurus size.' });
+P('trophy_gnasher', 'Gnasher\'s Tooth', { desc: 'Old Gnasher\'s biggest tooth, mounted. Predators give your camp a VERY wide berth.', stack: 1 });
+P('trophy_momma', 'Big Momma\'s Scale', { desc: 'A sail scale from the Terror of Mirror Lake. Scares predators, and crops nearby grow faster (lucky!).', stack: 1 });
+P('trophy_razor', 'Razor\'s Claw', { desc: 'The alpha raptor\'s sickle claw. Predators keep their distance from your camp.', stack: 1 });
 
 // ------------------------------------------------------------------ van + time machine parts
 const V = (id, name, opt) => def(id, name, 'part', { stack: 5, model: opt.model ?? 'part', ...opt });

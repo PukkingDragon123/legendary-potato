@@ -70,7 +70,8 @@ export class Drops {
     }
     if (!best) return null;
     const d = best;
-    return { dist: bt, kind: 'drop', label: `${ITEMS[d.id].name}${d.n > 1 ? ' ×' + d.n : ''}`, interact: 'Pick up', onInteract: () => { this.game.local.startAction('pickup', 0.35, () => this.pickup(d)); } };
+    const scan = d.id === 'dung' ? () => ({ key: 'dung:fresh', title: 'Fresh Dino Dung', fact: 'Still warm. Rich in methane. Could power a van, honestly.', cat: 'zoo', rp: 2, insight: 'dung' }) : undefined;
+    return { dist: bt, kind: 'drop', label: `${ITEMS[d.id].name}${d.n > 1 ? ' ×' + d.n : ''}`, interact: 'Pick up', scan, onInteract: () => { this.game.local.startAction('pickup', 0.35, () => this.pickup(d)); } };
   }
 
   update(dt) {
@@ -99,7 +100,8 @@ export class Drops {
       d.mesh.position.copy(d.pos);
       if (d.age > 900 && g.isHost) { this.remove(d.nid); g.net?.broadcast?.('dropGone', { nid: d.nid }); }
       // sparkle
-      if (d.rest && Math.random() < dt * 0.5) g.fx.sprite('spark', d.pos.x + (Math.random() - 0.5) * 0.2, d.pos.y + 0.15, d.pos.z + (Math.random() - 0.5) * 0.2, { life: 0.5, size: 0.08, vy: 0.3, color: 0xfff0b0 });
+      if (d.id === 'dung') { if (d.rest && Math.random() < dt * 0.5) g.fx.sprite('puff', d.pos.x, d.pos.y + 0.2, d.pos.z, { life: 1.6, size: 0.22, vy: 0.35, grow: 0.6, alpha: 0.3, color: 0x9aa048, wobble: 1 }); }
+      else if (d.rest && Math.random() < dt * 0.5) g.fx.sprite('spark', d.pos.x + (Math.random() - 0.5) * 0.2, d.pos.y + 0.15, d.pos.z + (Math.random() - 0.5) * 0.2, { life: 0.5, size: 0.08, vy: 0.3, color: 0xfff0b0 });
     }
   }
   serialize() { return [...this.list.values()].map((d) => [d.id, d.n, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), d.dur ?? null]); }

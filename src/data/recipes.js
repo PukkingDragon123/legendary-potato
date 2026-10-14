@@ -47,6 +47,9 @@ r('crop_plot', 'crop_plot', 1, { plank: 4, dung: 2, fiber: 6 }, { ...WB, cat: 'f
 r('water_collector', 'water_collector', 1, { plank: 6, hide: 2, resin: 2 }, { ...WB, cat: 'camp', time: 2.5, unlock: 'farming' });
 r('torch_stand', 'torch_stand', 1, { stick: 3, fiber: 3, resin: 1 }, { ...WB, cat: 'camp', time: 1.2 });
 r('feed_trough', 'feed_trough', 1, { plank: 8, rope: 2 }, { ...WB, cat: 'dinos', time: 2.5, unlock: 'tame_basics' });
+r('greenhouse', 'greenhouse', 1, { plank: 10, glass: 8, dung: 3, fiber: 6 }, { ...WB, cat: 'farm', time: 4, unlock: 'farming' });
+r('trap_snare', 'trap_snare', 1, { stick: 4, rope: 3, stone: 2 }, { ...WB, cat: 'dinos', time: 2, unlock: 'tame_basics' });
+r('trap_net', 'trap_net', 1, { log: 4, rope: 10, hide: 2 }, { ...WB, cat: 'dinos', time: 3, unlock: 'tranquilizers' });
 r('kiln', 'kiln', 1, { clay: 12, stone: 10 }, { ...WB, cat: 'camp', time: 3, unlock: 'pottery' });
 r('smoker', 'smoker', 1, { plank: 6, stone: 8, clay: 4 }, { ...WB, cat: 'camp', time: 3, unlock: 'cooking' });
 r('saddle_small', 'saddle_small', 1, { hide: 4, rope: 3, plank: 2 }, { ...WB, cat: 'dinos', time: 3, unlock: 'saddles' });

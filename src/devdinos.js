@@ -6,6 +6,7 @@ import { Sky } from './world/sky.js';
 import { patchMaterial } from './gfx/shaderlib.js';
 import { SPECIES } from './entities/dinoSpecies.js';
 import { buildDino, DinoRig } from './entities/dinoModel.js';
+import { alphaSpecies } from './systems/bosses.js';
 import { Character, PRESETS } from './entities/character.js';
 
 export function runDinoStudio(qs) {
@@ -18,11 +19,13 @@ export function runDinoStudio(qs) {
   const gap = parseFloat(qs.get('gap') || '2.6');
   const list = [];
   let x = 0;
-  const widths = ids.map((id) => Math.max(1.2, SPECIES[id].size * 0.55));
+  // 'alpha:gnasher' shows an alpha
+  const spOf = (id) => (id.startsWith('alpha:') ? alphaSpecies(id.slice(6)) : SPECIES[id]);
+  const widths = ids.map((id) => Math.max(1.2, spOf(id).size * 0.55));
   const total = widths.reduce((a, b) => a + b, 0) + gap * (ids.length - 1);
   x = -total / 2;
   for (const [i, id] of ids.entries()) {
-    const sp = SPECIES[id];
+    const sp = spOf(id);
     const rig = buildDino(sp, { baby: qs.get('baby') === '1' });
     x += widths[i] / 2;
     rig.root.position.set(x, 0, 0);

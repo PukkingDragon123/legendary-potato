@@ -21,7 +21,7 @@ export async function installExtras(game) {
   // ---------------------------------------------------------------- optional big systems (loaded lazily)
   const mods = await Promise.allSettled([
     import('./structures.js'), import('./building.js'), import('../entities/van.js'), import('./research.js'),
-    import('../ui/computer.js'), import('./journal.js'), import('./story.js'), import('./coop.js'), import('../entities/dinos.js'), import('./save.js'), import('../net/net.js'), import('./taming.js'), import('./weapons.js'),
+    import('../ui/computer.js'), import('./journal.js'), import('./story.js'), import('./coop.js'), import('../entities/dinos.js'), import('./bosses.js'), import('./tracks.js'), import('./save.js'), import('../net/net.js'), import('./taming.js'), import('./weapons.js'),
   ]);
   for (const m of mods) {
     if (m.status === 'fulfilled' && m.value.install) { try { await m.value.install(g); } catch (e) { console.error('install failed', e); } }
@@ -208,6 +208,12 @@ export async function installExtras(game) {
   };
 
   // misc helpers used by systems
+  // a toast for everyone standing near something that just happened (host -> clients)
+  g.toastNear = (pos, r, text, kind = '', icon = null, dur = 4000) => {
+    if (Math.hypot(g.local.pos.x - pos.x, g.local.pos.z - pos.z) < r) g.ui?.toast(text, kind, icon, dur);
+    g.net?.broadcast?.('toastNear', { x: pos.x, z: pos.z, r, text, kind, icon, dur });
+  };
+  g.netHandlers.toastNear = ({ x, z, r, text, kind, icon, dur }) => { if (Math.hypot(g.local.pos.x - x, g.local.pos.z - z) < r) g.ui?.toast(text, kind, icon, dur); };
   g.anyFriendNear = () => { for (const p of g.players.values()) if (!p.local && p.pos.distanceTo(g.local.pos) < 60) return true; return false; };
   g.sendChat = (text) => { g.ui?.chat(g.local.name, text, '#f2b630'); g.net?.send?.('chat', { text }); g.local.talk = 0.9; setTimeout(() => (g.local.talk = 0), Math.min(3000, text.length * 70)); };
   void BIOME; void SPECIES;

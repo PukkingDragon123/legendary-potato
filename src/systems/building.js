@@ -374,6 +374,21 @@ export class Building {
     };
     A.b_door = ({ id, open }) => { const pc = this.pieces.get(id); if (!pc) return; this.setDoor(pc, open); g.net?.broadcast?.('bDoor', { id, open }); };
   }
+  // big angry dinos (and stampedes) wreck walls (host)
+  damagePiece(pc, dmg, who = 'Something') {
+    const g = this.g;
+    if (!this.pieces.has(pc.id)) return;
+    pc.hp = (pc.hp ?? MATS[pc.mat].hp) - dmg;
+    g.fx.dust(_v.copy(pc.wpos).add(new THREE.Vector3(0, 0.8, 0)), 3, 0xb8a888, 1);
+    g.audio?.play('creak', { pos: pc.wpos, vol: 0.8 });
+    if (pc.hp > 0) return;
+    this.removePiece(pc.id);
+    g.net?.broadcast?.('bGone', { id: pc.id });
+    g.audio?.play('demolish', { pos: pc.wpos });
+    g.fx.dust(_v.copy(pc.wpos).add(new THREE.Vector3(0, 0.8, 0)), 10, 0xb8a888, 1.3);
+    this.collapse(pc.bid);
+    if ((this.toldSmash ?? -99) < g.time.elapsed - 30) { this.toldSmash = g.time.elapsed; g.toastNear?.(pc.wpos, 90, `CRASH! ${who} smashed through your ${MATS[pc.mat].name} ${PIECE[pc.kind].name}!`, 'warn', 'dino', 4500); }
+  }
   collapse(bid, by) {
     for (let pass = 0; pass < 6; pass++) {
       let any = false;

@@ -630,7 +630,7 @@ export class UI {
       this.drawMapMarkers();
     }
     legend.innerHTML = `<div class="section-title">LEGEND</div>`;
-    for (const [ic, label] of [['friend', 'You & friends'], ['van', 'The Van'], ['dino', 'Tamed dinos'], ['poi', 'Discovered places'], ['nest', 'Nests'], ['pin', 'Pins (right-click)']]) {
+    for (const [ic, label] of [['friend', 'You & friends'], ['van', 'The Van'], ['dino', 'Tamed dinos / trail'], ['poi', 'Discovered places'], ['skull', 'Alpha lairs'], ['pin', 'Pins (right-click)']]) {
       const row = h('div', 'req'); row.appendChild(iconCanvas(ic, 2)); row.appendChild(h('span', '', label)); legend.appendChild(row);
     }
     legend.appendChild(h('div', 'stats', 'Scroll to zoom. Explore to reveal the map.'));
@@ -644,7 +644,8 @@ export class UI {
     ctx.clearRect(0, 0, M.mk.width, M.mk.height);
     const w = g.world, k = M.mk.width / w.size;
     const put = (icon, x, z) => { const ic = iconCanvas(icon, 2); ctx.drawImage(ic, (x + w.half) * k - 12, (z + w.half) * k - 12); };
-    for (const poi of g.discoveredPOIs?.() ?? []) put('poi', poi.x, poi.z);
+    for (const poi of g.discoveredPOIs?.() ?? []) put(g.bosses?.lairOf?.(poi.id) ? 'skull' : 'poi', poi.x, poi.z);
+    if (g.tracks?.trail) put('dino', g.tracks.trail.mx ?? g.tracks.trail.x, g.tracks.trail.mz ?? g.tracks.trail.z);
     for (const pin of g.pins ?? []) put('pin', pin.x, pin.z);
     if (g.van) put('van', g.van.pos.x, g.van.pos.z);
     for (const d of g.dinos?.tamed() ?? []) put('dino', d.pos.x, d.pos.z);

@@ -211,6 +211,36 @@ B.crop_plot = () => {
   return { g, col: [col(0, 0.12, 0, 0.92, 0.12, 0.92)], parts, anchors: {} };
 };
 
+B.greenhouse = () => {
+  // a glass hut around one big crop bed; plants grow faster day and night
+  const g = new THREE.Group(), parts = {};
+  for (const sz of [-1, 1]) g.add(box(1.84, 0.25, 0.08, SM.plank(), 0, 0.125, sz * 0.88, 0.01, 0.6));
+  for (const sx of [-1, 1]) g.add(box(0.08, 0.25, 1.7, SM.plank(), sx * 0.88, 0.125, 0, 0.01, 0.6));
+  const soil = box(1.7, 0.18, 1.7, SM.soil(), 0, 0.12, 0, 0, 0.6); g.add(soil); parts.soil = soil;
+  const crops = new THREE.Group(); g.add(crops); parts.crops = crops;
+  const W = 1.3, Hh = 1.7, R = 2.35;
+  // frame
+  for (const [x, z] of [[-W, -W], [W, -W], [-W, W], [W, W]]) g.add(at(log(0.045, Hh), x, Hh / 2, z));
+  for (const z of [-W, W]) g.add(at(log(0.035, W * 2), 0, Hh, z, 0, 0, Math.PI / 2));
+  for (const x of [-W, W]) g.add(at(log(0.035, W * 2), x, Hh, 0, Math.PI / 2, 0, 0));
+  g.add(at(log(0.04, W * 2 + 0.1), 0, R, 0, Math.PI / 2, 0, 0));
+  const rafter = Math.hypot(W, R - Hh);
+  for (const z of [-W, 0, W]) for (const sx of [-1, 1]) g.add(at(log(0.03, rafter), sx * W / 2, (Hh + R) / 2, z, 0, 0, sx * Math.atan2(W, R - Hh)));
+  // glass: side walls, back wall, gables and the roof (front left open as a doorway)
+  const glass = T('ghglass', { color: 0xcfeef0, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
+  const pane = (w, h, x, y, z, ry = 0, rx = 0) => { const m = mk(new THREE.PlaneGeometry(w, h), glass, false); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); g.add(m); };
+  for (const sx of [-1, 1]) pane(W * 2, Hh, sx * W, Hh / 2, 0, Math.PI / 2);
+  pane(W * 2, Hh, 0, Hh / 2, W);
+  for (const sx of [-1, 1]) pane(W * 0.55, Hh, sx * W * 0.72, Hh / 2, -W);
+  const roofW = rafter;
+  for (const sx of [-1, 1]) { const m = mk(new THREE.PlaneGeometry(roofW, W * 2), glass, false); m.position.set(sx * W / 2, (Hh + R) / 2, 0); m.rotation.order = 'ZXY'; m.rotation.set(-Math.PI / 2, 0, -sx * Math.atan2(R - Hh, W)); g.add(m); }
+  for (const z of [-W, W]) { const tri = new THREE.Shape([new THREE.Vector2(-W, 0), new THREE.Vector2(W, 0), new THREE.Vector2(0, R - Hh)]); const m = mk(new THREE.ShapeGeometry(tri), glass, false); m.position.set(0, Hh, z); g.add(m); }
+  // a watering can + a thermometer for flavour
+  const can = mk(new THREE.CylinderGeometry(0.09, 0.1, 0.18, 10), SM.metal()); can.position.set(1.05, 0.09, -1.05); g.add(can);
+  const therm = box(0.05, 0.3, 0.02, SM.white(), -1.28, 1.2, 0.6, 0.005, 0); therm.rotation.y = Math.PI / 2; g.add(therm);
+  return { g, col: [col(0, 0.12, 0, 0.92, 0.12, 0.92), col(-W, Hh / 2, -W, 0.06, Hh / 2, 0.06, false), col(W, Hh / 2, -W, 0.06, Hh / 2, 0.06, false), col(-W, Hh / 2, W, 0.06, Hh / 2, 0.06, false), col(W, Hh / 2, W, 0.06, Hh / 2, 0.06, false)], parts, anchors: {} };
+};
+
 B.water_collector = () => {
   const g = new THREE.Group(), parts = {};
   const barrel = cyl(0.3, 0.3, 0.7, SM.plankV(), 12); barrel.position.y = 0.35; g.add(barrel);
@@ -500,6 +530,108 @@ B.skull_trophy = () => {
   const head = mk(new THREE.SphereGeometry(0.22, 10, 8), SM.bone()); head.scale.set(1, 0.9, 1.5); sk.add(head);
   for (const sx of [-1, 1]) { const e = mk(new THREE.SphereGeometry(0.06, 6, 4), SM.black(), false); e.position.set(sx * 0.11, 0.06, -0.24); sk.add(e); const h = mk(new THREE.ConeGeometry(0.05, 0.35, 6), SM.bone()); h.position.set(sx * 0.12, 0.2, -0.15); h.rotation.x = -0.9; sk.add(h); }
   return { g, col: [col(0, 0.7, 0, 0.1, 0.7, 0.1, false)], parts: {}, anchors: {} };
+};
+
+// ---- traps
+function baitPile() {
+  const b = new THREE.Group();
+  const leaf = mk(new THREE.CircleGeometry(0.16, 7), SM.leaf(), false); leaf.rotation.x = -Math.PI / 2; leaf.position.y = 0.02; b.add(leaf);
+  for (let k = 0; k < 5; k++) { const a = k * 1.3; const f = mk(new THREE.SphereGeometry(0.035, 6, 4), SM.red()); f.position.set(Math.cos(a) * 0.06, 0.05 + (k % 2) * 0.02, Math.sin(a) * 0.06); b.add(f); }
+  return b;
+}
+B.trap_snare = () => {
+  const g = new THREE.Group(), parts = {};
+  _seed = 21;
+  // peg + trigger stick + bait in the middle of the loop
+  g.add(at(stick(0.3, 0.02), 0.5, 0.12, 0, 0, 0, 0.15));
+  parts.bait = baitPile(); g.add(parts.bait);
+  // armed: sapling bent down to the trigger, rope loop flat on the ground
+  const armed = new THREE.Group(); g.add(armed); parts.armed = armed;
+  const sap = new THREE.Group(); sap.position.set(0.55, 0, 0); armed.add(sap);
+  const pole = log(0.035, 1.5); pole.position.y = 0.75; sap.add(pole); sap.rotation.z = 1.25;
+  const loop = mk(new THREE.TorusGeometry(0.38, 0.015, 4, 18), SM.rope()); loop.rotation.x = -Math.PI / 2; loop.position.y = 0.03; armed.add(loop);
+  const line = mk(new THREE.CylinderGeometry(0.01, 0.01, 0.62, 4), SM.rope()); line.rotation.z = Math.PI / 2; line.position.set(0.2, 0.08, 0); armed.add(line);
+  for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; const l = mk(new THREE.PlaneGeometry(0.22, 0.12), SM.leaf(), false); l.rotation.set(-Math.PI / 2, 0, a); l.position.set(Math.cos(a) * 0.38, 0.025, Math.sin(a) * 0.38); armed.add(l); }
+  // sprung: sapling upright, loop yanked up
+  const sprung = new THREE.Group(); g.add(sprung); parts.sprung = sprung; sprung.visible = false;
+  const pole2 = log(0.035, 1.5); pole2.position.set(0.55, 0.75, 0); pole2.rotation.z = 0.12; sprung.add(pole2);
+  const loop2 = mk(new THREE.TorusGeometry(0.18, 0.015, 4, 14), SM.rope()); loop2.position.set(0.45, 1.1, 0); loop2.rotation.y = 0.4; sprung.add(loop2);
+  const line2 = mk(new THREE.CylinderGeometry(0.01, 0.01, 0.5, 4), SM.rope()); line2.position.set(0.52, 1.35, 0); sprung.add(line2);
+  return { g, col: [], parts, anchors: {} };
+};
+B.trap_net = () => {
+  const g = new THREE.Group(), parts = {};
+  const H = 2.1, R = 1.45;
+  for (const [x, z] of [[-R, -R], [R, -R], [-R, R], [R, R]]) { const p = log(0.06, H + 0.2); p.position.set(x, H / 2, z); g.add(p); }
+  for (const [x0, z0, x1, z1] of [[-R, -R, R, -R], [-R, R, R, R], [-R, -R, -R, R], [R, -R, R, R]]) { const b = log(0.035, Math.hypot(x1 - x0, z1 - z0)); b.position.set((x0 + x1) / 2, H, (z0 + z1) / 2); if (x0 === x1) b.rotation.x = Math.PI / 2; else b.rotation.z = Math.PI / 2; g.add(b); }
+  parts.bait = baitPile(); parts.bait.scale.setScalar(1.6); g.add(parts.bait);
+  // net texture: rope grid with holes
+  const p = new PixelPainter(32, 32, 3).clear();
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) if (x % 8 < 2 || y % 8 < 2) p.set(x, y, [200, 176, 128]);
+  const netM = T('trapnet', { map: p.texture({ repeat: [3, 3] }), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.95 });
+  // armed: the net bundled up at the top
+  const armed = new THREE.Group(); g.add(armed); parts.armed = armed;
+  const bundle = mk(new THREE.SphereGeometry(0.42, 10, 8), T('netbundle', { color: 0xc8b080, roughness: 0.95 })); bundle.scale.set(1.3, 0.6, 1.3); bundle.position.y = H - 0.2; armed.add(bundle);
+  const trig = mk(new THREE.CylinderGeometry(0.01, 0.01, H - 0.3, 4), SM.rope()); trig.position.y = (H - 0.3) / 2; armed.add(trig);
+  // sprung: the net draped over the catch
+  const sprung = new THREE.Group(); g.add(sprung); parts.sprung = sprung; sprung.visible = false;
+  const drape = new THREE.PlaneGeometry(R * 2.2, R * 2.2, 8, 8);
+  const pp = drape.attributes.position; for (let i = 0; i < pp.count; i++) { const x = pp.getX(i), y = pp.getY(i); pp.setZ(i, 1.1 * Math.max(0, 1 - (x * x + y * y) / (R * R * 1.6))); }
+  drape.computeVertexNormals(); drape.rotateX(-Math.PI / 2);
+  const dm = mk(drape, netM, false); dm.position.y = 0.05; sprung.add(dm);
+  return { g, col: [], parts, anchors: {} };
+};
+
+// ---- alpha trophies
+function plaque(text, w = 0.62) {
+  const m = mk(new THREE.PlaneGeometry(w, 0.16), T('plq_' + text, { map: textTexture([text], { w: 256, h: 64, bg: '#7a5232', fg: '#f3ead2', size: 30 }), roughness: 0.85 }), false);
+  return m;
+}
+function bentCone(r, h, bend, m, seg = 10) {
+  const geo = new THREE.ConeGeometry(r, h, seg, 6);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const y = p.getY(i) / h + 0.5; p.setZ(i, p.getZ(i) + bend * y * y * h); }
+  geo.computeVertexNormals();
+  return mk(geo, m);
+}
+B.trophy_gnasher = () => {
+  const g = new THREE.Group();
+  _seed = 66;
+  const base = rock(0.42, SM.rockDark()); base.scale.set(1.1, 0.7, 1); base.position.y = 0.16; g.add(base);
+  g.add(box(0.5, 0.12, 0.5, SM.plank(), 0, 0.36, 0, 0.02, 0.5));
+  // the tooth: ivory point, darker root
+  const tooth = bentCone(0.16, 0.95, -0.35, T('rextooth', { color: 0xf0e6cc, roughness: 0.45 }));
+  tooth.position.set(0, 0.92, 0.04); g.add(tooth);
+  const root = mk(new THREE.CylinderGeometry(0.15, 0.13, 0.16, 10), T('rexroot', { color: 0x9a7a52, roughness: 0.8 })); root.position.y = 0.48; g.add(root);
+  const sign = plaque('OLD GNASHER'); sign.position.set(0, 0.36, -0.256); sign.rotation.y = Math.PI; g.add(sign);
+  for (const sx of [-1, 1]) { const f = mk(new THREE.ConeGeometry(0.03, 0.22, 4), SM.bone()); f.position.set(sx * 0.19, 0.5, -0.12); f.rotation.z = sx * 0.4; g.add(f); }
+  return { g, col: [col(0, 0.5, 0, 0.3, 0.5, 0.3, false)], parts: {}, anchors: {} };
+};
+B.trophy_momma = () => {
+  const g = new THREE.Group();
+  for (const x of [-0.42, 0.42]) g.add(at(log(0.05, 1.2), x, 0.6, 0));
+  g.add(at(log(0.04, 0.95), 0, 0.25, 0, 0, 0, Math.PI / 2));
+  // fan-shaped sail scale with teal + orange bands
+  const p = new PixelPainter(32, 32, 9);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) { const band = Math.floor(Math.hypot(x - 16, y) / 4); p.set(x, y, band % 2 ? [0x3e, 0x5a, 0x52] : [0xe0, 0x7a, 0x2a]); }
+  const mat = T('mommasail', { map: p.texture(), roughness: 0.7, side: THREE.DoubleSide });
+  const fan = mk(new THREE.CircleGeometry(0.42, 16, 0, Math.PI), mat); fan.position.set(0, 0.32, 0); g.add(fan);
+  for (let k = 0; k < 7; k++) { const a = (k / 6) * Math.PI; const sp = mk(new THREE.CylinderGeometry(0.012, 0.02, 0.44, 5), SM.bone()); sp.position.set(Math.cos(a) * 0.21, 0.32 + Math.sin(a) * 0.21, 0.01); sp.rotation.z = a - Math.PI / 2; g.add(sp); }
+  const sign = plaque('BIG MOMMA', 0.5); sign.position.set(0, 1.08, -0.06); sign.rotation.y = Math.PI; g.add(sign);
+  g.add(at(log(0.035, 0.95), 0, 1.08, 0, 0, 0, Math.PI / 2));
+  return { g, col: [col(0, 0.6, 0, 0.46, 0.6, 0.08, false)], parts: {}, anchors: {} };
+};
+B.trophy_razor = () => {
+  const g = new THREE.Group();
+  g.add(at(log(0.06, 1.25), 0, 0.62, 0));
+  // crossed bones + the sickle claw
+  for (const a of [-0.7, 0.7]) { const b = mk(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6), SM.bone()); b.position.set(0, 1.05, -0.07); b.rotation.set(0, 0, a); g.add(b); }
+  const claw = bentCone(0.07, 0.5, 0.9, T('raptorclaw', { color: 0x2a2624, roughness: 0.35 }));
+  claw.position.set(0, 1.12, -0.12); claw.rotation.x = -0.2; g.add(claw);
+  // feathers tied on with string
+  for (const [x, c] of [[-0.08, 0xe8d040], [0.0, 0x3a3a46], [0.08, 0xe8d040]]) { const f = mk(new THREE.PlaneGeometry(0.06, 0.26), T('rfeather' + c, { color: c, roughness: 0.8, side: THREE.DoubleSide }), false); f.position.set(x, 0.72, -0.07); f.rotation.z = x * 2; g.add(f); }
+  const sign = plaque('RAZOR', 0.36); sign.position.set(0, 0.45, -0.065); sign.rotation.y = Math.PI; g.add(sign);
+  return { g, col: [col(0, 0.62, 0, 0.1, 0.62, 0.1, false)], parts: {}, anchors: {} };
 };
 
 export const STRUCTURE_BUILDERS = B;

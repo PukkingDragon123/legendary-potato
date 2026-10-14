@@ -135,6 +135,9 @@ const ACH = [
   ['coffee', 'CAFFEINATED', 'Brewed coffee 66 million years before coffee.', (J) => (J.counts.coffee ?? 0) >= 1],
   ['nights5', 'SURVIVOR', 'Survived 5 nights.', (J) => (J.counts.nightSkipped ?? 0) >= 5],
   ['egg', 'PROUD PARENT', 'Hatched a dino egg.', (J) => (J.counts.eggHatched ?? 0) >= 1],
+  ['alpha1', 'GIANT SLAYER', 'Beat or tamed an alpha.', (J) => (J.counts.alpha ?? 0) >= 1],
+  ['alpha3', 'APEX EXPLORER', 'Dealt with all three alphas.', (J) => (J.counts.alpha ?? 0) >= 3],
+  ['alphaPet', 'WHO\'S A GOOD KING', 'Tamed an alpha.', (J) => (J.counts.alphaTamed ?? 0) >= 1],
 ];
 
 export class Journal {
@@ -165,6 +168,7 @@ export class Journal {
     E.on('analysed', () => inc('analysed'));
     E.on('timeJump', () => inc('timeJump'));
     E.on('eggHatched', () => inc('eggHatched'));
+    E.on('alphaDown', ({ tamed }) => { inc('alpha'); if (tamed) inc('alphaTamed'); });
     E.on('vanCoffee', () => inc('coffee'));
     E.on('snake', ({ score }) => { this.counts.snakeBest = Math.max(this.counts.snakeBest ?? 0, score); this.dirty = true; });
     E.on('vanSwitch', ({ i, on }) => { if (i === 1 && on && g.van && g.van.s.charge > 0 && !g.van.s.firstBoot) { g.van.s.firstBoot = true; this.dirty = true; } });
