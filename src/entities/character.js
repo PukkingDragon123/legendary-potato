@@ -507,6 +507,12 @@ export class Character {
       hipY = 0.22; leg[0].x = -1.45; leg[1].x = -1.45; leg[0].knee = 1.5; leg[1].knee = 1.5;
       if (s.ride) { leg[0].x = -1.1; leg[1].x = -1.1; leg[0].knee = 1.2; leg[1].knee = 1.2; this.legs[0].hip.rotation.z = -0.5; }
       arm[0].x = -0.7; arm[1].x = -0.7; arm[0].elbow = -0.9; arm[1].elbow = -0.9;
+      if (s.drive !== undefined && s.drive !== null) {
+        // hands on the wheel, leaning into turns
+        const st = s.drive;
+        arm[0].x = -1.25 - st * 0.25; arm[1].x = -1.25 + st * 0.25; arm[0].elbow = -0.55; arm[1].elbow = -0.55;
+        arm[0].z = 0.18; arm[1].z = -0.18; torsoRoll += st * 0.12; headRoll += st * 0.1;
+      }
     }
     if (s.sleeping) {
       rootRotX = -Math.PI / 2; rootY = 0.18; expr = 'sleepy';
@@ -540,6 +546,17 @@ export class Character {
           Lh.x = -2.2 * k + 0.5 * strike - 0.2; Lh.elbow = -1.0 * k - 0.3; Lh.z = 0.25;
           torsoPitch += -0.25 * k + 0.45 * strike; torsoYaw += -0.25 * k;
           if (act.name === 'mine') torsoPitch += 0.15 * strike;
+          break;
+        }
+        case 'crank': {
+          const a = t * 10;
+          R.x = -1.25 + Math.sin(a) * 0.38; R.elbow = -0.6 + Math.cos(a) * 0.4; R.z = -0.12;
+          Lh.x = -0.5; Lh.elbow = -0.8; torsoPitch += 0.14; torsoYaw += Math.sin(a) * 0.1; expr = 'angry';
+          break;
+        }
+        case 'wrench': {
+          const a = Math.sin(t * 11);
+          R.x = -1.35; R.elbow = -0.5; R.z = -0.2 + a * 0.28; Lh.x = -1.15; Lh.elbow = -0.6; Lh.z = 0.25; torsoPitch += 0.32;
           break;
         }
         case 'hammer': {

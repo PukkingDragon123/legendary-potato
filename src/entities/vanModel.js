@@ -12,10 +12,10 @@ export const VAN = { L: 4.9, W: 2.0, floor: 0.58, roof: 2.18, z0: -2.45, z1: 2.4
 
 const M = {};
 const mat = (key, make) => M[key] ?? (M[key] = patchMaterial(make(), { wet: !!make.wet }));
-function std(key, o) { return mat(key, () => new THREE.MeshStandardMaterial(o)); }
+export function std(key, o) { return mat(key, () => new THREE.MeshStandardMaterial(o)); }
 function phys(key, o) { return mat(key, () => new THREE.MeshPhysicalMaterial(o)); }
 
-function boxUV(geo, s = 0.5) {
+export function boxUV(geo, s = 0.5) {
   const p = geo.attributes.position, n = geo.attributes.normal;
   const uv = new Float32Array(p.count * 2);
   for (let i = 0; i < p.count; i++) {
@@ -28,9 +28,10 @@ function boxUV(geo, s = 0.5) {
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   return geo;
 }
-const mk = (geo, material, cast = true) => { const m = new THREE.Mesh(geo, material); m.castShadow = cast; m.receiveShadow = true; return m; };
-const box = (w, h, d, material, x, y, z, r = 0, uvs = 0.5) => { const g = r > 0 ? new RoundedBoxGeometry(w, h, d, 2, r) : new THREE.BoxGeometry(w, h, d); if (uvs) boxUV(g, uvs); const m = mk(g, material); m.position.set(x, y, z); return m; };
-const cyl = (rt, rb, h, material, seg = 12) => mk(new THREE.CylinderGeometry(rt, rb, h, seg), material);
+export const mk = (geo, material, cast = true) => { const m = new THREE.Mesh(geo, material); m.castShadow = cast; m.receiveShadow = true; return m; };
+export const box = (w, h, d, material, x, y, z, r = 0, uvs = 0.5) => { const g = r > 0 ? new RoundedBoxGeometry(w, h, d, 2, r) : new THREE.BoxGeometry(w, h, d); if (uvs) boxUV(g, uvs); const m = mk(g, material); m.position.set(x, y, z); return m; };
+export const at = (o, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => { o.position.set(x, y, z); o.rotation.set(rx, ry, rz); return o; };
+export const cyl = (rt, rb, h, material, seg = 12) => mk(new THREE.CylinderGeometry(rt, rb, h, seg), material);
 
 // side panel: profile in (z, y), extruded along x by thickness, placed at xOff
 function panel(outline, holes, thickness, xOff, material, uvScale = 0.5) {
@@ -159,7 +160,7 @@ export function buildVan() {
   ws.rotation.x = wsAng - Math.PI / 2;
   const wsGlass = box(1.84, wsLen, 0.01, glass, 0, 0, 0, 0, 0); wsGlass.castShadow = false; ws.add(wsGlass);
   const crackMat = std('crack', { map: T.crack(), transparent: true, alphaTest: 0.3, roughness: 0.2, emissive: 0x222222 });
-  const crack = mk(new THREE.PlaneGeometry(1.0, 1.0), crackMat, false); crack.position.set(0.35, 0.1, -0.012); crack.rotation.y = Math.PI; ws.add(crack);
+  const crack = mk(new THREE.PlaneGeometry(1.0, 1.0), crackMat, false); crack.position.set(0.35, 0.1, -0.012); crack.rotation.y = Math.PI; ws.add(crack); parts.crack = crack;
   for (const sx of [-1, 1]) ws.add(box(0.08, wsLen + 0.04, 0.07, cream, sx * 0.95, 0, 0, 0.02));
   ws.add(box(1.98, 0.08, 0.07, cream, 0, wsLen / 2, 0, 0.02));
   ws.add(box(1.98, 0.08, 0.07, cream, 0, -wsLen / 2, 0, 0.02));
@@ -196,7 +197,7 @@ export function buildVan() {
     const pane = box(0.01, winY1 - winY0 + 0.06, len - 0.15, glass, side * -0.025, (winY0 + winY1) / 2 - 0.03, len / 2, 0, 0); pane.castShadow = false; d.add(pane);
     const handle = box(0.03, 0.03, 0.14, chrome, side * 0.03, 1.0, len - 0.2, 0.01, 0); d.add(handle);
     const mirror = box(0.05, 0.16, 0.1, black, side * 0.12, 1.45, 0.05, 0.02, 0); d.add(mirror);
-    parts.doors[d.name] = { g: d, kind: 'hinge', axis: 'y', open: side * -1.2, t: 0, target: 0 };
+    parts.doors[d.name] = { g: d, kind: 'hinge', axis: 'y', open: side * 1.2, t: 0, target: 0 };
   }
   // sliding door (right side)
   {
@@ -252,7 +253,7 @@ export function buildVan() {
   const cone = mk(new THREE.ConeGeometry(0.14, 0.4, 10), std('cone', { color: 0xff6a20, roughness: 0.5 })); cone.position.set(-0.55, 0.35, 0.6); cone.rotation.z = 1.4; rack.add(cone);
   // bent satellite dish
   const dish = new THREE.Group(); dish.position.set(0.45, 0.16, -0.6); rack.add(dish);
-  dish.add(Object.assign(cyl(0.025, 0.025, 0.45, metal, 6), { position: new THREE.Vector3(0, 0.22, 0) }));
+  dish.add(at(cyl(0.025, 0.025, 0.45, metal, 6), 0, 0.22, 0));
   const bowl = mk(new THREE.SphereGeometry(0.42, 16, 6, 0, Math.PI * 2, 0, 0.7), std('dish', { color: 0xe8e4dc, roughness: 0.5, side: THREE.DoubleSide })); bowl.position.y = 0.5; bowl.rotation.set(-1.9, 0.3, 0.45); dish.add(bowl);
   parts.dish = dish;
   // temporal antenna tube + coils on the roof back
@@ -315,7 +316,7 @@ export function buildVan() {
   const wheel = new THREE.Group(); wheel.position.set(-0.48, 1.22, -1.74); wheel.rotation.x = -1.0; cab.add(wheel);
   wheel.add(mk(new THREE.TorusGeometry(0.19, 0.022, 8, 24), std('swheel', { color: 0x2a2420, roughness: 0.6 })));
   for (let k = 0; k < 3; k++) { const sp = box(0.18, 0.02, 0.02, black, Math.cos(k * 2.09 + 1.57) * 0.09, Math.sin(k * 2.09 + 1.57) * 0.09, 0, 0, 0); sp.rotation.z = k * 2.09 + 1.57; wheel.add(sp); }
-  wheel.add(Object.assign(cyl(0.04, 0.04, 0.04, red, 10), { rotation: new THREE.Euler(Math.PI / 2, 0, 0) }));
+  wheel.add(at(cyl(0.04, 0.04, 0.04, red, 10), 0, 0, 0, Math.PI / 2, 0, 0));
   parts.steering = wheel;
   // dino bobblehead on the dash
   const bob = new THREE.Group(); bob.position.set(0.2, 1.2, -1.95); cab.add(bob);
@@ -351,7 +352,7 @@ export function buildVan() {
   for (let k = 0; k < 3; k++) {
     const b = box(0.24, 0.2, 0.18, black, -0.64, floor + 0.11, -0.3 + k * 0.22, 0.015, 0);
     lab.add(b);
-    for (const sx of [-1, 1]) lab.add(Object.assign(cyl(0.018, 0.018, 0.03, sx < 0 ? red : black, 8), { position: new THREE.Vector3(-0.64 + sx * 0.07, floor + 0.23, -0.3 + k * 0.22) }));
+    for (const sx of [-1, 1]) lab.add(at(cyl(0.018, 0.018, 0.03, sx < 0 ? red : black, 8), -0.64 + sx * 0.07, floor + 0.23, -0.3 + k * 0.22));
     parts.batteries.push(b);
   }
   const battLed = mk(new THREE.BoxGeometry(0.03, 0.03, 0.005), std('battled', { color: 0xff3030, emissive: 0xff2020, emissiveIntensity: 2 }), false);
@@ -388,8 +389,8 @@ export function buildVan() {
   const mug = cyl(0.04, 0.035, 0.09, std('mug', { color: 0xe04a3a, roughness: 0.5 }), 12); mug.position.set(-0.52, 1.05, -0.35); lab.add(mug);
   for (let k = 0; k < 5; k++) { const n = mk(new THREE.PlaneGeometry(0.07, 0.07), std('note' + (k % 3), { color: [0xf6df7c, 0xff9ab0, 0x9ae0ff][k % 3], roughness: 0.9 }), false); n.position.set(-0.93, 1.25 + (k % 2) * 0.09, -0.2 + k * 0.12); n.rotation.y = Math.PI / 2; n.rotation.z = (k - 2) * 0.1; lab.add(n); }
   const lamp = new THREE.Group(); lamp.position.set(-0.72, 1.0, 1.0); lab.add(lamp);
-  lamp.add(Object.assign(cyl(0.06, 0.07, 0.02, black, 10), {}));
-  lamp.add(Object.assign(box(0.015, 0.3, 0.015, black, 0, 0.15, 0, 0, 0)));
+  lamp.add(cyl(0.06, 0.07, 0.02, black, 10));
+  lamp.add(box(0.015, 0.3, 0.015, black, 0, 0.15, 0, 0, 0));
   const lampHead = mk(new THREE.ConeGeometry(0.07, 0.1, 10, 1, true), std('lamphead', { color: 0x2a6a4a, side: THREE.DoubleSide })); lampHead.position.set(0.05, 0.3, 0); lampHead.rotation.z = 2.2; lamp.add(lampHead);
   // lava lamp (glows when powered)
   const lava = cyl(0.04, 0.05, 0.22, std('lava', { color: 0xff6030, emissive: 0xff4010, emissiveIntensity: 0, transparent: true, opacity: 0.85 }), 10); lava.position.set(-0.5, 1.12, 1.05); lab.add(lava); parts.lava = lava;
@@ -451,8 +452,8 @@ export function buildVan() {
   // ---------------------------------------------------------------- the time machine core (CHRONO-DRIVE Mk 0.9)
   const tm = new THREE.Group(); tm.position.set(0.0, floor, 1.92); lab.add(tm); parts.machine = tm;
   const tank = cyl(0.36, 0.38, 1.25, std('tank', { color: 0xc8ccd0, roughness: 0.35, metalness: 0.85, map: T.metal() }), 20); tank.position.y = 0.66; tm.add(tank);
-  tm.add(Object.assign(cyl(0.4, 0.4, 0.08, metal, 20), { position: new THREE.Vector3(0, 0.05, 0) }));
-  tm.add(Object.assign(cyl(0.3, 0.38, 0.08, metal, 20), { position: new THREE.Vector3(0, 1.32, 0) }));
+  tm.add(at(cyl(0.4, 0.4, 0.08, metal, 20), 0, 0.05, 0));
+  tm.add(at(cyl(0.3, 0.38, 0.08, metal, 20), 0, 1.32, 0));
   // coil wound around the tank
   const helix = [];
   for (let i = 0; i <= 160; i++) { const t = i / 160; const a = t * Math.PI * 2 * 9; helix.push(new THREE.Vector3(Math.cos(a) * 0.395, 0.2 + t * 1.0, Math.sin(a) * 0.395)); }
@@ -460,8 +461,8 @@ export function buildVan() {
   // glowing flux tube on the front
   const flux = cyl(0.07, 0.07, 0.8, std('fluxglass', { color: 0x60e8ff, emissive: 0x20c0ff, emissiveIntensity: 0.2, roughness: 0.05, transparent: true, opacity: 0.8 }), 12);
   flux.position.set(-0.28, 0.7, -0.34); tm.add(flux); parts.fluxTube = flux;
-  tm.add(Object.assign(cyl(0.085, 0.085, 0.05, copper, 12), { position: new THREE.Vector3(-0.28, 1.12, -0.34) }));
-  tm.add(Object.assign(cyl(0.085, 0.085, 0.05, copper, 12), { position: new THREE.Vector3(-0.28, 0.28, -0.34) }));
+  tm.add(at(cyl(0.085, 0.085, 0.05, copper, 12), -0.28, 1.12, -0.34));
+  tm.add(at(cyl(0.085, 0.085, 0.05, copper, 12), -0.28, 0.28, -0.34));
   // microwave (modified) on top
   const micro = box(0.42, 0.24, 0.32, std('micro', { color: 0xe8e4dc, roughness: 0.5 }), 0.05, 1.5, -0.05, 0.02, 0); tm.add(micro);
   tm.add(box(0.24, 0.16, 0.01, std('microglass', { color: 0x1a1a1a, roughness: 0.1 }), -0.03, 1.5, -0.215, 0, 0));
@@ -476,7 +477,7 @@ export function buildVan() {
   const leverBase = box(0.14, 0.1, 0.1, black, 0.33, 0.85, -0.3, 0.01, 0); tm.add(leverBase);
   const leverPivot = new THREE.Group(); leverPivot.position.set(0.33, 0.9, -0.3); tm.add(leverPivot);
   leverPivot.add(box(0.025, 0.3, 0.025, metal, 0, 0.15, 0, 0, 0));
-  leverPivot.add(Object.assign(mk(new THREE.SphereGeometry(0.045, 10, 8), red), { position: new THREE.Vector3(0, 0.31, 0) }));
+  leverPivot.add(at(mk(new THREE.SphereGeometry(0.045, 10, 8), red), 0, 0.31, 0));
   leverPivot.rotation.x = 0.6;
   parts.lever = leverPivot;
   // part sockets (empty frames that receive the crafted parts)
@@ -510,28 +511,37 @@ export function buildVan() {
   return { root, body, parts };
 }
 
-// Static colliders (local space) for walking around and inside the van.
-// returns [{kind:'box', x,y,z,hx,hy,hz, walk, solid, id}]
-export function vanColliders(state) {
+// Colliders in van-local space for walking around, inside and on top of the
+// van. state: { slideOpen, rearOpen, roofdeck, lift }. Boxes are re-posed by
+// the van logic every time the van moves (yaw + full tilt of each centre).
+export function vanColliders(state = {}) {
   const { z0, z1, floor, roof } = VAN;
   const W2 = VAN.W / 2;
+  const L = state.lift ?? 0;
   const C = [];
-  const add = (id, x, y, z, hx, hy, hz, walk = true, solid = true) => C.push({ id, x, y, z, hx, hy, hz, walk, solid });
-  add('floor', 0, floor / 2, 0.05, 0.95, floor / 2, 2.35, true, true);
-  add('roof', 0, roof, 0.2, 1.0, 0.06, 2.25, true, true);
-  add('nose', 0, 0.75, z0 + 0.2, 1.0, 0.33, 0.25, true, true);
-  add('cab', 0, 0.95, -1.5, 0.95, 0.4, 0.5, false, true); // seats/dash block (enter via doors = sit)
-  add('wallL', -W2 + 0.04, (floor + roof) / 2, 0.05, 0.05, (roof - floor) / 2, 2.35, false, true);
-  // right wall with sliding-door gap
-  add('wallR_front', W2 - 0.04, (floor + roof) / 2, -1.5, 0.05, (roof - floor) / 2, 0.55, false, true);
-  add('wallR_back', W2 - 0.04, (floor + roof) / 2, 1.45, 0.05, (roof - floor) / 2, 1.0, false, true);
-  if (!state.slideOpen) add('slide', W2 - 0.04, (floor + roof) / 2, -0.25, 0.05, (roof - floor) / 2, 0.72, false, true);
-  if (!state.rearOpen) add('rear', 0, (floor + roof) / 2, z1 - 0.05, 1.0, (roof - floor) / 2, 0.06, false, true);
+  const add = (id, x, y, z, hx, hy, hz, walk = true, solid = true, extra = {}) => C.push({ id, x, y: y + L, z, hx, hy, hz, walk, solid, ...extra });
+  // floor in four strips so a tilted van still has an accurate walking surface
+  for (let k = 0; k < 4; k++) { const za = -2.4 + k * 1.2; add('floor' + k, 0, floor / 2, za + 0.6, 0.95, floor / 2, 0.6); }
+  add('roof', 0, roof, 0.2, 1.0, 0.06, 2.25);
+  add('nose', 0, 0.75, z0 + 0.2, 1.0, 0.33, 0.25);
+  add('cab', 0, 0.95, -1.5, 0.95, 0.4, 0.5, false, true);
+  add('wallL', -W2 + 0.04, (floor + roof) / 2, 0.7, 0.05, (roof - floor) / 2, 1.7, false);
+  if (!state.cabL) add('wallL_cab', -W2 + 0.04, (floor + roof) / 2, -1.5, 0.05, (roof - floor) / 2, 0.5, false);
+  if (!state.cabR) add('wallR_cab', W2 - 0.04, (floor + roof) / 2, -1.5, 0.05, (roof - floor) / 2, 0.5, false);
+  add('wallR_back', W2 - 0.04, (floor + roof) / 2, 1.45, 0.05, (roof - floor) / 2, 1.0, false);
+  if (!state.slideOpen) add('slide', W2 - 0.04, (floor + roof) / 2, -0.25, 0.05, (roof - floor) / 2, 0.72, false);
+  if (!state.rearOpen) add('rear', 0, (floor + roof) / 2, z1 - 0.05, 1.0, (roof - floor) / 2, 0.06, false);
   // interior furniture
-  add('bench', -0.66, 0.78, 0.25, 0.3, 0.22, 0.86, true, true);
-  add('machine', 0, floor + 0.7, 1.92, 0.42, 0.7, 0.42, true, true);
-  add('fridge', 0.72, floor + 0.22, 1.6, 0.21, 0.24, 0.26, true, true);
-  // step under the sliding door
-  add('step', W2 + 0.1, 0.22, -0.25, 0.16, 0.22, 0.7, true, true);
+  add('bench', -0.66, 0.78, 0.25, 0.3, 0.22, 0.86);
+  add('machine', 0, floor + 0.7, 1.92, 0.42, 0.7, 0.42);
+  add('fridge', 0.72, floor + 0.22, 1.6, 0.21, 0.24, 0.26);
+  add('shelf', 0.74, 1.39, 0.95, 0.18, 0.21, 0.43, false);
+  // steps: under the sliding door and the rear bumper
+  add('step', W2 + 0.1, 0.22, -0.25, 0.16, 0.22, 0.7);
+  add('rearstep', 0, 0.2, z1 + 0.12, 0.95, 0.2, 0.14);
+  if (state.roofdeck) {
+    add('deck', 0, roof + 0.12, 0.35, 0.95, 0.1, 2.0);
+    for (const sx of [-1, 1]) add('rail' + sx, sx * 0.92, roof + 0.5, 0.3, 0.04, 0.3, 1.95, false);
+  }
   return C;
 }

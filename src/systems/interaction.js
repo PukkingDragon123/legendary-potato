@@ -117,7 +117,7 @@ export class Interaction {
 
   update(dt) {
     const g = this.game, p = g.local, inp = g.input;
-    if (g.uiOpen || p.downed || p.sitting || p.sleeping) { this.target = null; g.ui?.setPrompt(null); return; }
+    if (g.uiOpen || p.downed || p.sitting || p.sleeping) { this.target = null; if (!p.sitting) g.ui?.setPrompt(null); g.ui?.setTarget(null); return; }
     // hotbar selection
     for (let i = 0; i < 8; i++) if (inp.pressed('hot' + (i + 1))) this.select(i);
     if (inp.wheel && !inp.down('crouch') && !g.building?.active) { this.select((g.inventory.selected + (inp.wheel > 0 ? 1 : 7)) % 8); g.wheelCaptured = true; } else g.wheelCaptured = !!g.building?.active;

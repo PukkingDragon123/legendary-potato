@@ -328,9 +328,9 @@ export class Nodes {
         for (let q = 0; q < 14; q++) {
           const t = pr.next();
           const x = p.x + 5 + t * 45 + (pr.next() - 0.5) * 8, z = p.z - 3 - t * 41 + (pr.next() - 0.5) * 8;
-          if (inCell(x, z)) add('scrap', x, z);
+          if (inCell(x, z) && Math.hypot(x - (p.x + 3.2), z - (p.z - 1.6)) > 4) add('scrap', x, z);
         }
-        for (let q = 0; q < 5; q++) { const a = pr.next() * 6.28, d = 6 + pr.next() * 10; const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; if (inCell(x, z)) add('crate', x, z); }
+        for (let q = 0; q < 5; q++) { const a = pr.next() * 6.28, d = 6 + pr.next() * 10; const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; if (inCell(x, z) && Math.hypot(x - (p.x + 3.2), z - (p.z - 1.6)) > 4) add('crate', x, z); }
       }
       if (p.id === 'crystalcave' || p.id === 'caldera') {
         for (let q = 0; q < 6; q++) { const a = pr.next() * 6.28, d = pr.next() * p.radius * 0.7; const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; if (inCell(x, z)) add('crystal', x, z); }

@@ -105,6 +105,7 @@ export class Game {
   update(dt) {
     const e = this.engine;
     dt = Math.min(dt, 0.1);
+    this.frame = (this.frame ?? 0) + 1;
     this.input.pollGamepad();
     if (!this.paused) {
       this.time.update(dt);

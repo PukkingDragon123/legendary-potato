@@ -16,12 +16,14 @@ export class Inventory {
     const d = ITEMS[id];
     const s = { id, n };
     if (d?.durability) s.dur = d.durability;
+    if (d?.charge) s.ch = d.charge;
     if (extra) Object.assign(s, extra);
     return s;
   }
   // returns how many could NOT be added
   add(id, n = 1, extra = null, quiet = false) {
     if (!ITEMS[id]) { console.warn('unknown item', id); return n; }
+    if (this.accept && !this.accept(id)) return n;
     const max = this.stackOf(id);
     let left = n;
     if (max > 1) {
@@ -71,7 +73,8 @@ export class Inventory {
   moveTo(other, i) {
     const s = this.slots[i];
     if (!s) return;
-    const left = other.add(s.id, s.n, s.dur !== undefined ? { dur: s.dur } : null);
+    const { id: _id, n: _n, ...extra } = s; void _id; void _n;
+    const left = other.add(s.id, s.n, Object.keys(extra).length ? extra : null);
     if (left <= 0) this.slots[i] = null; else s.n = left;
     this.changed();
   }
@@ -84,6 +87,14 @@ export class Inventory {
     if (s.dur <= 0) { this.slots[i] = null; this.changed(); return true; }
     this.changed();
     return false;
+  }
+  useCharge(i, amt = 1) {
+    const s = this.slots[i];
+    if (!s || s.ch === undefined) return true;
+    if (s.ch < amt) return false;
+    s.ch -= amt;
+    this.changed();
+    return true;
   }
   firstEmpty() { return this.slots.findIndex((s) => !s); }
   serialize() { return { size: this.size, slots: this.slots.map((s) => (s ? { ...s } : null)), selected: this.selected }; }

@@ -133,7 +133,7 @@ export class UI {
     this._lastPrompt = key;
     this.el.cross.classList.toggle('active', !!p);
     if (!p) { this.el.prompt.innerHTML = ''; return; }
-    const row = (q) => `<div class="row shadow-text"><span class="key">${esc(q.key)}</span>${esc(q.text)}</div>`;
+    const row = (q) => `<div class="row shadow-text"><span class="key">${esc(q.key)}</span>${esc(q.text)}${q.progress !== null && q.progress !== undefined ? `<span class="hold"><i style="width:${Math.min(100, q.progress * 100).toFixed(1)}%"></i></span>` : ''}</div>`;
     this.el.prompt.innerHTML = (p.alt ? row(p.alt) : '') + row(p) + (p.warn ? `<div class="warn shadow-text">${esc(p.warn)}</div>` : '');
   }
   setTarget(t) {
@@ -231,7 +231,7 @@ export class UI {
     }
   }
   fillSlot(el, s, keyN, sel) {
-    const key = s ? s.id + ':' + s.n + ':' + (s.dur ?? '') + ':' + sel : 'empty:' + sel;
+    const key = s ? s.id + ':' + s.n + ':' + (s.dur ?? '') + ':' + Math.round(s.ch ?? -1) + ':' + sel : 'empty:' + sel;
     if (el._k === key) return;
     el._k = key;
     el.className = 'slot' + (sel ? ' sel' : '');
@@ -241,9 +241,14 @@ export class UI {
     const img = h('img'); img.src = this.icon(s.id); img.draggable = false; el.appendChild(img);
     if (s.n > 1) el.appendChild(h('span', 'n', s.n));
     const d = ITEMS[s.id];
-    if (s.dur !== undefined && d?.durability) {
+    if (s.dur !== undefined && d?.durability && d.durability < 9999) {
       const bar = h('div', 'dur'); const f = h('i'); const k = s.dur / d.durability;
       f.style.width = k * 100 + '%'; f.style.background = k < 0.25 ? '#e05040' : k < 0.5 ? '#f2b630' : '#7bc86c';
+      bar.appendChild(f); el.appendChild(bar);
+    }
+    if (s.ch !== undefined && d?.charge) {
+      const bar = h('div', 'dur charge'); const f = h('i'); const k = s.ch / d.charge;
+      f.style.width = k * 100 + '%'; f.style.background = k < 0.2 ? '#e05040' : '#5ab0e0';
       bar.appendChild(f); el.appendChild(bar);
     }
   }
@@ -441,6 +446,8 @@ export class UI {
     const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.slot');
     if (target && target._inv) {
       const ti = +target.dataset.slot, tinv = target._inv;
+      const a0 = d.inv.slots[d.i], b0 = tinv.slots[ti];
+      if (tinv !== d.inv && ((a0 && tinv.accept && !tinv.accept(a0.id)) || (b0 && d.inv.accept && !d.inv.accept(b0.id)))) { this.game.audio?.play('error', { vol: 0.5 }); this.toast('That doesn\'t go in there.', 'warn'); this.bagSel = null; return; }
       if (tinv === d.inv) d.inv.swap(d.i, ti);
       else {
         const a = d.inv.slots[d.i], b = tinv.slots[ti];

@@ -293,3 +293,8 @@ img.icon, canvas.icon { image-rendering: pixelated; image-rendering: crisp-edges
   #objective { width: 200px; font-size: 13px; }
   #title .logo { font-size: 56px; }
 }
+
+/* hold-to-interact progress + gadget charge bars */
+#prompt .hold { display: inline-block; width: 90px; height: 8px; margin-left: 10px; vertical-align: 1px; background: rgba(0, 0, 0, 0.45); box-shadow: 0 0 0 2px var(--ink); }
+#prompt .hold i { display: block; height: 100%; background: var(--sun); }
+.slot .dur.charge i { background: #5ab0e0; }

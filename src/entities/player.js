@@ -221,7 +221,7 @@ export class Player {
       speed: this.swim ? hspeed : this.grounded ? hspeed : 0,
       grounded: this.grounded || this.swim, vy: this.vel.y, crouch: this.crouch, sprint: this.sprint, swim: this.swim,
       action: this.action ? { name: this.action.name, t: Math.min(1, this.action.t), side: this.action.side } : this.emote ? { name: this.emote, t: 0.5 } : this.carrying ? { name: 'carry', t: 0.5 } : null,
-      talk: this.talk, expr: this.expr, downed: this.downed, carried: !!this.carriedBy, sitting: !!this.sitting, ride: this.sitting?.ride,
+      talk: this.talk, expr: this.expr, downed: this.downed, carried: !!this.carriedBy, sitting: !!this.sitting, ride: this.sitting?.ride, drive: this.sitting?.drive ?? null,
       sleeping: this.sleeping, lookPitch: this.lookPitch, lookYaw: this.lookYaw, yaw: this.yaw, holding: !!this.heldId, panic: panickingFor(this, panicking),
     });
   }

@@ -3,12 +3,21 @@
 import * as THREE from 'three';
 import { MAT, BIOME } from '../world/gen.js';
 import { SPECIES } from '../world/plantModels.js';
+import { LightPool } from './lights.js';
 
 const SYSTEMS = [];
 export function registerSystem(fn) { SYSTEMS.push(fn); }
 
 export async function installExtras(game) {
   const g = game;
+  // ---------------------------------------------------------------- shared hooks used by the systems below
+  g.stationProviders = g.stationProviders ?? [];
+  g.heldHandlers = g.heldHandlers ?? {};
+  g.actionHandlers = g.actionHandlers ?? {};
+  g.saveables = g.saveables ?? {};
+  g.netHandlers = g.netHandlers ?? {};
+  g.lightPool = new LightPool(g.engine.scene, 6);
+  g.addSystem({ name: 'lights', lateUpdate: (dt) => g.lightPool.update(dt, g.engine.camera.position) });
   // ---------------------------------------------------------------- optional big systems (loaded lazily)
   const mods = await Promise.allSettled([
     import('./structures.js'), import('./building.js'), import('../entities/van.js'), import('./research.js'),

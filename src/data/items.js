@@ -94,13 +94,13 @@ def('tranq_dart', 'Tranquilizer Dart', 'ammo', { desc: 'Snoozeberry-dipped. Adds
 T('tranq_rifle', 'Tranq Rifle', { kind: 'rifle', tier: 3, dmg: 6, ammo: 'tranq_bullet', dur: 300 }, { desc: 'Built from a lawn chair and a fire extinguisher. Drops a T. rex. Eventually.', model: 'rifle', cat: 'weapon' });
 def('tranq_bullet', 'Tranq Shell', 'ammo', { desc: 'Heavy-duty sleepy juice.', model: 'shell', stack: 20, torpor: 160 });
 T('hammer', 'Builder\'s Hammer', { kind: 'hammer', tier: 1, dmg: 4, dur: 999 }, { desc: 'Opens the build menu. Also repairs.', model: 'hammer' });
-T('scanner', 'Chrono-Scanner', { kind: 'scanner', tier: 1, dur: 9999 }, { desc: 'Handheld science gun from the van. Scans footprints, plants, fossils and dinos.', model: 'scanner' });
+T('scanner', 'Chrono-Scanner', { kind: 'scanner', tier: 1, dur: 9999 }, { charge: 100, desc: 'Handheld science gun from the van. Scans footprints, plants, fossils and dinos.', model: 'scanner' });
 T('shovel', 'Shovel', { kind: 'shovel', tier: 1, dmg: 5, dur: 160 }, { desc: 'Dig up fossils, clay and roots.', model: 'shovel' });
 T('canteen', 'Canteen', { kind: 'canteen', tier: 0, dur: 9999 }, { desc: 'Holds water. Fill it at rivers.', model: 'canteen' });
 T('net', 'Catch Net', { kind: 'net', tier: 1, dur: 60 }, { desc: 'For snatching tiny thieving dinosaurs.', model: 'net' });
 T('binoculars', 'Binoculars', { kind: 'binoculars', tier: 0, dur: 9999 }, { desc: 'Study wild dinos from a safe distance to learn what they eat.', model: 'binoculars' });
-T('flashlight', 'Flashlight', { kind: 'flashlight', tier: 0, dur: 9999, light: 2 }, { desc: 'From the van glovebox. Batteries not included. Batteries included.', model: 'flashlight' });
-T('walkie', 'Walkie-Talkie', { kind: 'walkie', tier: 0, dur: 9999 }, { desc: 'Talk to friends anywhere on the island (hold V).', model: 'walkie' });
+T('flashlight', 'Flashlight', { kind: 'flashlight', tier: 0, dur: 9999, light: 2 }, { charge: 100, desc: 'From the van glovebox. Batteries not included. Batteries included.', model: 'flashlight' });
+T('walkie', 'Walkie-Talkie', { kind: 'walkie', tier: 0, dur: 9999 }, { charge: 100, desc: 'Talk to friends anywhere on the island (hold V).', model: 'walkie' });
 T('sickle', 'Flint Sickle', { kind: 'sickle', tier: 1, dmg: 5, dur: 160 }, { desc: 'Harvests fiber and crops much faster.', model: 'sickle' });
 T('metal_hatchet', 'Metal Hatchet', { kind: 'axe', tier: 2, dmg: 18, dur: 400, speed: 1.2 }, { desc: 'Space-iron edge. Trees file complaints.', model: 'hatchet', metal: true });
 T('metal_pick', 'Metal Pickaxe', { kind: 'pick', tier: 2, dmg: 16, dur: 400, speed: 1.2 }, { desc: 'Cracks ore like eggs.', model: 'pick', metal: true });
