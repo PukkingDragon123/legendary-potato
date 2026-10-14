@@ -193,13 +193,19 @@ export async function installExtras(game) {
     update(dt) {
       if (!g.titleMode) return;
       this.t += dt;
-      const fall = g.world.pois.find((p) => p.id === 'waterfall');
       const a = this.t * 0.035 + 2.2;
+      // customising your explorer: a slow close-up turntable around them
+      if (g.titleLook) {
+        const lp = g.local.pos, b = this.t * 0.25;
+        const pos = new THREE.Vector3(lp.x + Math.sin(b) * 2.6, lp.y + 1.25, lp.z + Math.cos(b) * 2.6);
+        g.rig.override = { pos, look: g.titleLook, fov: 50 };
+        g.uiOpen = true;
+        return;
+      }
       const R = 26;
       const pos = new THREE.Vector3(crash.x + Math.cos(a) * R, 0, crash.z + Math.sin(a) * R);
       pos.y = Math.max(g.sampler.heightAt(pos.x, pos.z), g.sampler.waterAt(pos.x, pos.z)) + 4.5 + Math.sin(this.t * 0.1) * 1.2;
-      const look = g.titleLook ?? new THREE.Vector3(crash.x, crash.y + 1.6, crash.z);
-      if (fall && !g.titleLook) look.lerp(new THREE.Vector3(fall.x, fall.y + 12, fall.z), 0.0);
+      const look = new THREE.Vector3(crash.x, crash.y + 1.6, crash.z);
       g.rig.override = { pos, look, fov: 62 };
       g.uiOpen = true;
     },

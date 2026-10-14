@@ -12,6 +12,11 @@ const TIPS = [
   'Tip: Rain fills your Rain Catchers with clean water.',
   'Tip: Research at the van computer unlocks new tech. Science!',
   'Tip: The Chrono-Scanner can read footprints. Follow the trail!',
+  'Tip: Bait a Snare Trap with a dino\'s favourite food, then hide behind a tree.',
+  'Tip: Dino dung feeds your crops AND your van. Nature is beautiful.',
+  'Tip: Old Gnasher\'s stomp has a long reach. Do not stand still near him.',
+  'Tip: Big Momma dives. Watch the water. Then watch the other water.',
+  'Tip: Stampedes go around rocks, not around you.',
   'Fact: Nobody knows how the time machine works. Least of all us.',
   'Fact: Triceratops is grumpy before breakfast. And after.',
 ];
@@ -129,7 +134,10 @@ export class Title {
       <p>You and your friends crashed a homemade time-machine van 66 million years ago.</p>
       <p><b>Survive</b>: eat, drink, sleep, stay warm. <b>Gather</b>: punch bushes, chop trees, mine rocks. <b>Craft</b> in your CHRONO-PAL (Tab).</p>
       <p><b>Build</b> a base with the hammer (B). <b>Tame</b> dinosaurs: study, knock out or befriend, then feed them what they like.</p>
-      <p><b>Research</b> at the van computer to unlock tech and repair the time machine. Then go home. Maybe.</p></div>`);
+      <p><b>Track</b> them: look at the ground for footprints and scan them to follow the trail. Bait a <b>snare trap</b> with a dino's favourite food and wait.</p>
+      <p><b>Research</b> at the van computer to unlock tech and repair the time machine. Then go home. Maybe.</p>
+      <p>Three <b>alphas</b> rule their lairs. Bring friends.</p>
+      <p class="small">WASD move · Shift sprint · Space jump · E use · LMB swing/scan · RMB aim · Z ride/carry · Tab backpack · M map · J journal · B build · V talk</p></div>`);
     this.btn('Back', () => this.main());
   }
   close() { this.el.style.transition = 'opacity 0.5s'; this.el.style.opacity = 0; setTimeout(() => this.el.remove(), 520); }

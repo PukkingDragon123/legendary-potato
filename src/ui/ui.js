@@ -270,6 +270,10 @@ export class UI {
 
   update(dt) {
     const g = this.game;
+    // no HUD behind the title screen
+    const title = !!g.titleMode;
+    if (this._title !== title) { this._title = title; this.hud.classList.toggle('hidden', title); }
+    if (title) return;
     const v = g.vitals;
     if (v) {
       for (const k of ['hp', 'hunger', 'thirst', 'stamina', 'energy']) {
