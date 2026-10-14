@@ -25,6 +25,7 @@ export class Input {
     this.listeners = [];
     this.gp = null;
     this.virtual = new Set(); // scripted presses (tests / touch)
+    this.taps = new Set(); // short presses that must last at least one frame (touch buttons)
     const on = (t, e, f, o) => { t.addEventListener(e, f, o); this.listeners.push([t, e, f, o]); };
     on(window, 'keydown', (e) => {
       if (!this.enabled && e.code !== 'Escape' && e.code !== 'Enter') return;
@@ -48,7 +49,8 @@ export class Input {
   lock() { try { const p = this.canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => this.canvas.requestPointerLock()); } catch { /* not supported */ } }
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
 
-  _isDown(code) { return this.keys.has(code) || this.virtual.has(code); }
+  _isDown(code) { return this.keys.has(code) || this.virtual.has(code) || this.taps.has(code); }
+  tap(code) { this.taps.add(code); }
   down(action) {
     if (this.virtual.has('@' + action)) return true;
     const b = this.binds[action];
@@ -73,6 +75,8 @@ export class Input {
     if (this.down('left')) x -= 1; if (this.down('right')) x += 1;
     if (this.down('forward')) y += 1; if (this.down('back')) y -= 1;
     if (this.gp) { const ax = this.gp.axes; if (Math.hypot(ax[0], ax[1]) > 0.18) { x = ax[0]; y = -ax[1]; } }
+    // analog touch stick wins over the digital keys it also presses
+    if (this.touchAxis && (this.touchAxis.x || this.touchAxis.y)) { x = this.touchAxis.x; y = this.touchAxis.y; }
     const l = Math.hypot(x, y);
     return l > 1 ? { x: x / l, y: y / l } : { x, y };
   }
@@ -94,7 +98,8 @@ export class Input {
   gpPressed(action) { const i = Input.GP[action]; return i !== undefined && !!this.gpButtons?.[i] && !this.gpPrev?.[i]; }
 
   endFrame() {
-    this.prev = new Set([...this.keys, ...this.virtual]);
+    this.prev = new Set([...this.keys, ...this.virtual, ...this.taps]);
+    this.taps.clear();
     this.mdx = 0; this.mdy = 0; this.wheel = 0;
   }
   rebind(action, code) {

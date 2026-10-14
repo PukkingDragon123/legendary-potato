@@ -22,6 +22,7 @@ import { buildStructure } from './world/structureModels.js';
 import { ITEMS } from './data/items.js';
 import { PRESETS } from './entities/character.js';
 import { installExtras } from './systems/registry.js';
+import { isTouchDevice } from './ui/touch.js';
 
 const qs = new URLSearchParams(location.search);
 
@@ -33,7 +34,8 @@ async function boot() {
   if (qs.get('harness')) { (await import('./devharness.js')).runHarness(qs); return; }
   if (qs.get('studio')) { (await import('./devstudio.js')).runStudio(qs); return; }
   if (qs.get('dinos')) { (await import('./devdinos.js')).runDinoStudio(qs); return; }
-  const settings = loadJSON('prehistoric-settings', DEFAULT_SETTINGS);
+  const touch = isTouchDevice();
+  const settings = loadJSON('prehistoric-settings', { ...DEFAULT_SETTINGS, quality: touch ? 'low' : DEFAULT_SETTINGS.quality });
   if (qs.get('q')) settings.quality = qs.get('q');
   const profile = loadJSON('prehistoric-profile', { name: 'Explorer', outfit: { ...PRESETS[Math.floor(Math.random() * PRESETS.length)] } });
   const loading = new Loading();
@@ -95,7 +97,7 @@ async function boot() {
     game.titleMode = false;
     game.rig.override = null;
     await game.start?.(opt);
-    if (!qs.get('nolock')) input.lock();
+    if (!qs.get('nolock') && !touch) input.lock();
   };
   // ---- title over the live world
   let title = null;

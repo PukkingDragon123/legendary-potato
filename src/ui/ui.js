@@ -26,8 +26,9 @@ export class UI {
     this.renderHotbar();
     game.events.on('loot', ({ id, n }) => { if (n > 0) this.loot(id, n); });
     game.events.on('effect', (name) => { const e = EFFECTS[name]; if (e && !['wet', 'cold', 'hot', 'warm', 'sleepy'].includes(name)) this.toast(e.name + '!', name === 'wellfed' || name === 'caffeinated' ? '' : 'warn'); });
-    window.addEventListener('mousemove', (e) => this.onMouseMove(e));
-    window.addEventListener('mouseup', (e) => this.onMouseUp(e));
+    // pointer events so dragging items works with a finger as well as a mouse
+    window.addEventListener('pointermove', (e) => this.onMouseMove(e));
+    window.addEventListener('pointerup', (e) => this.onMouseUp(e));
     this.lastBiome = null;
     this.nametags = new Map();
   }
@@ -65,6 +66,11 @@ export class UI {
     this.el.biome = h('div', 'shadow-text'); this.el.biome.id = 'biome'; H.appendChild(this.el.biome);
     // objective note
     this.el.obj = h('div'); this.el.obj.id = 'objective'; H.appendChild(this.el.obj);
+    // on phones the note folds down to its next step; tap it to unfold
+    if (document.body.classList.contains('touch') || matchMedia?.('(pointer: coarse)').matches) {
+      this.el.obj.classList.add('mini');
+      this.el.obj.addEventListener('pointerdown', (e) => { e.stopPropagation(); this.el.obj.classList.toggle('mini'); });
+    }
     this.el.toasts = h('div'); this.el.toasts.id = 'toasts'; H.appendChild(this.el.toasts);
     this.el.banner = h('div'); this.el.banner.id = 'banner'; H.appendChild(this.el.banner);
     this.el.chat = h('div'); this.el.chat.id = 'chat'; H.appendChild(this.el.chat);
@@ -200,7 +206,8 @@ export class UI {
     const el = this.el.obj;
     if (!o) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
-    el.innerHTML = `<div class="ch">${esc(o.chapter ?? '')}</div><div class="title">${esc(o.title)}</div><ul>${(o.items ?? []).map((it) => `<li class="${it.done ? 'done' : ''}"><span class="cb"></span><span>${esc(it.text)}${it.count ? ` (${it.count})` : ''}</span></li>`).join('')}</ul>`;
+    const next = (o.items ?? []).findIndex((it) => !it.done);
+    el.innerHTML = `<div class="ch">${esc(o.chapter ?? '')}</div><div class="title">${esc(o.title)}</div><ul>${(o.items ?? []).map((it, i) => `<li class="${it.done ? 'done' : ''}${i === next ? ' next' : ''}"><span class="cb"></span><span>${esc(it.text)}${it.count ? ` (${it.count})` : ''}</span></li>`).join('')}</ul>`;
     el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
   }
   chat(from, text, color) {
@@ -429,7 +436,7 @@ export class UI {
     inv.changed();
   }
   bindSlot(el, inv, i, opt = {}) {
-    el.onmousedown = (e) => {
+    el.onpointerdown = (e) => {
       e.preventDefault();
       const s = inv.slots[i];
       if (e.button === 2) { this.split(inv, i); return; }
