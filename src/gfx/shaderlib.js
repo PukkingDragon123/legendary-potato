@@ -126,6 +126,24 @@ vec3 pusherOffset( vec3 wp, float weight ) {
 
 // ---------------------------------------------------------------- patcher
 let _patchId = 0;
+// Materials patched the same way share one shader program (colours, textures
+// and uniform values differ per material, the GLSL does not). The key is the
+// material type plus the patch options.
+const _shared = new Map();
+function sharedKey(opts, type) {
+  let s;
+  try {
+    s = JSON.stringify(opts, (k, v) => {
+      if (k === 'uniforms' && v) return Object.keys(v).sort().join(',');
+      if (typeof v === 'function') return 'fn:' + String(v);
+      if (v && typeof v === 'object' && (v.isTexture || v.isColor || v.isVector2 || v.isVector3 || v.isVector4 || v.isMatrix3 || v.isMatrix4)) return '#';
+      return v;
+    });
+  } catch { return null; }
+  const full = type + '|' + s;
+  if (!_shared.has(full)) _shared.set(full, 'pms' + _shared.size);
+  return _shared.get(full);
+}
 
 /**
  * Patch a stock material.
@@ -138,8 +156,10 @@ let _patchId = 0;
 export function patchMaterial(mat, opts = {}) {
   const key = `pm${_patchId++}`;
   const prev = mat.onBeforeCompile;
+  // a material that already had its own hook keeps a private program
+  const ownHook = typeof prev === 'function' && prev !== THREE.Material.prototype.onBeforeCompile;
   mat.userData.patchOpts = opts;
-  mat.onBeforeCompile = (shader, renderer) => {
+  const patched = (shader, renderer) => {
     if (prev) prev(shader, renderer);
     shader.uniforms.uTime = G.uTime;
     shader.uniforms.uWind = G.uWind;
@@ -215,7 +235,16 @@ export function patchMaterial(mat, opts = {}) {
     shader.fragmentShader = fs;
     mat.userData.shader = shader;
   };
-  mat.customProgramCacheKey = () => key;
+  mat.onBeforeCompile = patched;
+  let ck = null;
+  mat.customProgramCacheKey = () => {
+    if (ck === null) {
+      // hooks wrapped on top after patching (terrain, water, ground cover) can depend on
+      // closure values we cannot see, so those keep a private program
+      ck = (!ownHook && mat.onBeforeCompile === patched && sharedKey(opts, mat.type)) || key;
+    }
+    return ck;
+  };
   return mat;
 }
 

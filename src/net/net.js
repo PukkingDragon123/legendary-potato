@@ -125,7 +125,13 @@ export class Net {
       case 'dropGone': g.drops?.remove(d.nid); return;
       case 'dropPick': if (this.isHost) { const dr = g.drops?.list.get(d.nid); if (dr) g.drops.give(dr, from); } return;
       case 'rtc': this.voice?.onSignal(from, d); return;
-      case 'pinfo': { const p = g.players.get(d.id ?? from); if (p && d.outfit) { p.name = d.name; p.setOutfit(d.outfit); } if (this.isHost) this.broadcast('pinfo', { ...d, id: from }, from); return; }
+      case 'pinfo': {
+        // may arrive before that player's first state update: create them now so the outfit sticks
+        const id = d.id ?? from;
+        if (id !== g.local.id) { const had = g.players.has(id); const p = this.ensurePlayer(id, { ...d, quiet: !d.fresh }); if (had && d.outfit) { p.name = d.name ?? p.name; p.setOutfit(d.outfit); } }
+        if (this.isHost) this.broadcast('pinfo', { ...d, id: from }, from);
+        return;
+      }
       case 'time': if (!this.isHost) { if (Math.abs(g.time.elapsed - d.e) > 2) g.time.elapsed = d.e; g.weather.kind = d.w ?? g.weather.kind; } return;
       default: { const h = g.netHandlers?.[t]; if (h) h(d, from); }
     }
@@ -138,8 +144,7 @@ export class Net {
     if (!p) {
       p = new Player(g, { id, name: info.name ?? 'Friend', outfit: info.outfit, local: false });
       g.players.set(id, p);
-      g.ui?.toast(`${p.name} joined the expedition!`, '', 'friend');
-      g.audio?.jingle?.('discover');
+      if (!info.quiet) { g.ui?.toast(`${p.name} joined the expedition!`, '', 'friend'); g.audio?.jingle?.('discover'); }
     }
     return p;
   }
@@ -165,7 +170,7 @@ export class Net {
     void p;
     this.sendTo(id, 'welcome', this.snapshot());
     // tell everyone else about each other
-    this.broadcast('pinfo', { id, name: info.name, outfit: info.outfit }, id);
+    this.broadcast('pinfo', { id, name: info.name, outfit: info.outfit, fresh: 1 }, id);
     for (const q of g.players.values()) if (q.id !== id) this.sendTo(id, 'pinfo', { id: q.id, name: q.name, outfit: q.outfit });
   }
   snapshot() {

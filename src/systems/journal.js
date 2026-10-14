@@ -53,12 +53,14 @@ export const CHAPTERS = [
       { id: 'rd3', text: 'Research 4 technologies', check: (g) => [Math.min(4, g.research?.done.size ?? 0), 4] },
       { id: 'analyse', text: 'Analyse a specimen at the van', check: ev('analysed') },
       { id: 'dex', text: 'Scan 3 dinosaur species', check: (g) => [Math.min(3, g.research?.dex.size ?? 0), 3] },
+      { id: 'track', text: 'Scan some dino footprints (look at the ground!)', check: (g) => [...(g.research?.scanned.keys() ?? [])].some((k) => k.startsWith('track:')) },
     ],
     reward: { title: 'CERTIFIED NERD', text: 'Dr. Wanda is almost proud.' },
   },
   {
     id: 'tame', title: 'Dino Whisperer', blurb: 'Make a friend. A big, scaly friend.',
     goals: [
+      { id: 'trap', text: 'Build a Snare Trap and bait it', check: (g) => [...(g.structures?.list.values() ?? [])].some((s) => s.def.trap && (s.data.bait || s.data.sprung)) },
       { id: 'tame1', text: 'Tame your first dinosaur', check: ev('tamed') },
       { id: 'trough', text: 'Build a Feeding Trough', check: built('feed_trough') },
       { id: 'job', text: 'Give a tamed dino a job', check: ev('dinoJob') },

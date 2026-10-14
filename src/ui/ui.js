@@ -71,7 +71,8 @@ export class UI {
     this.el.voice = h('div'); this.el.voice.id = 'voice'; H.appendChild(this.el.voice);
     this.el.tame = h('div', 'px-dark hidden'); this.el.tame.id = 'tamepanel'; H.appendChild(this.el.tame);
     this.el.loot = h('div'); this.el.loot.style.cssText = 'position:absolute;left:calc(50% + 40px);top:calc(50% - 10px);'; H.appendChild(this.el.loot);
-    this.el.tags = h('div'); H.appendChild(this.el.tags);
+    // name tags sit underneath every other HUD panel
+    this.el.tags = h('div'); H.insertBefore(this.el.tags, H.firstChild);
     this.buildCompass();
   }
 

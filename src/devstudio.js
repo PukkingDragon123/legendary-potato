@@ -16,7 +16,14 @@ export function runStudio(qs) {
   const lk = (qs.get('look') || '0,0.75,0').split(',').map(Number);
   cam.position.set(...cp); cam.lookAt(...lk);
   const acts = (qs.get('acts') || 'none,wave,none,talk').split(',');
-  const chars = PRESETS.map((pr, i) => {
+  // ?props=greenhouse,trap_net lines up structure models instead of the crew
+  if (qs.get('props')) {
+    import('./world/structureModels.js').then(({ buildStructure }) => {
+      const ids = qs.get('props').split(','), gap = parseFloat(qs.get('gap') || '3');
+      ids.forEach((id, i) => { const b = buildStructure(id); if (!b) return; b.g.position.set((i - (ids.length - 1) / 2) * gap, 0, 0); b.g.rotation.y = parseFloat(qs.get('rot') || '0'); b.g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); engine.scene.add(b.g); });
+    });
+  }
+  const chars = (qs.get('props') ? [] : PRESETS).map((pr, i) => {
     const c = new Character(pr);
     c.root.position.set((i - 1.5) * 0.85, 0, 0);
     c.root.rotation.y = (i - 1.5) * -0.18 + parseFloat(qs.get('rot') || '0');

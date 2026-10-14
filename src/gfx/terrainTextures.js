@@ -311,45 +311,62 @@ const painters = {
     p.scatter(22, (x, y) => { p.set(x, y, 0x5b5f66); p.set(x - 1, y - 1, 0xc9ced6); });
     return p;
   },
-  // side-projection cliff: strata ledges, vertical joints, water stains, mossy ledges
+  // side-projection cliff: wavy bedding planes, sparse slanted joints,
+  // weathered patches, water stains and moss on the ledges (tiles in x and y)
   cliff(seed) {
     const p = new PixelPainter(S, S, seed);
     const pal = ramp(0x837f78, 6, { light: 0.24, hueShift: 0.1 });
-    const layers = [];
+    const r = p.rng;
+    const bounds = [];
     let y = 0;
-    while (y < S) { const t = 8 + Math.floor(p.rng.next() * 22); layers.push([y, Math.min(S, y + t), p.rng.next()]); y += t; }
-    if (layers.length > 1) layers[layers.length - 1][1] = S;
-    for (const [y0, y1, rnd] of layers) {
-      const shade = 1 + Math.floor(rnd * 3);
-      // joints for this layer
-      const joints = [];
-      let x = Math.floor(p.rng.next() * 12);
-      while (x < S) { joints.push(x); x += 9 + Math.floor(p.rng.next() * 22); }
-      for (let yy = y0; yy < y1; yy++) for (let xx = 0; xx < S; xx++) {
-        const n = tileFbm(xx / S * 8, yy / S * 8, 8, 2, seed);
-        let c = pal[shade + (n > 0.62 ? 1 : n < 0.36 ? -1 : 0)];
-        if (yy === y0) c = pal[Math.min(5, shade + 2)];
-        else if (yy === y0 + 1 && n > 0.4) c = pal[Math.min(5, shade + 1)];
-        if (yy >= y1 - 2) c = pal[0];
-        for (const j of joints) {
-          const jx = j + Math.round(Math.sin(yy * 0.4 + j) * 0.8);
-          if (xx === jx) c = pal[0];
-          else if (xx === jx + 1) c = pal[Math.min(5, shade + 1)];
+    while (y < S - 8) {
+      bounds.push({ y, amp: y === 0 ? 0 : 1 + r.next() * 2.6, cyc: 1 + Math.floor(r.next() * 3), ph: r.next() * 6.283, shade: 1 + Math.floor(r.next() * 3), joints: r.next() < 0.6 });
+      y += 10 + Math.floor(r.next() * 32);
+    }
+    bounds.push({ y: S, amp: 0, cyc: 1, ph: 0 });
+    const by = (b, x) => b.y + Math.round(Math.sin((x / S) * Math.PI * 2 * b.cyc + b.ph) * b.amp);
+    for (const b of bounds) {
+      b.js = [];
+      if (!b.joints) continue;
+      let x = Math.floor(r.next() * 24);
+      while (x < S - 6) { b.js.push({ x, slant: (r.next() - 0.5) * 0.7 }); x += 20 + Math.floor(r.next() * 40); }
+    }
+    for (let x = 0; x < S; x++) {
+      for (let k = 0; k < bounds.length - 1; k++) {
+        const b = bounds[k], y0 = by(b, x), y1 = by(bounds[k + 1], x);
+        for (let yy = y0; yy < y1; yy++) {
+          const n = tileFbm((x / S) * 8, (yy / S) * 8, 8, 2, seed);
+          const big = tileFbm((x / S) * 2, (yy / S) * 2, 2, 3, seed + 7);
+          let c = pal[Math.max(0, Math.min(5, b.shade + (n > 0.62 ? 1 : n < 0.36 ? -1 : 0) + (big < 0.32 ? -1 : 0)))];
+          if (yy === y0) c = pal[Math.min(5, b.shade + 2)];
+          else if (yy === y0 + 1 && n > 0.4) c = pal[Math.min(5, b.shade + 1)];
+          if (yy >= y1 - 2) c = pal[0];
+          for (const j of b.js) {
+            const jx = Math.round(j.x + (yy - y0) * j.slant + Math.sin(yy * 0.5 + j.x) * 0.7);
+            if (x === jx) c = pal[0];
+            else if (x === jx + 1) c = pal[Math.min(5, b.shade + 1)];
+          }
+          p.set(x, yy, c);
         }
-        p.set(xx, yy, c);
       }
-      // moss + grass tufts on the ledge
-      p.scatter(Math.floor(S / 14), (lx, ly, i, r) => {
-        if (r.next() < 0.45) return;
-        const g = ramp(0x5a8a33, 4);
-        for (let k = 0; k < 4 + r.int(0, 5); k++) { p.set(lx + k, y0, g[r.int(1, 3)]); if (r.next() < 0.5) p.set(lx + k, y0 - 1, g[3]); if (r.next() < 0.3) p.set(lx + k, y0 + 1, g[0]); }
-      });
+    }
+    // moss and grass along the ledge lips
+    const g = ramp(0x5a8a33, 4);
+    for (let k = 1; k < bounds.length - 1; k++) {
+      const b = bounds[k];
+      for (let x = 0; x < S; x++) {
+        if (tileNoise(x / 6, k * 3.1, Math.ceil(S / 6), seed + k) < 0.58) continue;
+        const yy = by(b, x);
+        p.set(x, yy, g[2]);
+        if (r.next() < 0.55) p.set(x, yy - 1, g[3]);
+        if (r.next() < 0.3) p.set(x, yy + 1, g[0]);
+      }
     }
     // dark water stains running down
-    p.scatter(7, (sx, sy, i, r) => { const len = 20 + r.next() * 50; for (let k = 0; k < len; k++) { p.mul(sx + Math.round(Math.sin(k * 0.2) * 0.6), sy + k, 0.82); } });
+    p.scatter(7, (sx, sy, i, rr) => { const len = 20 + rr.next() * 50; for (let k = 0; k < len; k++) p.mul(sx + Math.round(Math.sin(k * 0.2) * 0.6), sy + k, 0.82); });
     speckle(p, 200, [pal[1], pal[4]]);
     const lich = [ramp(0xb9b56c, 3), ramp(0xd59443, 3)];
-    p.scatter(6, (x, y, i, r) => { const c = r.pick(lich); for (let k = 0; k < 6; k++) p.blob(x + r.int(-3, 3), y + r.int(-2, 2), 1.2, 1, c); });
+    p.scatter(6, (x, yy, i, rr) => { const c = rr.pick(lich); for (let k = 0; k < 6; k++) p.blob(x + rr.int(-3, 3), yy + rr.int(-2, 2), 1.2, 1, c); });
     return p;
   },
   basaltcols(seed) {

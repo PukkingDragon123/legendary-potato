@@ -600,9 +600,15 @@ B.trophy_gnasher = () => {
   const base = rock(0.42, SM.rockDark()); base.scale.set(1.1, 0.7, 1); base.position.y = 0.16; g.add(base);
   g.add(box(0.5, 0.12, 0.5, SM.plank(), 0, 0.36, 0, 0.02, 0.5));
   // the tooth: ivory point, darker root
-  const tooth = bentCone(0.16, 0.95, -0.35, T('rextooth', { color: 0xf0e6cc, roughness: 0.45 }));
-  tooth.position.set(0, 0.92, 0.04); g.add(tooth);
-  const root = mk(new THREE.CylinderGeometry(0.15, 0.13, 0.16, 10), T('rexroot', { color: 0x9a7a52, roughness: 0.8 })); root.position.y = 0.48; g.add(root);
+  // the fang: fat root, curved point
+  const prof = [];
+  for (let i = 0; i <= 12; i++) { const t = i / 12; const r = 0.22 * (t < 0.22 ? 0.82 + t * 0.8 : Math.pow(1 - t, 0.75) * 1.2); prof.push(new THREE.Vector2(Math.max(0.004, r), t * 1.1)); }
+  const tg = new THREE.LatheGeometry(prof, 14);
+  const tp = tg.attributes.position;
+  for (let i = 0; i < tp.count; i++) { const y = tp.getY(i) / 1.1; tp.setZ(i, tp.getZ(i) + 0.32 * y * y); }
+  tg.computeVertexNormals();
+  const tooth = mk(tg, T('rextooth', { color: 0xf0e2c0, roughness: 0.4 })); tooth.position.set(0, 0.5, -0.04); g.add(tooth);
+  const root = mk(new THREE.CylinderGeometry(0.2, 0.19, 0.1, 12), T('rexroot', { color: 0x8a6a46, roughness: 0.8 })); root.position.y = 0.46; g.add(root);
   const sign = plaque('OLD GNASHER'); sign.position.set(0, 0.36, -0.256); sign.rotation.y = Math.PI; g.add(sign);
   for (const sx of [-1, 1]) { const f = mk(new THREE.ConeGeometry(0.03, 0.22, 4), SM.bone()); f.position.set(sx * 0.19, 0.5, -0.12); f.rotation.z = sx * 0.4; g.add(f); }
   return { g, col: [col(0, 0.5, 0, 0.3, 0.5, 0.3, false)], parts: {}, anchors: {} };

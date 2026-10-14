@@ -690,6 +690,24 @@ export class Dinos {
       else this.netInterp(d, dt);
       this.animate(d, dt);
     }
+    // stampedes and charges bowl you over (each machine checks its own player)
+    const me = g.local;
+    if (!me.sitting && !me.downed) {
+      for (const d of this.list.values()) {
+        if (d.tamed || d.hidden || d.sp.size < 2.5 || d.speed < 4 || !['flee', 'charge'].includes(d.state)) continue;
+        const r = d.radius * d.sizeK + 0.45;
+        if (d.dist2(me.pos) > r * r || Math.abs(me.pos.y - d.pos.y) > d.rig.height * d.sizeK) continue;
+        if ((me.trampledT ?? 0) > g.time.elapsed - 1.2) continue;
+        me.trampledT = g.time.elapsed;
+        const away = new THREE.Vector3(me.pos.x - d.pos.x, 0, me.pos.z - d.pos.z).normalize();
+        me.vel.addScaledVector(away, 9 + d.sp.size * 0.5); me.vel.y = 6;
+        g.vitals?.damage(Math.min(30, d.sp.size * 2.2), { kind: 'dino' });
+        g.audio?.play('bonk', { pos: me.pos, vol: 1 });
+        g.fx.stars(me.pos.clone().add(new THREE.Vector3(0, 1.4, 0)), 5);
+        if ((this.toldTrample ?? -99) < g.time.elapsed - 20) { this.toldTrample = g.time.elapsed; g.ui?.toast(`TRAMPLED by a ${d.sp.short}! Stampedes go around big rocks and trees, not you.`, 'warn', 'dino', 4000); }
+        break;
+      }
+    }
     // danger level for the music: something is hunting YOU
     let danger = 0;
     for (const d of this.list.values()) {
@@ -801,6 +819,22 @@ export async function install(g) {
   g.addSystem(D);
   g.interaction.handlers.push((o, d, reach) => D.raycast(o, d, reach + 1.5));
   g.saveables.dinos = { save: () => D.serialize(), load: (d) => D.load(d) };
+  // the third-person camera pulls in rather than clipping into big dinos
+  g.rig.blockers = (o, dir, max) => {
+    let best = null;
+    for (const d of D.list.values()) {
+      if (d.sp.size < 3 || d.hidden || d.riders.includes(g.local)) continue;
+      const r = d.radius * d.sizeK * 0.95, cy = d.pos.y + d.rig.height * d.sizeK * 0.5;
+      const ox = o.x - d.pos.x, oy = o.y - cy, oz = o.z - d.pos.z;
+      if (ox * ox + oz * oz > (max + r + 2) ** 2) continue;
+      const b = ox * dir.x + oy * dir.y + oz * dir.z, c = ox * ox + oy * oy + oz * oz - r * r;
+      const disc = b * b - c;
+      if (disc < 0) continue;
+      const t = -b - Math.sqrt(disc);
+      if (t > 0 && t < max && (best === null || t < best)) best = t;
+    }
+    return best;
+  };
   g.netHandlers.dinos = (arr) => { if (!g.isHost) D.applyNet(arr); };
   g.netHandlers.dinoName = ({ id, name }) => { const d = D.list.get(id); if (d) d.name = name; };
   // world noises that alarm dinos

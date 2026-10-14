@@ -160,6 +160,32 @@ export async function installExtras(game) {
     },
   });
 
+  // ---------------------------------------------------------------- waterfall mist + spray
+  g.addSystem({
+    name: 'fallsfx', acc: 0,
+    update(dt) {
+      const falls = g.world.waterfalls ?? [], river = g.world.river ?? [];
+      const cam = g.engine.camera.position;
+      for (const f of falls) {
+        const h = f.top - f.bottom;
+        const d = Math.hypot(cam.x - f.x1, cam.z - f.z1);
+        if (d > 160 || h < 2) continue;
+        const w = (river[f.i1]?.[3] ?? 6) * 0.5;
+        // direction of the fall (top -> bottom) and its side vector
+        let fx = f.x1 - f.x0, fz = f.z1 - f.z0; const L = Math.hypot(fx, fz) || 1; fx /= L; fz /= L;
+        f.acc = (f.acc ?? 0) + dt * Math.min(14, 2 + h * 0.6) * (d < 60 ? 1 : 0.5);
+        while (f.acc > 1) {
+          f.acc -= 1;
+          const s = (Math.random() - 0.5) * 2 * w, k = Math.random();
+          const x = f.x1 - fz * s - fx * k * 2, z = f.z1 + fx * s - fz * k * 2;
+          g.fx.sprite('puff', x, f.bottom + 0.3 + Math.random() * 0.8, z, { vx: fx * (1 + Math.random() * 2) + (Math.random() - 0.5), vy: 0.8 + Math.random() * 1.6, vz: fz * (1 + Math.random() * 2) + (Math.random() - 0.5), life: 2.6 + Math.random() * 1.6, size: 1.2 + h * 0.08, grow: 1.6, alpha: 0.32, color: 0xeef6ff, drag: 0.8, fadeIn: 0.25, wobble: 0.6 });
+          if (Math.random() < 0.35) g.fx.sprite('drop', x, f.bottom + 0.4, z, { vx: (Math.random() - 0.5) * 3 + fx * 2, vy: 2 + Math.random() * 3, vz: (Math.random() - 0.5) * 3 + fz * 2, life: 0.8, size: 0.12, color: 0xe8f4ff, grav: 9 });
+          if (Math.random() < 0.15) g.fx.splash(x, f.bottom, z, 0.8 + Math.random() * 0.6);
+        }
+      }
+    },
+  });
+
   // ---------------------------------------------------------------- title camera
   const crash = g.crash;
   g.addSystem({
@@ -188,8 +214,11 @@ export async function installExtras(game) {
   g.start = async (opt) => {
     g.uiOpen = false;
     if (g.profile?.name) g.local.name = g.profile.name; // typed on the title screen
-    if (opt.mode === 'join' && g.netJoin) await g.netJoin(opt.code);
-    else {
+    if (opt.mode === 'join' && g.netJoin) {
+      await g.netJoin(opt.code);
+      // joiners crash-landed too: same pocket snacks as the host
+      if (!g.inventory.slots.some(Boolean)) { g.give('noodles', 2, { quiet: true }); g.give('energybar', 2, { quiet: true }); g.give('canteen', 1, { quiet: true }); }
+    } else {
       if (opt.mode === 'continue' && g.loadGame) await g.loadGame();
       else {
         g.newGame?.();
