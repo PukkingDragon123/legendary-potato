@@ -4,7 +4,7 @@
 // colliders and persistent depletion state (networked by id).
 import * as THREE from 'three';
 import { RNG, Simplex, tileFbm } from '../core/rng.js';
-import { BIOME, MAT } from './gen.js';
+import { BIOME } from './gen.js';
 import { patchMaterial } from '../gfx/shaderlib.js';
 import { PixelPainter, ramp, makeArrayTexture } from '../gfx/pixel.js';
 import { GLSL_HASH } from './terrain.js';

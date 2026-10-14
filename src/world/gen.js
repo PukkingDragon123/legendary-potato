@@ -643,7 +643,7 @@ function calmFalls(world, hAt) {
 
 // shared sampling helpers (used by the main thread after transfer)
 export function makeSampler(world) {
-  const { N, M, half, height, water, biome, splat } = world;
+  const { N, M, half, height, biome, splat } = world;
   const hAt = (x, z) => {
     const fx = Math.min(Math.max(x + half, 0), N - 1.001), fz = Math.min(Math.max(z + half, 0), N - 1.001);
     const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;

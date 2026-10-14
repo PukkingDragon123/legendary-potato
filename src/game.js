@@ -1,7 +1,5 @@
 // The Game: owns every system and runs the frame loop.
 import * as THREE from 'three';
-import { Engine } from './core/engine.js';
-import { Input } from './core/input.js';
 import { Events } from './core/events.js';
 import { CollisionWorld } from './core/physics.js';
 import { CameraRig } from './core/cameraRig.js';

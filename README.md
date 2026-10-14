@@ -18,6 +18,8 @@ Co-op needs the game server (`npm run serve`, or `npm start` after `npm run buil
 
 Useful URL flags: `?q=low|medium|high|ultra` (graphics), `?seed=word` (another island), `?day=600` (seconds per in-game day), `?server=https://host:8080` (use a remote game server), `?autostart=1`.
 
+Dev viewers: `?dinos=1&sp=rex,alpha:gnasher,raptor` lines up dinosaurs (alphas too), `?studio=1&props=greenhouse,trap_net` lines up structure models, `?studio=1` shows the crew.
+
 ## Controls
 
 | Action | Key |
@@ -67,7 +69,8 @@ Three.js (WebGL2) with a custom HDR pipeline (SAO, bloom, god rays, grading), re
 src/core       engine, input, physics, camera
 src/world      island generator, terrain, water, sky, flora, ground cover, resource nodes, structure models
 src/entities   characters, player, van, dinosaurs
-src/systems    vitals, interaction, crafting, structures, building, research, journal, taming, weapons, co-op, save
+src/systems    vitals, interaction, crafting, structures, building, research, journal, taming, weapons,
+               alphas (bosses), tracks, caves, volcano, story, co-op, save
 src/ui         HUD, CHRONO-PAL, CHRONO-OS, menus
 src/audio      procedural sound library, van engine and radio
 src/net        co-op networking and voice

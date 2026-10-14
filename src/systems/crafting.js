@@ -1,7 +1,6 @@
 // Crafting: recipes need their station nearby (or the van workshop), are
 // unlocked by research, take a little time with a satisfying animation.
 import * as THREE from 'three';
-import { RECIPES } from '../data/recipes.js';
 import { ITEMS } from '../data/items.js';
 
 export class Crafting {

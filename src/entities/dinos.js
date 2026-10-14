@@ -4,7 +4,7 @@
 // and fear fire, thieves that steal, combat, torpor + knock-outs, corpses,
 // nests with eggs, and host-authoritative networking + saving.
 import * as THREE from 'three';
-import { SPECIES, DINO_NAMES, PERSONALITIES, BIOME_KEYS } from './dinoSpecies.js';
+import { SPECIES, DINO_NAMES, BIOME_KEYS } from './dinoSpecies.js';
 import { buildDino, DinoRig } from './dinoModel.js';
 import { RNG, hash2i } from '../core/rng.js';
 import { ITEMS } from '../data/items.js';

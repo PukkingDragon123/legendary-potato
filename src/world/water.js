@@ -3,7 +3,7 @@
 // ripples, depth absorption, shoreline foam and sky reflections, so it still
 // receives sun shadows and fog like everything else.
 import * as THREE from 'three';
-import { patchMaterial, G } from '../gfx/shaderlib.js';
+import { patchMaterial } from '../gfx/shaderlib.js';
 import { GLSL_HASH } from './terrain.js';
 
 const WATER_GLSL = /* glsl */ `
