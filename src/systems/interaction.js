@@ -119,7 +119,7 @@ export class Interaction {
     const g = this.game, p = g.local, inp = g.input;
     if (g.uiOpen || p.downed || p.sitting || p.sleeping) { this.target = null; if (!p.sitting) g.ui?.setPrompt(null); g.ui?.setTarget(null); return; }
     // hotbar selection
-    for (let i = 0; i < 8; i++) if (inp.pressed('hot' + (i + 1))) this.select(i);
+    for (let i = 0; i < 8; i++) if (inp.pressed('hot' + (i + 1)) && !g.building?.active) this.select(i);
     if (inp.wheel && !inp.down('crouch') && !g.building?.active) { this.select((g.inventory.selected + (inp.wheel > 0 ? 1 : 7)) % 8); g.wheelCaptured = true; } else g.wheelCaptured = !!g.building?.active;
     const held = g.inventory.held();
     const hdef = held ? ITEMS[held.id] : null;
@@ -139,7 +139,7 @@ export class Interaction {
       }
       if (tgt.prompt) prompt = tgt.prompt;
     }
-    g.ui?.setPrompt(prompt);
+    if (!g.promptClaim) g.ui?.setPrompt(prompt);
     // E: interact
     if (inp.pressed('interact') && tgt) {
       if (tgt.onInteract) tgt.onInteract();

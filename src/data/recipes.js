@@ -62,6 +62,12 @@ r('lantern', 'lantern', 1, { glass: 1, scrap: 1, resin: 1 }, { ...WB, cat: 'tool
 r('whistle', 'whistle', 1, { bone: 1, resin: 1 }, { ...WB, cat: 'dinos', time: 1, unlock: 'tame_basics' });
 r('fridge', 'fridge', 1, { plank: 6, scrap: 6, salt: 4 }, { ...WB, cat: 'camp', time: 2.5, unlock: 'cooking' });
 r('specimen_shelf', 'specimen_shelf', 1, { plank: 8 }, { ...WB, cat: 'camp', time: 2 });
+r('table', 'table', 1, { plank: 6 }, { ...WB, cat: 'decor', time: 2 });
+r('chair', 'chair', 1, { plank: 3, fiber: 4 }, { ...WB, cat: 'decor', time: 1.5 });
+r('rug', 'rug', 1, { fiber: 20, hide: 1 }, { ...WB, cat: 'decor', time: 2 });
+r('planter', 'planter', 1, { clay: 4, fiber: 2, seed_fern: 1 }, { ...WB, cat: 'decor', time: 1.5 });
+r('hammock', 'hammock', 1, { rope: 6, log: 2, hide: 1 }, { ...WB, cat: 'decor', time: 2.5 });
+r('skull_trophy', 'skull_trophy', 1, { bone: 6, stick: 2 }, { ...WB, cat: 'decor', time: 2 });
 r('research_table', 'research_table', 1, { plank: 8, glass: 2, scrap: 4, circuit: 1 }, { ...WB, cat: 'science', time: 3, unlock: 'lab' });
 
 // ---- campfire (cooking)

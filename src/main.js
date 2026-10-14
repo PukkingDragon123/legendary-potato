@@ -17,7 +17,8 @@ import { Interaction } from './systems/interaction.js';
 import { Crafting } from './systems/crafting.js';
 import { Drops } from './systems/drops.js';
 import { Hotkeys } from './systems/hotkeys.js';
-import { renderIcons } from './gfx/itemModels.js';
+import { renderIcons, setStructureModelBuilder } from './gfx/itemModels.js';
+import { buildStructure } from './world/structureModels.js';
 import { ITEMS } from './data/items.js';
 import { PRESETS } from './entities/character.js';
 import { installExtras } from './systems/registry.js';
@@ -31,6 +32,7 @@ function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } ca
 async function boot() {
   if (qs.get('harness')) { (await import('./devharness.js')).runHarness(qs); return; }
   if (qs.get('studio')) { (await import('./devstudio.js')).runStudio(qs); return; }
+  if (qs.get('dinos')) { (await import('./devdinos.js')).runDinoStudio(qs); return; }
   const settings = loadJSON('prehistoric-settings', DEFAULT_SETTINGS);
   if (qs.get('q')) settings.quality = qs.get('q');
   const profile = loadJSON('prehistoric-profile', { name: 'Explorer', outfit: { ...PRESETS[Math.floor(Math.random() * PRESETS.length)] } });
@@ -52,6 +54,7 @@ async function boot() {
   game.addSystem(new Drops(game));
   loading.set(0.96, 'Painting tiny pixel icons');
   await new Promise((r) => setTimeout(r, 0));
+  setStructureModelBuilder(buildStructure);
   game.icons = renderIcons(engine.renderer, ITEMS, 40);
   new UI(game);
   game.addSystem(game.ui);

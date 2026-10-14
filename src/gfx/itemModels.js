@@ -143,9 +143,23 @@ const B = {
 };
 
 const modelCache = new Map();
+// placeables show a miniature of the real structure (set by the structures module)
+let structureBuilder = null;
+export function setStructureModelBuilder(fn) { structureBuilder = fn; modelCache.clear(); }
+function miniature(def) {
+  const st = structureBuilder?.(def.place);
+  if (!st) return B.kit(def);
+  const g = new THREE.Group();
+  g.add(st.g);
+  const bb = new THREE.Box3().setFromObject(st.g), sz = bb.getSize(new THREE.Vector3());
+  st.g.scale.setScalar(0.42 / Math.max(sz.x, sz.y, sz.z, 0.01));
+  st.g.position.y = -bb.min.y * st.g.scale.y;
+  return g;
+}
 export function buildItemModel(def, opt = {}) {
-  const key = def.model + ':' + (def.color ?? '') + ':' + (def.metal ? 1 : 0) + ':' + (def.scale ?? '');
-  const fn = B[def.model] ?? B.kit;
+  const mini = def.place && def.model === 'kit' && structureBuilder;
+  const key = (mini ? 'mini:' + def.id : def.model) + ':' + (def.color ?? '') + ':' + (def.metal ? 1 : 0) + ':' + (def.scale ?? '');
+  const fn = mini ? miniature : B[def.model] ?? B.kit;
   if (opt.fresh || !modelCache.has(key)) {
     const g = fn(def);
     g.name = 'item:' + def.id;

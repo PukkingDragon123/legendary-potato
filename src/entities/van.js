@@ -17,7 +17,7 @@ const DRAW = [0.03, 0.05, 0.012, 0.22]; // battery % per second per breaker
 const SOCKETS = ['temporal_coil', 'flux_crystal', 'nav_chip', 'power_core', 'stabilizer'];
 const WHEELBASE = VAN.rearAxle - VAN.frontAxle, TRACK = 1.72;
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4(), _ray = new THREE.Ray(), _hit = new THREE.Vector3();
-const _box = new THREE.Box3();
+const _box = new THREE.Box3(), _c = new THREE.Vector3(), _sz = new THREE.Vector3();
 const OCCLUDERS = new Set(['wallL', 'wallL_cab', 'wallR_cab', 'wallR_back', 'slide', 'rear', 'roof']);
 
 export class Van {
@@ -201,7 +201,7 @@ export class Van {
     }
     // breaker switches -----------------------------------------------------
     P.switches.forEach((sw, i) => {
-      ia({ id: 'sw' + i, obj: sw.g, min: [-0.045, -0.12, -0.01], max: [0.045, 0.14, 0.055], label: () => 'Breaker: ' + sw.label, info: () => this.powerInfo(), prompt: () => ({ text: (S.sw[i] ? 'Switch OFF ' : 'Switch ON ') + sw.label }), act: () => this.request('switch', { i, on: !S.sw[i] }) });
+      ia({ id: 'sw' + i, obj: sw.g, min: [-0.042, -0.12, 0], max: [0.042, 0.14, 0.045], label: () => 'Breaker: ' + sw.label, info: () => this.powerInfo(), prompt: () => ({ text: (S.sw[i] ? 'Switch OFF ' : 'Switch ON ') + sw.label }), act: () => this.request('switch', { i, on: !S.sw[i] }) });
     });
     // battery bank + dynamo ------------------------------------------------
     ia({
@@ -301,7 +301,7 @@ export class Van {
   raycastInteract(o, d, reach) {
     if ((o.x - this.pose.x) ** 2 + (o.z - this.pose.z) ** 2 > (reach + 5) ** 2) return null;
     const wall = this.wallHit(o, d, reach);
-    let best = null;
+    const hits = [];
     for (const it of this.ia) {
       if (it.enabled && !it.enabled()) continue;
       const obj = it.obj;
@@ -310,11 +310,15 @@ export class Van {
       _ray.direction.copy(d).transformDirection(_m);
       if (!_ray.intersectBox(it.box, _hit)) continue;
       const dist = _ray.origin.distanceTo(_hit);
-      if (dist > reach || (best && dist >= best.dist)) continue;
+      if (dist > reach) continue;
       if (dist > wall + 0.04 && !it.onWall) continue;
-      best = { dist, it };
+      it.box.getCenter(_c);
+      hits.push({ dist, it, off: _ray.distanceToPoint(_c) / Math.max(0.05, it.box.getSize(_sz).length()) });
     }
-    if (!best) return null;
+    if (!hits.length) return null;
+    // small neighbouring targets (switches, sockets): prefer the one the ray passes closest to the middle of
+    const near = Math.min(...hits.map((h) => h.dist));
+    const best = hits.filter((h) => h.dist < near + 0.22).sort((a, b) => a.off - b.off)[0];
     const it = best.it;
     const pr = it.prompt ? it.prompt() : null;
     const holdSpec = pr?.hold && it.hold ? it.hold() : null;
@@ -958,6 +962,7 @@ export class Van {
   applyRadio() {
     const S = this.s;
     this.audio.tune(S.sw[SW.RADIO] && S.charge > 0 ? S.radio : -1);
+    this.g.events.emit('radioTune', { st: S.radio });
     this.parts.radio.lcd.material.emissiveIntensity = S.radio >= 0 ? 1.4 : 0;
   }
   bobbleKick(a) { const b = this.parts.bobble; b.v.x += (Math.random() - 0.5) * a * 2; b.v.y += (Math.random() - 0.5) * a * 2; }

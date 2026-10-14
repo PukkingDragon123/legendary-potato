@@ -298,3 +298,13 @@ img.icon, canvas.icon { image-rendering: pixelated; image-rendering: crisp-edges
 #prompt .hold { display: inline-block; width: 90px; height: 8px; margin-left: 10px; vertical-align: 1px; background: rgba(0, 0, 0, 0.45); box-shadow: 0 0 0 2px var(--ink); }
 #prompt .hold i { display: block; height: 100%; background: var(--sun); }
 .slot .dur.charge i { background: #5ab0e0; }
+
+/* scanner result card */
+.scancard { position: absolute; right: 18px; top: 150px; width: 300px; padding: 10px 12px 12px; transform: translateX(340px); transition: transform .35s cubic-bezier(.2,1.4,.4,1); pointer-events: none; z-index: 6; }
+.scancard.in { transform: translateX(0); }
+.scancard .sc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.scancard .sc-tag { font-family: var(--font-small); font-size: 11px; color: var(--ink); padding: 2px 6px; box-shadow: 0 0 0 2px var(--ink); }
+.scancard .sc-new { font-family: var(--font-small); font-size: 11px; color: var(--sun); animation: blink 0.8s steps(2) 4; }
+.scancard .sc-title { font-size: 18px; color: var(--lcd-text); margin-bottom: 4px; }
+.scancard .sc-fact { font-size: 13px; line-height: 17px; color: var(--lcd-dim); }
+.scancard .sc-rp { margin-top: 8px; font-family: var(--font-small); font-size: 12px; color: var(--sun); }

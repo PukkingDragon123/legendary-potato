@@ -181,6 +181,20 @@ export class UI {
     void b.offsetWidth;
     b.className = 'show';
   }
+  // scanner result card (slides in at the right)
+  scanCard(d, first) {
+    const cats = { bio: ['BIO', '#7bc86c'], geo: ['GEO', '#c8a070'], zoo: ['ZOO', '#f2b630'], paleo: ['PALEO', '#b090e0'] };
+    const c = cats[d.cat];
+    const el = h('div', 'scancard px-dark');
+    el.innerHTML = `<div class="sc-top"><span class="sc-tag" style="background:${c ? c[1] : '#8a8a8a'}">${c ? c[0] : 'SCAN'}</span><span class="sc-new">${first ? 'NEW!' : 'SCANNED'}</span></div><div class="sc-title">${esc(d.title)}</div><div class="sc-fact">${esc(d.fact)}</div>${first && d.rp && c ? `<div class="sc-rp">+${d.rp} ${c[0]} DATA</div>` : ''}`;
+    this.root.appendChild(el);
+    (this._cards = this._cards || []).push(el);
+    while (this._cards.length > 2) this._cards.shift().remove();
+    this._cards.forEach((x, i) => { x.style.top = 150 + i * 0 + 'px'; });
+    requestAnimationFrame(() => el.classList.add('in'));
+    setTimeout(() => el.classList.remove('in'), 6500);
+    setTimeout(() => { el.remove(); this._cards = this._cards.filter((x) => x !== el); }, 7000);
+  }
   setObjective(o) {
     const el = this.el.obj;
     if (!o) { el.classList.add('hidden'); return; }
@@ -473,7 +487,7 @@ export class UI {
     S.innerHTML = '';
     const pane = h('div', 'pane');
     const cats = h('div', 'cats');
-    const catList = [['all', 'All'], ['basics', 'Basics'], ['tools', 'Tools'], ['camp', 'Camp'], ['food', 'Food'], ['medical', 'Medical'], ['farm', 'Farming'], ['dinos', 'Dinos'], ['materials', 'Materials'], ['power', 'Power'], ['tech', 'Tech'], ['van', 'Van Parts'], ['defense', 'Defense'], ['science', 'Science']];
+    const catList = [['all', 'All'], ['basics', 'Basics'], ['tools', 'Tools'], ['camp', 'Camp'], ['food', 'Food'], ['medical', 'Medical'], ['farm', 'Farming'], ['dinos', 'Dinos'], ['materials', 'Materials'], ['power', 'Power'], ['tech', 'Tech'], ['van', 'Van Parts'], ['defense', 'Defense'], ['science', 'Science'], ['decor', 'Decor']];
     this.craftCat = this.craftCat ?? 'all';
     for (const [k, label] of catList) { const c = h('div', 'c' + (this.craftCat === k ? ' on' : ''), label); c.onclick = () => { this.craftCat = k; this.renderCraft(); }; cats.appendChild(c); }
     pane.appendChild(cats);

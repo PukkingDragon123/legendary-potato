@@ -17,6 +17,7 @@ export const EFFECTS = {
   caffeinated: { name: 'Caffeinated', icon: 'spark', color: '#c08040', desc: 'Faster stamina regen.' },
   sleepy: { name: 'Sleepy', icon: 'zzz', color: '#9090d0', desc: 'Get some rest.' },
   warm: { name: 'Toasty', icon: 'flame', color: '#ffb060', desc: 'Near a fire.' },
+  blind: { name: 'Spat On', icon: 'drop', color: '#9ad040', desc: 'Dilophosaurus spit. Everything is blurry.' },
 };
 
 export class Vitals {
@@ -53,6 +54,7 @@ export class Vitals {
     this.game.rig.addTrauma(Math.min(0.6, amount / 40));
     p.setExpr('hurt', 0.8);
     this.game.audio?.play('hurt', { pos: p.pos, vol: 0.8 });
+    this.game.events.emit('damage', { amount, ...src });
     if (src.bleed && Math.random() < src.bleed) this.add('bleeding', 40);
     if (src.poison) this.add('poison', src.poison);
     if (this.hp <= 0) { this.hp = 0; this.down(src); }
@@ -167,7 +169,7 @@ export class Vitals {
     const low = this.hp < 25 ? (1 - this.hp / 25) * (0.25 + 0.15 * Math.sin(performance.now() / 300)) : 0;
     post.uDamage.value = Math.max(this.damageFlash, low);
     post.uDesat.value = p.downed ? 0.8 : this.hp < 20 ? 0.35 : 0;
-    post.uBlur.value = this.effects.has('sleepy') ? 0.6 : this.effects.has('trippy') ? 0.4 : 0;
+    post.uBlur.value = this.effects.has('blind') ? 1 : this.effects.has('sleepy') ? 0.6 : this.effects.has('trippy') ? 0.4 : 0;
     if (this.effects.has('trippy')) { const t = performance.now() / 1000; post.uSaturation.value = 1.6 + Math.sin(t * 2) * 0.5; post.uLift.value.set(0.04 * Math.sin(t), 0.02 * Math.sin(t * 1.3 + 2), 0.04 * Math.sin(t * 0.7 + 4)); }
     else { post.uSaturation.value = 1.12; post.uLift.value.set(0.012, 0.014, 0.022); }
     if (p.downed) {

@@ -153,6 +153,12 @@ P('flag', 'Team Flag', { desc: 'Claim your camp. Very important. Very official.'
 P('coffee_machine', 'Coffee Machine', { desc: 'Salvaged from the van. Powered by hope.' });
 P('dino_bed', 'Dino Nest Bed', { desc: 'Tamed dinos sleep happier here.' });
 P('fridge', 'Cooler Box', { desc: 'Slows food spoiling.' });
+P('table', 'Table', { desc: 'For dinner, maps and arguing about maps.' });
+P('chair', 'Chair', { desc: 'Sit down. You deserve it.' });
+P('rug', 'Patchwork Rug', { desc: 'Ties the room together.' });
+P('planter', 'Planter', { desc: 'A potted fern. Very homey.' });
+P('hammock', 'Hammock', { desc: 'Sleep swinging between two posts.' });
+P('skull_trophy', 'Skull Trophy', { desc: 'A big skull on a stick. Tells raptors who is boss.' });
 
 // ------------------------------------------------------------------ van + time machine parts
 const V = (id, name, opt) => def(id, name, 'part', { stack: 5, model: opt.model ?? 'part', ...opt });
