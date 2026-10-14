@@ -49,6 +49,17 @@ function planks(seed = 63, vertical = false) {
     return { c, h, r: 0.86 - line * 0.05 - (1 - bevel) * 0.1 };
   }, { normal: 3, rough: 0.85 });
 }
+// clean timber with long grain along v (turned legs, posts, handles)
+function grain(seed = 76) {
+  const light = rgb(0xb68654), dark = rgb(0x84583a);
+  return paintSet(128, 256, (u, v) => {
+    const g = fbm(u * 2, v * 6, 2, 4, seed);
+    const w = u * 9 + g * 3;
+    const line = 1 - sstep(0.0, 0.25, Math.abs(Math.sin(w * Math.PI)));
+    const c = mul3(mix3(light, dark, g * 0.7), (0.86 + g * 0.24) * (1 - line * 0.2) * (0.95 + fbm(u * 24, v * 4, 24, 2, seed + 3) * 0.1));
+    return { c, h: g * 0.3 - line * 0.1, r: 0.8 };
+  }, { normal: 2, rough: 0.8 });
+}
 function logs(seed = 62) {
   const N = 4;
   const wood = rgb(0xa47648), bark = rgb(0x5a3e2a), chink = rgb(0x7a705e);
@@ -271,6 +282,7 @@ export const BTEX = {
   endgrain: () => once('endgrain', () => endgrain()),
   thatch: () => once('thatch', () => thatch()),
   logs: () => once('logs', () => logs()),
+  wood: () => once('wood', () => grain()),
   plank: () => once('plank', () => planks()),
   plankV: () => once('plankV', () => planks(71, true)),
   stone: () => once('stone', () => stone()),

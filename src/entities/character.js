@@ -1,5 +1,5 @@
-// Chunky cartoon explorers (PEAK-style): big rounded felt heads, tiny glossy
-// dot eyes, bulb noses, small bean bodies, noodle arms and stubby legs, dressed
+// Chunky cartoon explorers (PEAK-style): big rounded felt heads, glossy
+// dot eyes with catch-lights, rosy cheeks, bulb noses, small bean bodies, noodle arms and stubby legs, dressed
 // in pixel-art fabrics. Fully procedural animation with springs for squash,
 // wobble, blinking, expressions and talking mouths.
 import * as THREE from 'three';
@@ -17,12 +17,12 @@ export const OPTIONS = {
   overlay: ['none', 'fleece', 'labcoat'],
   bottom: ['shorts', 'cargo', 'jeans'],
   pack: ['hiker', 'daypack', 'none'],
-  extra: ['fanny', 'scarf', 'glasses', 'none'],
+  extra: ['kerchief', 'sash', 'fanny', 'scarf', 'glasses', 'none'],
 };
 export const PRESETS = [
   { name: 'Doug', hat: 'bucket', top: 'hawaiian', overlay: 'fleece', bottom: 'shorts', pack: 'hiker', extra: 'fanny', skin: 1, nose: 0, socks: [0xff7a2a, 0xf2efe6] },
-  { name: 'Kev', hat: 'hardhat', top: 'hivis', overlay: 'none', bottom: 'cargo', pack: 'daypack', extra: 'none', skin: 3, nose: 3, socks: [0x333333, 0x666666] },
-  { name: 'Pip', hat: 'beanie', top: 'puffer', overlay: 'none', bottom: 'jeans', pack: 'hiker', extra: 'scarf', skin: 6, nose: 2, socks: [0xd94040, 0xffffff], pompom: 0xd94040 },
+  { name: 'Kev', hat: 'hardhat', top: 'hivis', overlay: 'none', bottom: 'cargo', pack: 'daypack', extra: 'kerchief', skin: 3, nose: 3, socks: [0x333333, 0x666666], kerchief: 0xe8b830 },
+  { name: 'Pip', hat: 'beanie', top: 'puffer', overlay: 'none', bottom: 'jeans', pack: 'hiker', extra: 'sash', skin: 6, nose: 2, socks: [0xd94040, 0xffffff], pompom: 0xd94040 },
   { name: 'Dr. Wanda', hat: 'goggles', top: 'flannel', overlay: 'labcoat', bottom: 'jeans', pack: 'none', extra: 'glasses', skin: 4, nose: 1, socks: [0x4a8ad0, 0xffffff] },
 ];
 
@@ -43,7 +43,7 @@ function fabric(key, texFn, opt = {}) {
   const map = texFn ? cachedTex(key, texFn) : null;
   const m = new THREE.MeshPhysicalMaterial({
     color: opt.color ?? 0xffffff, map, roughness: opt.roughness ?? 0.88, metalness: opt.metalness ?? 0,
-    sheen: opt.sheen ?? 0.55, sheenRoughness: 0.75, sheenColor: new THREE.Color(opt.sheenColor ?? 0xffffff).multiplyScalar(0.35),
+    sheen: opt.sheen ?? 0.75, sheenRoughness: 0.6, sheenColor: new THREE.Color(opt.sheenColor ?? 0xffffff).multiplyScalar(0.35),
     clearcoat: opt.clearcoat ?? 0, clearcoatRoughness: 0.3, emissive: opt.emissive ?? 0x000000, emissiveIntensity: opt.emissiveIntensity ?? 1,
   });
   if (map && opt.bump !== false) {
@@ -92,6 +92,10 @@ const BLACK = new THREE.MeshPhysicalMaterial({ color: 0x0a0a0c, roughness: 0.08,
 patchMaterial(BLACK, {});
 const MOUTH = new THREE.MeshStandardMaterial({ color: 0x3a1418, roughness: 0.6 });
 patchMaterial(MOUTH, {});
+const GLINT = new THREE.MeshBasicMaterial({ color: 0xffffff });
+patchMaterial(GLINT, {});
+const BLUSH = new THREE.MeshStandardMaterial({ color: 0xff7a7a, roughness: 1, transparent: true, opacity: 0.32, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+patchMaterial(BLUSH, {});
 
 // X eyes for knocked-out state
 function xEyeGeo() {
@@ -188,7 +192,9 @@ export class Character {
 
     // --- head
     const headPivot = new THREE.Group(); headPivot.position.y = 0.38; torso.add(headPivot);
-    const head = new THREE.Group(); head.position.y = HEAD.y - 0.68; headPivot.add(head);
+    // the head is big, like a scout's: scaled up as one piece (hats and face too)
+    const HS = 1.12;
+    const head = new THREE.Group(); head.position.y = HEAD.y - 0.68 + HEAD.b * (HS - 1) * 0.85; head.scale.setScalar(HS); headPivot.add(head);
     this.headPivot = headPivot; this.head = head;
     const hg = ellipsoid(1, 1, 1, 40, 28);
     const hp = hg.attributes.position;
@@ -207,7 +213,8 @@ export class Character {
     const fy = (y) => y - HEAD.y;
     const face = new THREE.Group(); head.add(face);
     this.face = face;
-    const eyeGeo = new THREE.SphereGeometry(0.0195, 12, 10);
+    const eyeGeo = new THREE.SphereGeometry(0.0225, 14, 12);
+    const glint = new THREE.SphereGeometry(0.0062, 8, 6);
     this.eyes = [];
     for (const sx of [-1, 1]) {
       const p = headSurface(sx * 0.078, 0.925, 0.002);
@@ -215,6 +222,8 @@ export class Character {
       e.position.set(p.x, fy(p.y), p.z);
       e.scale.set(1, 1.05, 0.55);
       e.lookAt(e.position.clone().multiplyScalar(2));
+      // a catch-light, so the dots look wet and alive
+      const gl = mesh(glint, GLINT, false); gl.position.set(sx * 0.006, 0.009, 0.0232); e.add(gl);
       face.add(e);
       this.eyes.push(e);
     }
@@ -226,6 +235,13 @@ export class Character {
       e.position.set(p.x, fy(p.y), p.z);
       e.visible = false;
       face.add(e); this.xEyes.push(e);
+    }
+    // rosy cheeks
+    for (const sx of [-1, 1]) {
+      const p = headSurface(sx * 0.128, 0.872, 0.0015);
+      const ch = mesh(new THREE.CircleGeometry(0.032, 18), BLUSH, false);
+      ch.position.set(p.x, fy(p.y), p.z); ch.lookAt(ch.position.clone().multiplyScalar(2)); ch.scale.set(1.2, 0.8, 1);
+      face.add(ch);
     }
     const noseCol = NOSE_COLORS[o.nose ?? 0];
     const nose = mesh(new THREE.SphereGeometry(0.036, 14, 12), plain(noseCol, { sheen: 0.9, roughness: 0.7 }), false);
@@ -344,6 +360,50 @@ export class Character {
     if (o.extra === 'fanny') {
       const fm = fabric('fanny', () => fannyTexture(), { sheen: 0.3 });
       const fp = mesh(new RoundedBoxGeometry(0.17, 0.08, 0.06, 2, 0.025), fm); fp.position.set(0.03, 0.01, 0.19); fp.rotation.z = -0.15; torso.add(fp);
+    }
+    if (o.extra === 'kerchief') {
+      // a scout neckerchief: rolled around the neck, a woggle in front, the triangle down the back
+      const kc = o.kerchief ?? 0xd94a3a;
+      const km = plain(kc, { sheen: 0.8, roughness: 0.85 });
+      km.side = THREE.DoubleSide;
+      const roll = mesh(new THREE.TorusGeometry(0.098, 0.022, 8, 22), km); roll.rotation.x = Math.PI / 2; roll.position.y = 0.372; roll.scale.set(1, 1, 0.78); torso.add(roll);
+      const tri = new THREE.Shape([new THREE.Vector2(-0.12, 0), new THREE.Vector2(0.12, 0), new THREE.Vector2(0, -0.17)]);
+      const flap = mesh(new THREE.ShapeGeometry(tri), km); flap.position.set(0, 0.37, -0.105); flap.rotation.x = 0.42; torso.add(flap);
+      const wog = mesh(new THREE.TorusGeometry(0.016, 0.007, 6, 12), plain(0x8a5a30, { roughness: 0.6, sheen: 0.2 })); wog.position.set(0, 0.32, Math.sqrt(this.bodyR(0.32) ** 2) + 0.012); torso.add(wog);
+      for (const sx of [-1, 1]) { const tail = mesh(new RoundedBoxGeometry(0.03, 0.09, 0.012, 1, 0.005), km); tail.position.set(sx * 0.012, 0.27, Math.sqrt(this.bodyR(0.27) ** 2) + 0.01); tail.rotation.set(-0.15, 0, sx * 0.18); torso.add(tail); }
+    }
+    if (o.extra === 'sash') {
+      // a merit-badge sash from the left shoulder down to the right hip
+      const sm2 = plain(0x6a7a3a, { sheen: 0.7, roughness: 0.85 });
+      const onBody = (th) => {
+        const x0 = Math.cos(th) * 0.2, z0 = Math.sin(th) * 0.2;
+        const y = 0.2 - x0 * 0.68;
+        const l = Math.hypot(x0 * 0.73, z0) || 1;
+        const r = this.bodyR(Math.min(0.37, Math.max(-0.05, y))) + 0.012;
+        return new THREE.Vector3((x0 * 0.73) / l * r, y, z0 / l * r);
+      };
+      // a flat ribbon hugging the body: width runs across the curve, along the surface
+      const N = 64, pos = [], nrm = [], uvs = [], idx = [];
+      for (let k = 0; k <= N; k++) {
+        const th = (k / N) * Math.PI * 2, p0 = onBody(th), p1 = onBody(th + 0.01);
+        const tan = p1.sub(p0).normalize(), out = new THREE.Vector3(p0.x, 0, p0.z).normalize();
+        const wd = new THREE.Vector3().crossVectors(tan, out).normalize().multiplyScalar(0.034);
+        for (const sg of [-1, 1]) { const q = p0.clone().addScaledVector(wd, sg).addScaledVector(out, 0.004); pos.push(q.x, q.y, q.z); nrm.push(out.x, out.y, out.z); uvs.push(k / N * 8, sg > 0 ? 1 : 0); }
+        if (k < N) { const a = k * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); geo.setIndex(idx);
+      sm2.side = THREE.DoubleSide;
+      torso.add(mesh(geo, sm2));
+      const cols = [0xe8c040, 0xd94a3a, 0x3a8ad0, 0xf2efe6, 0x5aa04a];
+      [1.05, 1.4, 1.75, 2.1].forEach((th, i) => {
+        const pt = onBody(th);
+        const bdg = mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.008, 14), plain(cols[i], { roughness: 0.5, sheen: 0.3 }), false);
+        bdg.position.copy(pt).multiply(new THREE.Vector3(1.04, 1, 1.04));
+        bdg.lookAt(new THREE.Vector3(pt.x * 3, pt.y, pt.z * 3)); bdg.rotateX(Math.PI / 2);
+        torso.add(bdg);
+        const dot = mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.01, 10), plain(cols[(i + 2) % cols.length]), false); dot.position.y = 0.002; bdg.add(dot);
+      });
     }
     if (o.extra === 'scarf') {
       const sm = fabric('scarf', () => scarfTexture(), { sheen: 0.8 });

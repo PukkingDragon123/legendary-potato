@@ -3,7 +3,8 @@
 // use it from). Each builder returns { g, col, parts, anchors }:
 //   col: walkable/solid boxes in local space [{x,y,z,hx,hy,hz,walk}]
 import * as THREE from 'three';
-import { std, box, cyl, mk, at } from '../entities/vanModel.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { std, box as vbox, cyl, mk, at, boxUV } from '../entities/vanModel.js';
 import { bTex, withMaps } from '../gfx/buildTextures.js';
 import { textTexture } from '../gfx/vanTextures.js';
 import { PixelPainter } from '../gfx/pixel.js';
@@ -13,6 +14,7 @@ const T = (key, o = {}) => std('st_' + key, withMaps(o));
 export const SM = {
   plank: () => T('plank', { map: bTex('plank'), roughness: 0.82 }),
   plankV: () => T('plankV', { map: bTex('plankV'), roughness: 0.82 }),
+  wood: () => T('wood', { map: bTex('wood'), roughness: 0.8 }),
   bark: () => T('bark', { map: bTex('bark'), roughness: 0.92 }),
   end: () => T('end', { map: bTex('endgrain'), roughness: 0.85 }),
   stone: () => T('stone', { map: bTex('stone'), roughness: 0.9 }),
@@ -47,6 +49,8 @@ export const SM = {
 };
 
 // ------------------------------------------------------------------ helpers
+// every box gets a small bevel so edges catch the light like real timber
+const box = (w, h, d, m, x, y, z, r = 0, uvs = 0.5) => vbox(w, h, d, m, x, y, z, r > 0 ? r : Math.min(0.012, Math.min(w, h, d) * 0.2), uvs);
 let _seed = 1;
 const rnd = () => ((_seed = (_seed * 16807) % 2147483647) / 2147483647);
 function rock(r, m = SM.rock()) {
@@ -65,6 +69,74 @@ function stick(len, r = 0.025) { return log(r, len); }
 const lean = (o, rx, ry, rz) => { o.rotation.set(rx, ry, rz); return o; };
 function lathe(points, m, seg = 14) { return mk(new THREE.LatheGeometry(points.map(([x, y]) => new THREE.Vector2(x, y)), seg), m); }
 const col = (x, y, z, hx, hy, hz, walk = true) => ({ x, y, z, hx, hy, hz, walk });
+
+
+// ------------------------------------------------------------------ furniture craft
+// a top made of separate bevelled boards (running along x, side by side in z)
+function boards(w, d, n, th, m, y) {
+  const grp = new THREE.Group();
+  const bw = d / n;
+  for (let i = 0; i < n; i++) {
+    const b = box(w * (0.985 + rnd() * 0.015), th * (0.92 + rnd() * 0.12), bw - 0.007, m, (rnd() - 0.5) * 0.012, y, -d / 2 + bw * (i + 0.5), Math.min(0.01, th * 0.3), 0.6);
+    b.rotation.set((rnd() - 0.5) * 0.01, (rnd() - 0.5) * 0.008, (rnd() - 0.5) * 0.006);
+    grp.add(b);
+  }
+  return grp;
+}
+// a lathe-turned leg (foot, beads, a waist and a top collar), height h along +y
+function turnedLeg(h, r, m = SM.wood()) {
+  const P = [[0.001, 0], [r * 0.8, 0], [r * 0.92, h * 0.025], [r * 0.7, h * 0.06], [r * 0.6, h * 0.28], [r * 0.95, h * 0.33], [r * 0.95, h * 0.36], [r * 0.6, h * 0.41], [r * 0.52, h * 0.66], [r * 0.82, h * 0.72], [r * 0.82, h * 0.78], [r, h * 0.8], [r, h * 0.995], [0.001, h]];
+  return lathe(P, m, 10);
+}
+// a plump cushion / mattress / pillow: rounded box with the faces puffed out
+function cushion(w, h, d, m, puff = 0.35) {
+  const g = new RoundedBoxGeometry(w, h, d, 4, Math.min(w, h, d) * 0.45);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const k = Math.max(0, 1 - (2 * x / w) ** 2) * Math.max(0, 1 - (2 * z / d) ** 2);
+    p.setY(i, y + Math.sign(y) * k * h * puff + Math.sin(x * 23 + z * 17) * 0.002);
+  }
+  g.computeVertexNormals(); boxUV(g, 1);
+  return mk(g, m);
+}
+// a sheet lying over a w x d top whose sides and foot fall down by "hang"
+function drape(w, d, hang, m, foot = true) {
+  const W = w + hang * 2, D = d + (foot ? hang : 0);
+  const g = new THREE.PlaneGeometry(W, D, 18, 22); g.rotateX(-Math.PI / 2);
+  g.translate(0, 0, foot ? hang / 2 : 0);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), z = p.getZ(i), y = 0;
+    const ox = Math.max(0, Math.abs(x) - w / 2), oz = foot ? Math.max(0, z - d / 2) : 0;
+    if (ox > 0) { x = Math.sign(x) * (w / 2 + ox * 0.12 + Math.sin(z * 9) * 0.01 * ox / hang); }
+    if (oz > 0) z = d / 2 + oz * 0.12;
+    y = -Math.max(ox, oz) * 0.95;
+    // soft folds on top and ripples where it hangs
+    y += Math.sin(x * 11 + z * 3) * 0.006 + Math.sin(z * 7.3 - x * 2) * 0.008 + (ox > 0 || oz > 0 ? Math.sin(z * 18 + x * 18) * 0.012 * Math.min(1, Math.max(ox, oz) / hang) : 0);
+    p.setXYZ(i, x, y, z);
+  }
+  g.computeVertexNormals();
+  const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * W * 0.8, uv.getY(i) * D * 0.8);
+  return mk(g, m);
+}
+// a rope lashing (a few wraps) around a joint
+function lashing(r, n = 3) {
+  const grp = new THREE.Group();
+  for (let k = 0; k < n; k++) { const t = mk(new THREE.TorusGeometry(r, 0.012, 5, 14), SM.rope(), false); t.rotation.x = Math.PI / 2; t.position.y = (k - (n - 1) / 2) * 0.024; grp.add(t); }
+  return grp;
+}
+// double-sided cloth for drapes
+const cloth2 = (key) => T(key + '_2s', { map: bTex(key), roughness: 0.92, side: THREE.DoubleSide });
+// a box bent along x (ends pushed by "bend" in z), e.g. a curved chair rail
+function bentBox(w, h, d, bend, m) {
+  const g = new THREE.BoxGeometry(w, h, d, 10, 1, 1);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setZ(i, p.getZ(i) + (p.getX(i) / (w / 2)) ** 2 * bend);
+  g.computeVertexNormals(); boxUV(g, 0.6);
+  return mk(g, m);
+}
+function rivet(m = SM.iron()) { return mk(new THREE.SphereGeometry(0.012, 6, 4), m, false); }
 
 // ------------------------------------------------------------------ builders
 const B = {};
@@ -88,56 +160,94 @@ B.campfire = () => {
 
 B.workbench = () => {
   const g = new THREE.Group(), parts = {};
-  g.add(box(1.5, 0.09, 0.72, SM.plank(), 0, 0.82, 0, 0.012, 0.6));
-  for (const [x, z] of [[-0.65, -0.28], [0.65, -0.28], [-0.65, 0.28], [0.65, 0.28]]) { const l = log(0.055, 0.8); l.position.set(x, 0.4, z); g.add(l); }
-  g.add(box(1.36, 0.05, 0.56, SM.plank(), 0, 0.22, 0, 0.008, 0.6));
-  for (let k = 0; k < 3; k++) g.add(at(log(0.06, 0.5), -0.3 + k * 0.14, 0.31, 0.08, Math.PI / 2, 0, 0.1 * k)); // spare logs on the shelf
-  // vise
-  g.add(box(0.12, 0.12, 0.16, SM.iron(), 0.62, 0.92, -0.3, 0.01, 0));
-  g.add(box(0.03, 0.03, 0.22, SM.iron(), 0.62, 0.92, -0.42, 0.005, 0));
-  // tools on top: stone hammer, saw, chisel, shavings
-  const ham = new THREE.Group(); ham.position.set(-0.3, 0.88, -0.1); ham.rotation.y = 0.5; g.add(ham);
-  ham.add(at(stick(0.32, 0.016), 0, 0, 0, 0, 0, Math.PI / 2)); ham.add(at(rock(0.05), 0.16, 0.01, 0));
-  const saw = mk(new THREE.PlaneGeometry(0.42, 0.1), T('sawblade', { color: 0xc8ccd0, roughness: 0.3, metalness: 0.9, side: THREE.DoubleSide }), false); saw.rotation.x = -Math.PI / 2; saw.position.set(0.2, 0.872, 0.12); saw.rotation.z = -0.3; g.add(saw);
-  g.add(at(box(0.12, 0.03, 0.05, SM.plank(), 0, 0, 0, 0.005, 0), 0.43, 0.88, 0.05, 0, -0.3, 0));
-  for (let k = 0; k < 6; k++) { const c = mk(new THREE.TorusGeometry(0.025, 0.006, 3, 6, 4), T('shaving', { color: 0xe0c08a, roughness: 0.9 }), false); c.position.set((rnd() - 0.5) * 0.8, 0.875, (rnd() - 0.5) * 0.5); c.rotation.set(Math.PI / 2, 0, rnd() * 6); g.add(c); }
+  _seed = 5;
+  // a thick top of four boards, square legs with stretchers and a lower shelf
+  g.add(boards(1.5, 0.72, 4, 0.08, SM.plank(), 0.82));
+  for (const [x, z] of [[-0.66, -0.29], [0.66, -0.29], [-0.66, 0.29], [0.66, 0.29]]) g.add(box(0.09, 0.8, 0.09, SM.wood(), x, 0.4, z, 0.012, 0.6));
+  for (const z of [-0.29, 0.29]) g.add(box(1.24, 0.07, 0.05, SM.wood(), 0, 0.12, z, 0.01, 0.6));
+  for (const x of [-0.66, 0.66]) g.add(box(0.05, 0.07, 0.5, SM.wood(), x, 0.12, 0, 0.01, 0.6));
+  g.add(boards(1.3, 0.5, 3, 0.035, SM.plank(), 0.18));
+  for (let k = 0; k < 3; k++) g.add(at(log(0.06, 0.5), -0.3 + k * 0.14, 0.26, 0.08, Math.PI / 2, 0, 0.1 * k)); // spare logs on the shelf
+  // a tool board at the back with hanging tools
+  const back = new THREE.Group(); back.position.set(0, 1.18, 0.33); g.add(back);
+  for (const x of [-0.68, 0.68]) g.add(box(0.07, 0.75, 0.07, SM.wood(), x, 1.2, 0.33, 0.01, 0.6));
+  back.add(box(1.36, 0.5, 0.03, SM.plankV(), 0, 0, 0, 0.006, 0.6));
+  const peg = (x, y) => { const p = cyl(0.008, 0.008, 0.06, SM.iron(), 5); p.rotation.x = Math.PI / 2; p.position.set(x, y, -0.04); back.add(p); };
+  // hammer
+  peg(-0.45, 0.12); back.add(at(stick(0.3, 0.014), -0.45, -0.02, -0.04)); back.add(at(box(0.11, 0.045, 0.045, SM.iron(), 0, 0, 0, 0.008, 0), -0.45, 0.12, -0.045));
+  // saw
+  peg(-0.12, 0.16); const saw = mk(new THREE.PlaneGeometry(0.36, 0.11), T('sawblade', { color: 0xc8ccd0, roughness: 0.3, metalness: 0.9, side: THREE.DoubleSide }), false); saw.position.set(-0.02, 0.06, -0.022); back.add(saw); back.add(at(box(0.1, 0.09, 0.025, SM.wood(), 0, 0, 0, 0.01, 0), -0.24, 0.08, -0.025));
+  // wrench + rope coil
+  peg(0.2, 0.12); back.add(at(box(0.025, 0.24, 0.012, SM.iron(), 0, 0, 0, 0.005, 0), 0.2, 0.0, -0.035, 0, 0, 0.15));
+  peg(0.48, 0.15); const coil = mk(new THREE.TorusGeometry(0.09, 0.022, 6, 16), SM.rope()); coil.position.set(0.48, 0.05, -0.04); back.add(coil);
+  // the vise
+  const vise = new THREE.Group(); vise.position.set(0.62, 0.9, -0.3); g.add(vise);
+  vise.add(box(0.14, 0.1, 0.12, SM.iron(), 0, 0, 0, 0.012, 0));
+  vise.add(box(0.14, 0.1, 0.04, SM.iron(), 0, 0, -0.12, 0.01, 0));
+  const scr = cyl(0.012, 0.012, 0.22, SM.iron(), 6); scr.rotation.x = Math.PI / 2; scr.position.set(0, -0.02, -0.12); vise.add(scr);
+  const bar = cyl(0.008, 0.008, 0.16, SM.iron(), 5); bar.rotation.z = Math.PI / 2; bar.position.set(0, -0.02, -0.23); vise.add(bar);
+  // stuff on top: mallet, chisel, pencil, shavings, a lantern
+  const mal = new THREE.Group(); mal.position.set(-0.3, 0.885, -0.1); mal.rotation.y = 0.5; g.add(mal);
+  mal.add(at(stick(0.3, 0.014), 0, 0, 0, 0, 0, Math.PI / 2)); mal.add(at(cyl(0.045, 0.045, 0.12, SM.wood(), 10), 0.17, 0.0, 0, Math.PI / 2, 0, 0));
+  g.add(at(box(0.16, 0.02, 0.025, SM.wood(), 0, 0, 0, 0.006, 0), 0.25, 0.875, 0.05, 0, -0.3, 0));
+  g.add(at(box(0.07, 0.008, 0.02, SM.iron(), 0, 0, 0, 0.003, 0), 0.36, 0.875, 0.01, 0, -0.3, 0));
+  for (let k = 0; k < 9; k++) { const c = mk(new THREE.TorusGeometry(0.025, 0.006, 3, 6, 4), T('shaving', { color: 0xe0c08a, roughness: 0.9 }), false); c.position.set((rnd() - 0.5) * 0.8, 0.872, (rnd() - 0.5) * 0.5); c.rotation.set(Math.PI / 2, 0, rnd() * 6); g.add(c); }
+  const lan = new THREE.Group(); lan.position.set(-0.6, 0.86, 0.2); g.add(lan);
+  lan.add(at(cyl(0.05, 0.055, 0.02, SM.iron(), 10), 0, 0.01, 0)); lan.add(at(cyl(0.04, 0.04, 0.1, SM.glass(), 10), 0, 0.07, 0)); lan.add(at(cyl(0.02, 0.05, 0.04, SM.iron(), 10), 0, 0.14, 0));
   const note = mk(new THREE.PlaneGeometry(0.12, 0.12), T('wbnote', { map: textTexture(['MEASURE ONCE', 'CUT TWICE'], { w: 96, h: 96, bg: '#f6df7c', fg: '#17130e', size: 13 }) }), false);
-  note.rotation.x = -Math.PI / 2; note.rotation.z = 0.2; note.position.set(-0.55, 0.868, 0.18); g.add(note);
+  note.position.set(0.0, 0.0, -0.02); note.rotation.y = Math.PI; note.rotation.z = 0.08; note.position.set(0.0, -0.12, -0.018); back.add(note);
   return { g, col: [col(0, 0.43, 0, 0.75, 0.43, 0.36)], parts, anchors: {} };
 };
 
 B.storage_box = () => {
   const g = new THREE.Group(), parts = {};
-  g.add(box(0.9, 0.5, 0.6, SM.plankV(), 0, 0.27, 0, 0.02, 0.8));
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(box(0.06, 0.52, 0.06, SM.plank(), sx * 0.43, 0.27, sz * 0.28, 0.01, 0.6));
-  for (const sx of [-1, 1]) { const h = mk(new THREE.TorusGeometry(0.06, 0.014, 4, 10, Math.PI), SM.rope()); h.position.set(sx * 0.46, 0.38, 0); h.rotation.y = Math.PI / 2; g.add(h); }
+  // a plank chest bound with iron: bands, corner brackets, rivets, a hasp and rope handles
+  g.add(box(0.9, 0.5, 0.6, SM.plankV(), 0, 0.27, 0, 0.015, 0.8));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(box(0.06, 0.52, 0.06, SM.wood(), sx * 0.43, 0.27, sz * 0.28, 0.01, 0.6));
+  for (const y of [0.1, 0.44]) g.add(box(0.915, 0.04, 0.615, SM.iron(), 0, y, 0, 0.006, 0));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0.1, 0.44]) { const r = rivet(); r.position.set(sx * 0.3, y, sz * 0.31); g.add(r); }
+  for (const sx of [-1, 1]) { const h = mk(new THREE.TorusGeometry(0.06, 0.014, 5, 12, Math.PI), SM.rope()); h.position.set(sx * 0.47, 0.34, 0); h.rotation.y = Math.PI / 2; h.rotation.x = Math.PI; g.add(h); for (const z of [-0.06, 0.06]) { const b = box(0.02, 0.04, 0.03, SM.iron(), sx * 0.462, 0.34, z, 0.004, 0); g.add(b); } }
   const lid = new THREE.Group(); lid.position.set(0, 0.52, 0.3); g.add(lid); parts.lid = lid;
-  lid.add(box(0.94, 0.07, 0.64, SM.plank(), 0, 0.035, -0.3, 0.015, 0.8));
-  lid.add(box(0.1, 0.06, 0.04, SM.iron(), 0, 0.0, -0.62, 0.005, 0));
+  // slightly arched lid: half a cylinder of planks
+  const arch = new THREE.CylinderGeometry(0.33, 0.33, 0.94, 12, 1, false, -Math.PI / 2, Math.PI);
+  arch.rotateZ(Math.PI / 2); arch.scale(1, 0.32, 1);
+  const top = mk(arch, [SM.plankV(), SM.wood(), SM.wood()]); top.position.set(0, 0.01, -0.3); lid.add(top);
+  for (const x of [-0.3, 0.3]) { const band = mk(new THREE.CylinderGeometry(0.338, 0.338, 0.04, 12, 1, true, -Math.PI / 2, Math.PI).rotateZ(Math.PI / 2).scale(1, 0.32, 1), SM.iron()); band.position.set(x, 0.01, -0.3); lid.add(band); }
+  lid.add(box(0.94, 0.04, 0.64, SM.plank(), 0, 0.0, -0.3, 0.012, 0.8));
+  const hasp = box(0.07, 0.12, 0.012, SM.iron(), 0, -0.04, -0.625, 0.004, 0); lid.add(hasp);
+  const lock = new THREE.Group(); lock.position.set(0, -0.12, -0.64); lid.add(lock);
+  lock.add(box(0.05, 0.05, 0.02, SM.brass(), 0, 0, 0, 0.006, 0));
+  const shackle = mk(new THREE.TorusGeometry(0.018, 0.005, 4, 10, Math.PI), SM.iron(), false); shackle.position.y = 0.025; lock.add(shackle);
   return { g, col: [col(0, 0.29, 0, 0.47, 0.29, 0.32)], parts, anchors: {} };
 };
 
 B.bedroll = () => {
   const g = new THREE.Group();
-  g.add(box(0.75, 0.07, 1.8, SM.thatch(), 0, 0.035, 0, 0.03, 0.6));
-  const roll = log(0.1, 0.75, SM.thatch()); roll.rotation.z = Math.PI / 2; roll.position.set(0, 0.1, 0.85); g.add(roll);
-  g.add(box(0.5, 0.1, 0.3, SM.canvas(), 0, 0.12, -0.72, 0.05, 1));
-  const blanket = box(0.72, 0.04, 0.9, SM.patch(), 0, 0.09, 0.2, 0.02, 1.4); blanket.rotation.z = 0.02; g.add(blanket);
+  const pad = cushion(0.72, 0.07, 1.78, SM.straw(), 0.25); pad.position.y = 0.045; g.add(pad);
+  const roll = mk(new THREE.CapsuleGeometry(0.1, 0.55, 4, 10), SM.canvas()); roll.rotation.z = Math.PI / 2; roll.position.set(0, 0.12, -0.78); g.add(roll);
+  for (const x of [-0.18, 0.18]) { const t = mk(new THREE.TorusGeometry(0.105, 0.01, 4, 14), SM.rope(), false); t.rotation.y = Math.PI / 2; t.position.set(x, 0.12, -0.78); g.add(t); }
+  const blanket = drape(0.74, 1.1, 0.04, cloth2('patch')); blanket.position.set(0, 0.105, 0.28); g.add(blanket);
   return { g, col: [col(0, 0.06, 0, 0.38, 0.06, 0.9)], parts: {}, anchors: { sleep: new THREE.Vector3(0, 0.12, 0) } };
 };
 
 B.bed = () => {
   const g = new THREE.Group();
+  // a lashed log frame, a planked headboard, a plump mattress, pillow, blanket and fur throw
   for (const sx of [-1, 1]) { const l = log(0.06, 2.1); l.rotation.x = Math.PI / 2; l.position.set(sx * 0.5, 0.2, 0); g.add(l); }
   for (const z of [-1.0, 1.0]) { const l = log(0.06, 1.1); l.rotation.z = Math.PI / 2; l.position.set(0, 0.2, z); g.add(l); }
-  for (const sx of [-1, 1]) for (const z of [-1, 1]) { const l = log(0.065, 0.42); l.position.set(sx * 0.5, 0.21, z); g.add(l); }
-  const head = box(1.12, 0.6, 0.08, SM.plankV(), 0, 0.55, -1.02, 0.03, 0.8); g.add(head);
-  g.add(box(0.96, 0.16, 1.9, SM.hide(), 0, 0.33, 0, 0.07, 1));
-  const blanket = box(1.0, 0.06, 1.1, SM.patch(), 0, 0.43, 0.38, 0.03, 1.2); g.add(blanket);
-  g.add(box(0.6, 0.12, 0.32, SM.canvas(), 0, 0.47, -0.74, 0.06, 1));
+  for (const sx of [-1, 1]) for (const z of [-1, 1]) { const l = log(0.065, z < 0 ? 0.95 : 0.42); l.position.set(sx * 0.5, z < 0 ? 0.47 : 0.21, z); g.add(l); const la = lashing(0.072); la.position.set(sx * 0.5, 0.2, z); g.add(la); }
+  // slats under the mattress
+  for (let k = 0; k < 7; k++) g.add(box(0.98, 0.025, 0.09, SM.wood(), 0, 0.245, -0.84 + k * 0.28, 0.006, 0.6));
+  const head = new THREE.Group(); head.position.set(0, 0.62, -1.02); g.add(head);
+  head.add(boards(1.0, 0.5, 4, 0.05, SM.plank(), 0).rotateX(Math.PI / 2));
+  head.add(at(log(0.04, 1.06), 0, 0.27, 0, 0, 0, Math.PI / 2));
+  const mattress = cushion(0.98, 0.16, 1.92, SM.canvas(), 0.3); mattress.position.set(0, 0.34, 0); g.add(mattress);
+  const pillow = cushion(0.58, 0.12, 0.32, SM.white(), 0.6); pillow.position.set(0, 0.47, -0.72); pillow.rotation.x = -0.12; g.add(pillow);
+  const blanket = drape(0.98, 1.15, 0.2, cloth2('patch')); blanket.position.set(0, 0.425, 0.24); g.add(blanket);
+  const fur = drape(1.0, 0.36, 0.16, cloth2('hide'), false); fur.position.set(0, 0.44, 0.62); fur.scale.set(1.04, 1, 1); g.add(fur);
   // tiny carved dino on the headboard
   const d = mk(new THREE.PlaneGeometry(0.3, 0.18), T('bedcarve', { map: (() => { const p = new PixelPainter(32, 20, 5).clear(); for (const [x, y, w, h] of [[10, 6, 14, 6], [20, 2, 6, 6], [6, 8, 6, 2], [12, 12, 2, 6], [20, 12, 2, 6]]) p.rect(x, y, w, h, [90, 58, 32]); return p.texture(); })(), transparent: true, alphaTest: 0.5, roughness: 0.9 }), false);
-  d.position.set(0, 0.62, -0.975); g.add(d);
+  d.position.set(0, 0.05, 0.031); head.add(d);
   return { g, col: [col(0, 0.25, 0, 0.56, 0.25, 1.05)], parts: {}, anchors: { sleep: new THREE.Vector3(0, 0.46, 0) } };
 };
 
@@ -486,18 +596,36 @@ B.fridge = () => {
 // ------------------------------------------------------------------ decorations
 B.table = () => {
   const g = new THREE.Group();
-  g.add(box(1.3, 0.07, 0.85, SM.plank(), 0, 0.72, 0, 0.015, 0.6));
-  for (const [x, z] of [[-0.55, -0.33], [0.55, -0.33], [-0.55, 0.33], [0.55, 0.33]]) g.add(at(log(0.045, 0.7), x, 0.35, z));
-  const cup = cyl(0.04, 0.035, 0.08, SM.clay(), 8); cup.position.set(0.3, 0.8, 0.1); g.add(cup);
+  _seed = 13;
+  g.add(boards(1.3, 0.85, 5, 0.06, SM.plank(), 0.73));
+  // apron rails, turned legs and a stretcher
+  for (const z of [-0.36, 0.36]) g.add(box(1.08, 0.1, 0.035, SM.wood(), 0, 0.65, z, 0.008, 0.6));
+  for (const x of [-0.56, 0.56]) g.add(box(0.035, 0.1, 0.66, SM.wood(), x, 0.65, 0, 0.008, 0.6));
+  for (const [x, z] of [[-0.56, -0.36], [0.56, -0.36], [-0.56, 0.36], [0.56, 0.36]]) g.add(at(turnedLeg(0.7, 0.045), x, 0, z));
+  const st = cyl(0.018, 0.018, 1.1, SM.wood(), 8); st.rotation.z = Math.PI / 2; st.position.y = 0.18; g.add(st);
+  for (const x of [-0.56, 0.56]) { const s2 = cyl(0.016, 0.016, 0.72, SM.wood(), 8); s2.rotation.x = Math.PI / 2; s2.position.set(x, 0.18, 0); g.add(s2); }
+  // a mug, a plate with a snack and a candle
+  const cup = lathe([[0.001, 0], [0.035, 0], [0.04, 0.02], [0.042, 0.085], [0.036, 0.09], [0.034, 0.012], [0.001, 0.012]], SM.clay(), 12); cup.position.set(0.3, 0.765, 0.1); g.add(cup);
+  const handle = mk(new THREE.TorusGeometry(0.022, 0.006, 4, 10, Math.PI * 1.2), SM.clay(), false); handle.position.set(0.345, 0.81, 0.1); handle.rotation.z = -Math.PI / 2 - 0.3; g.add(handle);
+  const plate = lathe([[0.001, 0], [0.09, 0], [0.12, 0.018], [0.11, 0.02], [0.08, 0.006], [0.001, 0.006]], SM.white(), 16); plate.position.set(-0.22, 0.765, -0.08); g.add(plate);
+  for (let k = 0; k < 5; k++) { const b = mk(new THREE.SphereGeometry(0.02, 8, 6), T('berryred', { color: 0xc8303a, roughness: 0.25 }), false); b.position.set(-0.22 + (rnd() - 0.5) * 0.08, 0.79, -0.08 + (rnd() - 0.5) * 0.08); g.add(b); }
+  const candle = new THREE.Group(); candle.position.set(0.05, 0.765, -0.22); g.add(candle);
+  candle.add(at(cyl(0.045, 0.05, 0.015, SM.brass(), 12), 0, 0.008, 0)); candle.add(at(cyl(0.018, 0.018, 0.09, T('wax', { color: 0xf2ead2, roughness: 0.5 }), 10), 0, 0.06, 0));
   return { g, col: [col(0, 0.38, 0, 0.66, 0.38, 0.43)], parts: {}, anchors: {} };
 };
 B.chair = () => {
   const g = new THREE.Group();
-  g.add(box(0.5, 0.06, 0.48, SM.plank(), 0, 0.45, 0, 0.012, 0.6));
-  for (const [x, z] of [[-0.2, -0.19], [0.2, -0.19], [-0.2, 0.19], [0.2, 0.19]]) g.add(at(log(0.03, 0.45), x, 0.22, z));
-  for (const x of [-0.2, 0.2]) g.add(at(log(0.03, 0.55), x, 0.72, 0.2));
-  g.add(box(0.5, 0.16, 0.04, SM.plank(), 0, 0.9, 0.2, 0.01, 0.6));
-  g.add(box(0.44, 0.04, 0.42, SM.patch(), 0, 0.5, 0, 0.015, 1));
+  _seed = 17;
+  g.add(boards(0.5, 0.48, 3, 0.05, SM.plank(), 0.45));
+  for (const [x, z] of [[-0.2, -0.19], [0.2, -0.19]]) g.add(at(turnedLeg(0.43, 0.03), x, 0, z));
+  // the back posts run from the floor to the top rail
+  for (const x of [-0.2, 0.2]) g.add(at(turnedLeg(1.0, 0.032), x, 0, 0.2));
+  for (const [y, z0, z1] of [[0.14, -0.19, 0.2]]) for (const x of [-0.2, 0.2]) { const s2 = cyl(0.013, 0.013, z1 - z0, SM.wood(), 6); s2.rotation.x = Math.PI / 2; s2.position.set(x, y, (z0 + z1) / 2); g.add(s2); }
+  const front = cyl(0.013, 0.013, 0.4, SM.wood(), 6); front.rotation.z = Math.PI / 2; front.position.set(0, 0.2, -0.19); g.add(front);
+  // curved top rail and three slats
+  const rail = bentBox(0.5, 0.09, 0.035, -0.035, SM.wood()); rail.position.set(0, 0.93, 0.2); g.add(rail);
+  for (const x of [-0.1, 0, 0.1]) g.add(box(0.05, 0.36, 0.018, SM.wood(), x, 0.7, 0.205, 0.006, 0.6));
+  const pad = cushion(0.42, 0.06, 0.4, SM.patch(), 0.5); pad.position.set(0, 0.5, 0); g.add(pad);
   return { g, col: [col(0, 0.24, 0, 0.26, 0.24, 0.25)], parts: {}, anchors: { sit: new THREE.Vector3(0, 0.5, 0) } };
 };
 B.rug = () => {

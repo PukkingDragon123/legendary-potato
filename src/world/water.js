@@ -1,5 +1,5 @@
 // Water: ocean, flowing river ribbons (with whitewater on the falls), lake and
-// pool discs. Stock MeshStandardMaterial patched with pixel-snapped flowing
+// pool discs. Stock MeshStandardMaterial patched with smooth flowing
 // ripples, depth absorption, shoreline foam and sky reflections, so it still
 // receives sun shadows and fog like everything else.
 import * as THREE from 'three';
@@ -81,9 +81,11 @@ export class Water {
               float wlv = texture2D( tWaterLvl, ( wp.xz + uHalf ) / uSize ).r;
               if ( abs( wlv - wp.y ) > 0.5 ) discard;
             }
-            // pixel-snap the surface so ripples read as crisp pixel clusters (16 px/m)
-            vec2 q = ( floor( wp.xz * 16.0 ) + 0.5 ) / 16.0;
+            // smooth surface coordinates; down the falls height stands in for
+            // distance along the flow, so the whitewater streaks run downhill
             vec2 flow = vFlow;
+            vec2 q = wp.xz;
+            if ( vFoamA > 0.01 && length( flow ) > 0.001 ) q -= normalize( flow ) * wp.y * vFoamA;
             float speed = length( flow );
             float e = 0.12;
             vec2 grad;
@@ -118,11 +120,17 @@ export class Water {
             vec3 wc = mix( deep, shallow, exp( - depth * 0.45 ) );
             // shoreline foam: animated pixel bands that lap the beach
             float shore = 1.0 - smoothstep( 0.0, uWaterKind < 0.5 ? 0.9 : 0.35, depth );
-            float bands = step( 0.72, fract( depth * 2.5 - t * 0.35 + vnoise( q * 0.7 ) * 0.6 ) ) * smoothstep( 0.0, 0.25, shore );
+            float bands = smoothstep( 0.66, 0.78, fract( depth * 2.5 - t * 0.35 + vnoise( q * 0.7 ) * 0.6 ) ) * smoothstep( 0.0, 0.25, shore );
             if ( uWaterKind > 0.5 ) bands *= 0.0;
-            wFoam = max( bands * shore, smoothstep( 0.93, 1.0, shore ) * step( 0.45, vnoise( q * 2.0 + t * 0.3 ) ) * 0.7 );
+            wFoam = max( bands * shore, smoothstep( 0.93, 1.0, shore ) * smoothstep( 0.4, 0.55, vnoise( q * 2.0 + t * 0.3 ) ) * 0.7 );
             wFoam = max( wFoam, foamStreak * ( 0.35 + vFoamA ) );
-            wFoam = max( wFoam, vFoamA * smoothstep( 0.35, 0.65, vnoise( q * 3.0 + vec2( 0.0, -t * 6.0 ) ) ) );
+            {
+              // whitewater: long streaks that race down the falls
+              vec2 fd2 = length( flow ) > 0.001 ? normalize( flow ) : vec2( 0.0, 1.0 );
+              vec2 sq = vec2( dot( q, vec2( -fd2.y, fd2.x ) ) * 3.2, dot( q, fd2 ) * 0.45 - t * 5.0 );
+              float ww = vnoise( sq ) * 0.65 + vnoise( sq * vec2( 2.1, 1.3 ) + 7.0 ) * 0.35;
+              wFoam = max( wFoam, vFoamA * smoothstep( 0.3, 0.62, ww ) );
+            }
             wFoam = clamp( wFoam, 0.0, 1.0 );
             wAlpha = clamp( 1.0 - exp( - depth * 1.4 ), 0.18, 0.94 );
             wAlpha = max( wAlpha, wFoam * 0.95 );

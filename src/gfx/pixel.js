@@ -282,12 +282,13 @@ export class PixelPainter {
     return this;
   }
 
-  // Build a THREE texture with crisp pixel magnification and smooth mips.
+  // Build a THREE texture with smooth magnification and mips (opt.nearest
+  // keeps crisp pixels for the few things that want them).
   texture(opt = {}) {
     const { repeat = [1, 1], srgb = true, wrap = THREE.RepeatWrapping, nearestMin = false, anisotropy = 8, flipY = false } = opt;
     const tex = new THREE.DataTexture(this.data, this.w, this.h, THREE.RGBAFormat);
     tex.wrapS = tex.wrapT = wrap;
-    tex.magFilter = THREE.NearestFilter;
+    tex.magFilter = opt.nearest ? THREE.NearestFilter : THREE.LinearFilter;
     tex.minFilter = nearestMin ? THREE.NearestMipmapLinearFilter : THREE.LinearMipmapLinearFilter;
     tex.generateMipmaps = true;
     tex.anisotropy = anisotropy;
@@ -320,7 +321,7 @@ export class PixelPainter {
     }
     const tex = new THREE.DataTexture(out, w, h, THREE.RGBAFormat);
     tex.wrapS = tex.wrapT = opt.wrap ?? THREE.RepeatWrapping;
-    tex.magFilter = THREE.NearestFilter;
+    tex.magFilter = opt.nearest ? THREE.NearestFilter : THREE.LinearFilter;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.generateMipmaps = true;
     tex.anisotropy = 8;
@@ -337,7 +338,7 @@ export function makeArrayTexture(painters, opt = {}) {
   const tex = new THREE.DataArrayTexture(data, w, h, painters.length);
   tex.format = THREE.RGBAFormat;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.magFilter = THREE.NearestFilter;
+  tex.magFilter = opt.nearest ? THREE.NearestFilter : THREE.LinearFilter;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.generateMipmaps = true;
   tex.anisotropy = opt.anisotropy ?? 8;

@@ -27,7 +27,7 @@ function spriteAtlas() {
   draw(13, (s) => { const Q = ['.XXX.', 'X...X', '...X.', '..X..', '.....', '..X..']; Q.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'X') for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) s(x * 2 + 3 + a, y * 2 + 2 + b, [255, 255, 255]); })); });
   draw(14, (s) => { for (let y = 1; y < 10; y++) for (let x = 6; x < 10; x++) s(x, y, [255, 255, 255]); for (let y = 12; y < 15; y++) for (let x = 6; x < 10; x++) s(x, y, [255, 255, 255]); });
   draw(15, (s) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 7.5); if (d < 6 && d > 4.5) s(x, y, [220, 240, 255]); if (Math.hypot(x - 5.5, y - 5.5) < 1.2) s(x, y, [255, 255, 255]); } });
-  const tex = p.texture({ wrap: THREE.ClampToEdgeWrapping, srgb: true });
+  const tex = p.texture({ wrap: THREE.ClampToEdgeWrapping, srgb: true, nearest: true });
   tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
   return { tex, cols, rows };
 }
@@ -59,14 +59,32 @@ void main() {
   float c = cos( vRot ), s = sin( vRot );
   pc = vec2( c * pc.x - s * pc.y, s * pc.x + c * pc.y ) + 0.5;
   if ( pc.x < 0.0 || pc.y < 0.0 || pc.x > 1.0 || pc.y > 1.0 ) discard;
-  // snap to the 16px sprite grid for crisp pixels
-  pc = ( floor( pc * 16.0 ) + 0.5 ) / 16.0;
-  float col = mod( vSprite, uGrid.x ), row = floor( vSprite / uGrid.x );
-  vec2 uv = ( vec2( col, row ) + pc ) / uGrid;
-  vec4 t = texture2D( tAtlas, uv );
-  float a = t.a * vCol.a;
-  if ( a < 0.04 ) discard;
-  gl_FragColor = vec4( t.rgb * vCol.rgb, a );
+  float sid = floor( vSprite + 0.5 );
+  vec3 rgb; float a;
+  if ( sid < 1.5 || abs( sid - 9.0 ) < 0.5 ) {
+    // puffs, smoke and glows are soft, billowy and smooth
+    vec2 d = pc - 0.5;
+    float r = length( d ) * 2.0;
+    if ( sid > 8.5 ) a = pow( max( 0.0, 1.0 - r ), 2.2 );
+    else {
+      float n = sin( d.x * 13.0 + vRot * 3.0 + 1.7 ) * sin( d.y * 11.0 - vRot * 2.0 ) * 0.5 + 0.5;
+      n = n * 0.6 + ( sin( ( d.x + d.y ) * 23.0 + vRot ) * 0.5 + 0.5 ) * 0.4;
+      a = smoothstep( 1.0, 0.2, r + n * 0.3 ) * ( 0.75 + 0.25 * n );
+    }
+    rgb = vCol.rgb * ( sid < 1.5 ? 0.92 + 0.08 * ( 1.0 - r ) : 1.0 );
+    a *= vCol.a;
+    if ( a < 0.01 ) discard;
+  } else {
+    // everything else stays a crisp 16px pixel sprite
+    pc = ( floor( pc * 16.0 ) + 0.5 ) / 16.0;
+    float col = mod( vSprite, uGrid.x ), row = floor( vSprite / uGrid.x );
+    vec2 uv = ( vec2( col, row ) + pc ) / uGrid;
+    vec4 t = texture2D( tAtlas, uv );
+    a = t.a * vCol.a;
+    if ( a < 0.04 ) discard;
+    rgb = t.rgb * vCol.rgb;
+  }
+  gl_FragColor = vec4( rgb, a );
   #include <colorspace_fragment>
 }
 `;

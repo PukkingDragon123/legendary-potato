@@ -1,6 +1,7 @@
 // Hand-painted (procedurally) pixel-art ground materials. Each is a 128x128
 // tile covering 4 m (32 px per metre), lit from the top-left like classic
 // pixel art, and seamless.
+import * as THREE from 'three';
 import { PixelPainter, ramp, makeArrayTexture, mixRgb, bayer } from './pixel.js';
 import { tileFbm, tileNoise } from '../core/rng.js';
 import { MAT_NAMES } from '../world/gen.js';
@@ -430,6 +431,8 @@ export function buildTerrainTextures() {
     return n;
   });
   const normal = makeArrayTexture(normals, { srgb: false });
+  // smooth magnification: the ground reads as painted texture, not pixels
+  albedo.magFilter = THREE.LinearFilter; normal.magFilter = THREE.LinearFilter;
   const rough = MAT_NAMES.map((n) => TERRAIN_ROUGHNESS[n]);
   return { albedo, normal, rough, painters: ps };
 }

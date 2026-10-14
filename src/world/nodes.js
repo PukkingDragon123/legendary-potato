@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { RNG, Simplex, tileFbm } from '../core/rng.js';
 import { BIOME } from './gen.js';
 import { patchMaterial } from '../gfx/shaderlib.js';
-import { PixelPainter, ramp, makeArrayTexture } from '../gfx/pixel.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { sstep, rgb, mix3, mul3, cell, put } from '../gfx/paint.js';
 import { GLSL_HASH } from './terrain.js';
 import { GeoBuilder } from '../gfx/geo.js';
 import { LEAF } from '../gfx/plantTextures.js';
@@ -65,22 +66,29 @@ const SPAWN = {
 };
 
 // ------------------------------------------------------------------ geometry
+// Rounded, weathered boulders: a subdivided icosahedron (shared vertices so
+// it shades smooth) pushed around by noise, with softened ledges and a flat
+// bottom that sinks into the ground.
 function rockGeo(seed, detail = 1, squash = 0.7, lumps = 0.35) {
   const r = new RNG(seed);
   const n = new Simplex(seed);
-  const g = new THREE.IcosahedronGeometry(1, detail);
+  let g = new THREE.IcosahedronGeometry(1, detail + 1);
+  g.deleteAttribute('normal'); g.deleteAttribute('uv');
+  g = mergeVertices(g);
   const p = g.attributes.position;
-  const ox = r.next() * 10, oz = r.next() * 10;
+  const ox = r.next() * 10, oz = r.next() * 10, sx = 0.85 + r.next() * 0.3;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const f = 1 + lumps * n.noise3(x * 1.3 + ox, y * 1.3, z * 1.3 + oz) + 0.12 * n.noise3(x * 3 + oz, y * 3, z * 3);
+    let f = 1 + lumps * n.noise3(x * 1.3 + ox, y * 1.3, z * 1.3 + oz) + 0.1 * n.noise3(x * 3 + oz, y * 3, z * 3) + 0.035 * n.noise3(x * 7, y * 7 + ox, z * 7);
+    // soft ledges: quantise the radius a little, like weathered strata
+    const ledge = Math.round(f * 6) / 6;
+    f = f * 0.7 + ledge * 0.3;
     let yy = y * squash;
     if (yy < -0.2) yy = -0.2 - (yy + 0.2) * 0.3; // flatter bottom sinks into ground
-    p.setXYZ(i, x * f, yy * f + 0.35 * squash, z * f * (0.85 + r.next() * 0.1));
+    p.setXYZ(i, x * f * sx, yy * f + 0.35 * squash, z * f * (0.85 + 0.1 * Math.sin(seed)));
   }
-  const ng = g.index ? g.toNonIndexed() : g;
-  ng.computeVertexNormals();
-  return ng;
+  g.computeVertexNormals();
+  return g;
 }
 
 function bushGeo(seed) {
@@ -140,32 +148,43 @@ function tuftGeo(seed, h = 0.9, blades = 14, w = 0.035) {
   return b.build();
 }
 
-// rock material: triplanar pixel texture + moss on top + per-instance tint
+// rock material: triplanar painted texture + moss on top + per-instance tint
 function rockTextures() {
-  const mk = (base, seed, cracks) => {
-    const p = new PixelPainter(64, 64, seed);
-    const pal = ramp(base, 5, { light: 0.2 });
-    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
-      // soft strata + blotches + grain
-      const strata = Math.sin(y * 0.45 + Math.sin(x * 0.11) * 2.2) * 0.5 + 0.5;
-      const blot = tileFbm(x / 64 * 4, y / 64 * 4, 4, 3, seed);
-      const n = strata * 0.35 + blot * 0.65 + (Math.random() - 0.5) * 0.12;
-      p.set(x, y, pal[Math.max(0, Math.min(4, Math.round(n * 3.2)))]);
-    }
-    for (let k = 0; k < cracks; k++) p.crack(Math.random() * 64, Math.random() * 64, 6 + Math.random() * 12, pal[0], pal[4], { wiggle: 0.6 });
-    p.scatter(40, (x, y) => p.set(x, y, pal[4]));
-    return p;
-  };
-  const moss = new PixelPainter(64, 64, 9);
-  const mp = ramp(0x5c7a36, 5, { light: 0.18, sat: 0.1 });
-  moss.fill(mp[1]);
-  moss.scatter(420, (x, y, i, r) => { const rr = 0.6 + r.next() * 1.1; moss.blob(x, y, rr, rr * 0.8, mp.slice(0, 4)); });
-  moss.scatter(60, (x, y) => moss.set(x, y, mp[4]));
-  return makeArrayTexture([mk(0x8a8780, 1, 10), moss]);
+  const S = 256, data = new Uint8Array(S * S * 4 * 2);
+  const stone = rgb(0x8e8a82), warm = rgb(0x9a8c78), dark = rgb(0x5e5a54), lich = rgb(0xb8b48a);
+  const moss = rgb(0x4e6a30), mossL = rgb(0x6e8a3c), mossD = rgb(0x2c4219);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S, v = y / S, i = (y * S + x) * 4;
+    // rock: strata bands, blotches, crack network, lichen speckles
+    const n = tileFbm(u * 4, v * 4, 4, 5, 3), n2 = tileFbm(u * 16, v * 16, 16, 3, 5);
+    const strata = 0.5 + 0.5 * Math.sin((v + n * 0.12) * Math.PI * 2 * 7);
+    let c = mix3(stone, warm, sstep(0.4, 0.7, n));
+    c = mul3(c, 0.8 + strata * 0.12 + (n2 - 0.5) * 0.22);
+    const cr = cell(u, v, 6, 6, 9), e = cr.f2 - cr.f1;
+    const crack = (1 - sstep(0.0, 0.035, e)) * sstep(0.45, 0.6, tileFbm(u * 3, v * 3, 3, 2, 11));
+    c = mix3(c, dark, crack * 0.8);
+    const lc = cell(u, v, 22, 22, 13);
+    if (lc.id > 0.8) c = mix3(c, lich, sstep(0.3, 0.15, lc.f1) * 0.55);
+    put(data, i, c);
+    // moss: soft clumps with bright tips and dark hollows
+    const m1 = tileFbm(u * 8, v * 8, 8, 4, 21), m2 = tileFbm(u * 32, v * 32, 32, 2, 23);
+    let mc = mix3(mossD, moss, sstep(0.3, 0.6, m1));
+    mc = mix3(mc, mossL, sstep(0.62, 0.8, m1 + m2 * 0.25));
+    mc = mul3(mc, 0.85 + m2 * 0.3);
+    put(data, S * S * 4 + i, mc);
+  }
+  const tex = new THREE.DataArrayTexture(data, S, S, 2);
+  tex.format = THREE.RGBAFormat;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true; tex.anisotropy = 8;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
 }
 
 export function makeRockMaterial(tex, opt = {}) {
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, flatShading: true, side: opt.side ?? THREE.FrontSide });
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, side: opt.side ?? THREE.FrontSide });
   patchMaterial(mat, {
     wet: true,
     uniforms: { tRockArr: { value: tex }, uMoss: { value: opt.moss ?? 1 } },
@@ -194,7 +213,7 @@ export function makeRockMaterial(tex, opt = {}) {
         float upY = gl_FrontFacing ? vRN.y : -vRN.y;
         float mossAmt = smoothstep( 0.62, 0.95, upY + ( vnoise( vRW.xz * 1.3 ) - 0.5 ) * 0.6 ) * uMoss;
         vec3 mc = texture( tRockArr, vec3( vRW.xz * 0.5, 1.0 ) ).rgb;
-        float pick = step( 0.5, mossAmt + ( hash21( floor( ruv * 64.0 ) ) - 0.5 ) * 0.3 );
+        float pick = smoothstep( 0.4, 0.6, mossAmt + ( vnoise( ruv * 9.0 ) - 0.5 ) * 0.35 );
         diffuseColor.rgb *= mix( rc, mc, pick );`,
     },
   });

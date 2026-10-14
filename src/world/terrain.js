@@ -1,6 +1,6 @@
-// Chunked LOD heightfield terrain with a pixel-art splat shader.
-// Every terrain texel (32 px / m) picks exactly one material, so material
-// borders are crisp, dithered pixel clusters instead of blurry blends.
+// Chunked LOD heightfield terrain with a painted splat shader.
+// Up close every spot picks its material through a noisy threshold, so
+// borders between ground types are ragged and natural instead of blurry.
 import * as THREE from 'three';
 import { patchMaterial } from '../gfx/shaderlib.js';
 import { buildTerrainTextures } from '../gfx/terrainTextures.js';
@@ -109,12 +109,10 @@ export class Terrain {
             float dist = distance( wp, cameraPosition );
             int axis;
             vec2 uv = projUV( wp, wn, axis );
-            vec2 cell = floor( uv * 128.0 );
-            vec2 cellW = ( axis == 1 ) ? ( cell + 0.5 ) / 32.0 : wp.xz; // texel centre in metres (top)
-            // organic jitter of the splat lookup (pixel-snapped), fades with distance
+            // organic jitter of the splat lookup, fades with distance
             float near = 1.0 - smoothstep( uDitherDist * 0.6, uDitherDist, dist );
-            vec2 jit = ( vec2( vnoise( cellW * 0.9 ), vnoise( cellW * 0.9 + 31.7 ) ) - 0.5 ) * 2.6;
-            jit += ( vec2( hash21( cell ), hash21( cell + 11.0 ) ) - 0.5 ) * 0.5;
+            vec2 jit = ( vec2( vnoise( wp.xz * 0.9 ), vnoise( wp.xz * 0.9 + 31.7 ) ) - 0.5 ) * 2.6;
+            jit += ( vec2( vnoise( wp.xz * 3.1 ), vnoise( wp.xz * 3.1 + 11.0 ) ) - 0.5 ) * 0.5;
             vec4 sp = splatAt( wp.xz + jit * mix( 0.35, 1.0, near ) );
             float id1 = floor( sp.r * 255.0 + 0.5 );
             float id2 = floor( sp.g * 255.0 + 0.5 );
@@ -124,10 +122,11 @@ export class Terrain {
               if ( id2 == 3.0 ) id2 = 16.0; else if ( id2 == 14.0 ) id2 = 17.0;
             }
             float bl = sp.b;
-            float sel = vnoise( cellW * 0.75 + 5.3 ) * 0.78 + hash21( cell * 1.37 + 3.0 ) * 0.22;
+            float sel = vnoise( wp.xz * 0.75 + 5.3 ) * 0.78 + vnoise( wp.xz * 4.3 + 3.0 ) * 0.22;
             vec3 c1 = texture( tAlbedo, vec3( uv, id1 ) ).rgb;
             vec3 c2 = texture( tAlbedo, vec3( uv, id2 ) ).rgb;
-            float pickB = near > 0.5 ? step( sel, bl ) : bl;
+            // ragged but soft borders between ground types (sharper up close)
+            float pickB = mix( bl, smoothstep( sel - 0.12, sel + 0.12, bl ), near );
             tAlb = mix( c1, c2, pickB );
             tPick = pickB > 0.5 ? id2 : id1;
             tRoughOut = mix( uRough[ int( id1 ) ], uRough[ int( id2 ) ], pickB );
