@@ -25,7 +25,7 @@ export class Story {
     const g = this.g;
     const cave = g.world.pois.find((p) => p.id === 'fallcave');
     if (cave) {
-      const y = g.sampler.heightAt(cave.x, cave.z) + 0.15;
+      const y = (cave.floorY ?? g.sampler.heightAt(cave.x, cave.z)) + 0.15; // on the grotto floor when there is one
       const grp = new THREE.Group(); grp.position.set(cave.x, y, cave.z);
       const board = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.16), new THREE.MeshStandardMaterial({ color: 0x1a6a50, emissive: 0x30c090, emissiveIntensity: 0.5, roughness: 0.4 }));
       board.rotation.set(0.2, 0.6, 0.15); grp.add(board);

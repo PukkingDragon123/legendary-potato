@@ -616,6 +616,31 @@ function buildPOIs(L, hAt, onLand, rng, mainFall) {
   return pois;
 }
 
+// The water grid follows the falling sheet down each waterfall so it renders
+// as a ribbon, but nobody should be able to swim up a waterfall (or float in
+// the air behind one). Deep, steep cells near the falls drop to the level of
+// the water below them.
+function calmFalls(world, hAt) {
+  const { M, half, water } = world;
+  const out = new Float32Array(water);
+  for (const f of world.waterfalls ?? []) {
+    const i0 = Math.max(1, Math.floor((Math.min(f.x0, f.x1) - 30 + half) / 2)), i1 = Math.min(M - 2, Math.ceil((Math.max(f.x0, f.x1) + 30 + half) / 2));
+    const j0 = Math.max(1, Math.floor((Math.min(f.z0, f.z1) - 30 + half) / 2)), j1 = Math.min(M - 2, Math.ceil((Math.max(f.z0, f.z1) + 30 + half) / 2));
+    for (let pass = 0; pass < 40; pass++) {
+      let changed = false;
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const k = j * M + i, w = out[k];
+        if (w < -999) continue;
+        let lo = w;
+        for (const n of [k - 1, k + 1, k - M, k + M]) { const v = out[n]; if (v > -999 && v < lo) lo = v; }
+        if (lo < w - 1.2 && w - hAt(-half + (i + 0.5) * 2, -half + (j + 0.5) * 2) > 3) { out[k] = lo; changed = true; }
+      }
+      if (!changed) break;
+    }
+  }
+  return out;
+}
+
 // shared sampling helpers (used by the main thread after transfer)
 export function makeSampler(world) {
   const { N, M, half, height, water, biome, splat } = world;
@@ -625,6 +650,7 @@ export function makeSampler(world) {
     const a = height[j * N + i], b = height[j * N + i + 1], c = height[(j + 1) * N + i], d = height[(j + 1) * N + i + 1];
     return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
   };
+  const calm = calmFalls(world, hAt);
   const cell = (x, z) => {
     const i = Math.min(M - 1, Math.max(0, Math.floor((x + half) / 2)));
     const j = Math.min(M - 1, Math.max(0, Math.floor((z + half) / 2)));
@@ -644,7 +670,7 @@ export function makeSampler(world) {
       const e = 1;
       return Math.hypot(hAt(x + e, z) - hAt(x - e, z), hAt(x, z + e) - hAt(x, z - e)) / (2 * e);
     },
-    waterAt(x, z) { return water[cell(x, z)]; },
+    waterAt(x, z) { return calm[cell(x, z)]; },
     biomeAt(x, z) { return biome[cell(x, z)]; },
     matAt(x, z) { const k = cell(x, z) * 4; return splat[k + 2] > 140 ? splat[k + 1] : splat[k]; },
     grassAt(x, z) { return splat[cell(x, z) * 4 + 3] / 255; },

@@ -89,6 +89,7 @@ export class Game {
   biomeName(x, z) { return BIOME_NAMES[this.sampler.biomeAt(x, z)] ?? 'Wilds'; }
   isCameraSheltered() {
     const c = this.engine.camera.position;
+    if (this.caves?.inside(c)) return true;
     const hit = this.physics.raycast(c, _up, 25, { terrain: false });
     return !!hit;
   }

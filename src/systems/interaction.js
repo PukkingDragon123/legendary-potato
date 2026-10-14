@@ -105,12 +105,14 @@ export class Interaction {
   }
 
   rayWater(o, d, reach) {
-    const s = this.game.sampler;
+    const s = this.game.sampler, ph = this.game.physics;
     for (let t = 0.3; t < reach; t += 0.2) {
       const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
+      // floors, docks and stepping stones over the water count as ground
+      const ground = ph ? ph.groundAt(x, z, y + 0.3, 0.3, 0.1) : s.heightAt(x, z);
       const wl = s.waterAt(x, z);
-      if (wl > -999 && y <= wl + 0.05) return { dist: t, point: new THREE.Vector3(x, wl, z) };
-      if (y < s.heightAt(x, z)) return null;
+      if (wl > -999 && wl > ground && y <= wl + 0.05) return { dist: t, point: new THREE.Vector3(x, wl, z) };
+      if (y < ground) return null;
     }
     return null;
   }

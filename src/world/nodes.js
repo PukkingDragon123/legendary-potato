@@ -164,8 +164,8 @@ function rockTextures() {
   return makeArrayTexture([mk(0x8a8780, 1, 10), moss]);
 }
 
-function makeRockMaterial(tex, opt = {}) {
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, flatShading: true });
+export function makeRockMaterial(tex, opt = {}) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, flatShading: true, side: opt.side ?? THREE.FrontSide });
   patchMaterial(mat, {
     wet: true,
     uniforms: { tRockArr: { value: tex }, uMoss: { value: opt.moss ?? 1 } },
@@ -190,7 +190,9 @@ function makeRockMaterial(tex, opt = {}) {
         vec2 ruv = an.y > max( an.x, an.z ) ? vRW.xz : an.x > an.z ? vRW.zy : vRW.xy;
         ruv *= 0.5;
         vec3 rc = texture( tRockArr, vec3( ruv, 0.0 ) ).rgb;
-        float mossAmt = smoothstep( 0.62, 0.95, vRN.y + ( vnoise( vRW.xz * 1.3 ) - 0.5 ) * 0.6 ) * uMoss;
+        // inside a cave we see back faces: moss belongs on the floor side, not the ceiling
+        float upY = gl_FrontFacing ? vRN.y : -vRN.y;
+        float mossAmt = smoothstep( 0.62, 0.95, upY + ( vnoise( vRW.xz * 1.3 ) - 0.5 ) * 0.6 ) * uMoss;
         vec3 mc = texture( tRockArr, vec3( vRW.xz * 0.5, 1.0 ) ).rgb;
         float pick = step( 0.5, mossAmt + ( hash21( floor( ruv * 64.0 ) ) - 0.5 ) * 0.3 );
         diffuseColor.rgb *= mix( rc, mc, pick );`,
@@ -239,6 +241,7 @@ export class Nodes {
       V[key] = { im, cap, list: [] };
     };
     const rockMat = makeRockMaterial(rockTex);
+    this.rockTex = rockTex; // shared with the caves
     const rockGeos = [rockGeo(11), rockGeo(23, 1, 0.6), rockGeo(37, 1, 0.8, 0.4), rockGeo(51, 1, 0.55, 0.3)];
     rockGeos.forEach((g, i) => mk('rock' + i, g, rockMat, 1200));
     mk('pebble', rockGeo(71, 0, 0.6, 0.3), rockMat, 1500);
@@ -349,7 +352,7 @@ export class Nodes {
       if (p.id === 'skeleton' || p.id === 'petrified') {
         for (let q = 0; q < 5; q++) { const a = pr.next() * 6.28, d = pr.next() * p.radius; const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; if (inCell(x, z)) add('fossil', x, z); }
       }
-      if (p.id === 'fallcave') { const x = p.x, z = p.z; if (inCell(x, z)) { add('fossil', x + 2, z - 1); add('crystal', x - 2, z - 1.5); } }
+      if (p.id === 'fallcave') { const x = p.x, z = p.z, y = p.floorY !== undefined ? { y: p.floorY } : {}; if (inCell(x, z)) { add('fossil', x + 1.6, z - 0.6, y); add('crystal', x - 1.6, z - 0.9, y); } }
     }
     this.cells.set(k, list);
     for (const nd of list) this.byId.set(nd.id, nd);
