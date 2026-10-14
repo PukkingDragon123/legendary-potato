@@ -593,7 +593,7 @@ export class UI {
     const det = h('div', 'detail');
     const d = tames.find((x) => x.id === this.dinoSel);
     if (d) {
-      det.innerHTML = `<div class="cat">${esc(d.sp.name.toUpperCase())} · LV ${d.level ?? 1}</div><h3>${esc(d.name)}</h3><p>${esc(d.sp.blurb ?? '')}</p>`;
+      det.innerHTML = `<div class="cat">${esc(d.sp.name.toUpperCase())} · ${esc((d.sp.elementName ?? '').toUpperCase())} · LV ${d.level ?? 1}</div><h3>${esc(d.name)}</h3><p>${esc(d.sp.blurb ?? '')}</p>`;
       const bars = [['Health', d.hp / d.maxHp, '#e04a3a'], ['Food', d.food / 100, '#e8a040'], ['Happiness', (d.happy ?? 70) / 100, '#f2b630']];
       for (const [n, k, c] of bars) det.appendChild(h('div', '', `<div class="stats">${n}</div><div class="bar seg"><i style="width:${Math.max(0, k) * 100}%;background:${c}"></i></div>`));
       det.appendChild(h('div', 'stats', `Trait: ${esc(d.personality)} · Job: ${esc(d.sp.jobName ?? 'none')} · ${Math.round(d.pos.distanceTo(g.local.pos))}m away`));

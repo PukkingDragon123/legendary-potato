@@ -1,12 +1,14 @@
-// Species definitions: look (parametric model), stats, behaviour, diet,
-// taming method, jobs and habitat. Sizes are in metres for the adult.
+// Species definitions: look (parametric model), element, stats, behaviour,
+// diet, taming method, jobs and habitat. Sizes are in metres for the adult.
+// The element (see elements.js) drives the glowing markings, extra parts
+// and particle aura of the creature.
 // Behaviour flags: herd, predator, territorial, skittish, thief, nocturnal,
 // flyer, swimmer, scavenger.
 
 export const SPECIES = {
   compy: {
-    name: 'Compsognathus', short: 'Compy', size: 0.55, rp: 3,
-    look: { kind: 'theropod', body: [0.5, 0.17], hip: 0.34, neck: [0.25, 0.06, 0.9], tail: [0.75, 0.09, 0.1], head: { type: 'thero', len: 0.2, w: 0.12, h: 0.12 }, legs: 'biped', hind: 0.36, arms: 0.12, color: 0x7aa23a, belly: 0xe0d890, pattern: 'stripes', pcolor: 0x4a6a24, accent: 0xe8a040 },
+    name: 'Compsognathus', short: 'Compy', size: 0.55, rp: 3, element: 'grass',
+    look: { kind: 'theropod', body: [0.5, 0.17], hip: 0.34, neck: [0.25, 0.06, 0.9], tail: [0.75, 0.09, 0.1], head: { type: 'thero', len: 0.2, w: 0.12, h: 0.12 }, legs: 'biped', hind: 0.36, arms: 0.12, color: 0x6ab83a, belly: 0xf0eaa0, pattern: 'stripes', pcolor: 0x3a7a2a, accent: 0x4ac040 },
     stats: { hp: 30, speed: 3.2, run: 7.5, dmg: 3, bite: 1.0 },
     behaviour: { skittish: true, thief: true, pack: [3, 6], sight: 14 },
     diet: 'omnivore', foods: ['noodles', 'meat_cooked', 'redberry', 'meat_raw', 'energybar'], favorite: 'noodles',
@@ -16,8 +18,8 @@ export const SPECIES = {
     biomes: { jungle: 1.0, prairie: 0.6, beach: 0.5, redwood: 0.4 }, call: 'chirp',
   },
   microraptor: {
-    name: 'Microraptor', short: 'Microraptor', size: 0.5, rp: 4,
-    look: { kind: 'theropod', body: [0.42, 0.13], hip: 0.26, neck: [0.2, 0.05, 0.8], tail: [0.6, 0.06, 0.05], head: { type: 'thero', len: 0.15, w: 0.09, h: 0.09 }, legs: 'biped', hind: 0.27, arms: 0.2, feathers: true, wings4: true, color: 0x2a3a6a, belly: 0x5a6aa0, pattern: 'iridescent', pcolor: 0x40a0b0, accent: 0x50c0c8 },
+    name: 'Microraptor', short: 'Microraptor', size: 0.5, rp: 4, element: 'electric',
+    look: { kind: 'theropod', body: [0.42, 0.13], hip: 0.26, neck: [0.2, 0.05, 0.8], tail: [0.6, 0.06, 0.05], head: { type: 'thero', len: 0.15, w: 0.09, h: 0.09 }, legs: 'biped', hind: 0.27, arms: 0.2, feathers: true, wings4: true, color: 0x2a2f5a, belly: 0x6a78c0, pattern: 'iridescent', pcolor: 0x40b0e0, accent: 0x50d8ff },
     stats: { hp: 25, speed: 3, run: 8, dmg: 2, glide: true },
     behaviour: { skittish: true, thief: true, shiny: true, pack: [1, 2], sight: 16, flyer: 'glide' },
     diet: 'carnivore', foods: ['meat_raw', 'fish_raw', 'meat_cooked'], favorite: 'fish_raw',
@@ -27,8 +29,8 @@ export const SPECIES = {
     biomes: { jungle: 0.5, redwood: 0.8 }, call: 'squeak',
   },
   gallimimus: {
-    name: 'Gallimimus', short: 'Galli', size: 1.9, rp: 4,
-    look: { kind: 'ornitho', body: [0.62, 0.22], hip: 0.95, neck: [0.6, 0.07, 1.15], tail: [0.95, 0.1, 0.15], head: { type: 'beak', len: 0.2, w: 0.1, h: 0.1 }, legs: 'biped', hind: 1.0, arms: 0.3, color: 0xc8a060, belly: 0xf0e0c0, pattern: 'saddle', pcolor: 0x8a5a30, accent: 0x40a0c0 },
+    name: 'Gallimimus', short: 'Galli', size: 1.9, rp: 4, element: 'fire',
+    look: { kind: 'ornitho', body: [0.62, 0.22], hip: 0.95, neck: [0.6, 0.07, 1.15], tail: [0.95, 0.1, 0.15], head: { type: 'beak', len: 0.2, w: 0.1, h: 0.1 }, legs: 'biped', hind: 1.0, arms: 0.3, color: 0xc8482a, belly: 0xffe8c8, pattern: 'saddle', pcolor: 0x7a2414, accent: 0xffb040 },
     stats: { hp: 80, speed: 3.6, run: 13, dmg: 4 },
     behaviour: { herd: [5, 10], skittish: true, sight: 30 },
     diet: 'herbivore', foods: ['sunberry', 'redberry', 'blueberry', 'fiddlehead'], favorite: 'sunberry',
@@ -39,8 +41,8 @@ export const SPECIES = {
     biomes: { prairie: 1.2, beach: 0.4, highland: 0.6 }, call: 'honk',
   },
   parasaur: {
-    name: 'Parasaurolophus', short: 'Parasaur', size: 3.2, rp: 4,
-    look: { kind: 'hadro', body: [1.3, 0.48], hip: 1.25, neck: [0.65, 0.18, 0.55], tail: [1.5, 0.24, 0.1], head: { type: 'duck', len: 0.55, w: 0.22, h: 0.24, crest: 0.75 }, legs: 'semi', hind: 1.2, fore: 0.85, arms: 0.55, color: 0x5a8ab0, belly: 0xe8dcc0, pattern: 'bands', pcolor: 0x2a4a7a, accent: 0xd8603a },
+    name: 'Parasaurolophus', short: 'Parasaur', size: 3.2, rp: 4, element: 'water',
+    look: { kind: 'hadro', body: [1.3, 0.48], hip: 1.25, neck: [0.65, 0.18, 0.55], tail: [1.5, 0.24, 0.1], head: { type: 'duck', len: 0.55, w: 0.22, h: 0.24, crest: 0.75 }, legs: 'semi', hind: 1.2, fore: 0.85, arms: 0.55, color: 0x3a86d0, belly: 0xe8f4ff, pattern: 'bands', pcolor: 0x1a4a9a, accent: 0x40d8ff },
     stats: { hp: 220, speed: 2.2, run: 7, dmg: 8 },
     behaviour: { herd: [4, 9], sight: 26, gentle: true },
     diet: 'herbivore', foods: ['blueberry', 'redberry', 'fiddlehead', 'starchroot'], favorite: 'blueberry',
@@ -51,8 +53,8 @@ export const SPECIES = {
     biomes: { river: 1.0, prairie: 0.8, swamp: 0.6, jungle: 0.3 }, call: 'honk',
   },
   proto: {
-    name: 'Protoceratops', short: 'Proto', size: 1.6, rp: 3,
-    look: { kind: 'cera', body: [0.7, 0.28], hip: 0.5, neck: [0.25, 0.14, 0.3], tail: [0.6, 0.15, 0.1], head: { type: 'cera', len: 0.38, w: 0.24, h: 0.26, frill: 0.35, horns: 0 }, legs: 'quad', hind: 0.5, fore: 0.42, color: 0xd0a868, belly: 0xf0e2c0, pattern: 'spots', pcolor: 0x9a6a30, accent: 0xc84a2a },
+    name: 'Protoceratops', short: 'Proto', size: 1.6, rp: 3, element: 'earth',
+    look: { kind: 'cera', body: [0.7, 0.28], hip: 0.5, neck: [0.25, 0.14, 0.3], tail: [0.6, 0.15, 0.1], head: { type: 'cera', len: 0.38, w: 0.24, h: 0.26, frill: 0.35, horns: 0 }, legs: 'quad', hind: 0.5, fore: 0.42, color: 0xc8925a, belly: 0xf2e0c0, pattern: 'spots', pcolor: 0x8a5a30, accent: 0xa8a090 },
     stats: { hp: 90, speed: 2.4, run: 6, dmg: 6 },
     behaviour: { herd: [3, 6], sight: 18, alarm: true },
     diet: 'herbivore', foods: ['cycadcone', 'fiddlehead', 'starchroot', 'redberry'], favorite: 'starchroot',
@@ -62,8 +64,8 @@ export const SPECIES = {
     biomes: { badlands: 1.2, prairie: 0.5, highland: 0.5 }, call: 'grunt',
   },
   pachy: {
-    name: 'Pachycephalosaurus', short: 'Pachy', size: 2.6, rp: 4,
-    look: { kind: 'ornitho', body: [0.9, 0.34], hip: 1.0, neck: [0.4, 0.14, 0.7], tail: [1.0, 0.16, 0.1], head: { type: 'dome', len: 0.4, w: 0.3, h: 0.34 }, legs: 'biped', hind: 1.0, arms: 0.3, color: 0x8a6a9a, belly: 0xe8d8c8, pattern: 'stripes', pcolor: 0x4a3a6a, accent: 0xd0d0e0 },
+    name: 'Pachycephalosaurus', short: 'Pachy', size: 2.6, rp: 4, element: 'crystal',
+    look: { kind: 'ornitho', body: [0.9, 0.34], hip: 1.0, neck: [0.4, 0.14, 0.7], tail: [1.0, 0.16, 0.1], head: { type: 'dome', len: 0.4, w: 0.3, h: 0.34 }, legs: 'biped', hind: 1.0, arms: 0.3, color: 0x7a6ac8, belly: 0xe8e0ff, pattern: 'stripes', pcolor: 0x4a3a90, accent: 0xd8d0ff },
     stats: { hp: 160, speed: 2.5, run: 8.5, dmg: 18, charge: true },
     behaviour: { territorial: 12, herd: [2, 4], sight: 22 },
     diet: 'herbivore', foods: ['fiddlehead', 'redberry', 'ginkgo_roast', 'blueberry'], favorite: 'ginkgo_roast',
@@ -74,8 +76,8 @@ export const SPECIES = {
     biomes: { highland: 1.0, badlands: 0.6, prairie: 0.3 }, call: 'grunt',
   },
   trike: {
-    name: 'Triceratops', short: 'Trike', size: 7.5, rp: 6,
-    look: { kind: 'cera', body: [2.6, 1.05], hip: 1.6, neck: [0.6, 0.5, 0.25], tail: [2.3, 0.45, 0.15], head: { type: 'cera', len: 1.3, w: 0.8, h: 0.8, frill: 1.2, horns: 1 }, legs: 'quad', hind: 1.55, fore: 1.3, color: 0x7a8a4a, belly: 0xd8d0a8, pattern: 'bands', pcolor: 0x4a5a2a, accent: 0xc8402a },
+    name: 'Triceratops', short: 'Trike', size: 7.5, rp: 6, element: 'grass',
+    look: { kind: 'cera', body: [2.6, 1.05], hip: 1.6, neck: [0.6, 0.5, 0.25], tail: [2.3, 0.45, 0.15], head: { type: 'cera', len: 1.3, w: 0.8, h: 0.8, frill: 1.2, horns: 1 }, legs: 'quad', hind: 1.55, fore: 1.3, color: 0x5a8a48, belly: 0xe0d8a8, pattern: 'bands', pcolor: 0x3a6030, accent: 0x5ab840 },
     stats: { hp: 900, speed: 2.2, run: 7, dmg: 45, charge: true },
     behaviour: { herd: [2, 4], territorial: 18, sight: 24, defensive: true },
     diet: 'herbivore', foods: ['cycad_roast', 'fiddlehead', 'starchroot', 'cycadcone', 'redberry'], favorite: 'cycad_roast',
@@ -86,8 +88,8 @@ export const SPECIES = {
     biomes: { prairie: 1.0, highland: 0.6, nesting: 0.4 }, call: 'bellow',
   },
   stego: {
-    name: 'Stegosaurus', short: 'Stego', size: 7, rp: 6,
-    look: { kind: 'stego', body: [2.4, 0.9], hip: 1.9, neck: [0.8, 0.32, 0.05], tail: [2.6, 0.4, 0.05], head: { type: 'small', len: 0.6, w: 0.3, h: 0.3 }, legs: 'quad', hind: 1.85, fore: 1.0, plates: true, thag: true, color: 0x6a7a3a, belly: 0xc8c090, pattern: 'spots', pcolor: 0x3a4a20, accent: 0xd06a30 },
+    name: 'Stegosaurus', short: 'Stego', size: 7, rp: 6, element: 'crystal',
+    look: { kind: 'stego', body: [2.4, 0.9], hip: 1.9, neck: [0.8, 0.32, 0.05], tail: [2.6, 0.4, 0.05], head: { type: 'small', len: 0.6, w: 0.3, h: 0.3 }, legs: 'quad', hind: 1.85, fore: 1.0, plates: true, thag: true, color: 0x4a5a8a, belly: 0xc8d0e8, pattern: 'spots', pcolor: 0x2a3460, accent: 0x8ae0ff },
     stats: { hp: 850, speed: 1.9, run: 5.5, dmg: 40 },
     behaviour: { herd: [2, 3], sight: 18, defensive: true, tailWhip: true },
     diet: 'herbivore', foods: ['fiddlehead', 'cycadcone', 'redberry', 'blueberry'], favorite: 'fiddlehead',
@@ -98,8 +100,8 @@ export const SPECIES = {
     biomes: { jungle: 0.6, prairie: 0.6, redwood: 0.5 }, call: 'bellow',
   },
   ankylo: {
-    name: 'Ankylosaurus', short: 'Ankylo', size: 6, rp: 6,
-    look: { kind: 'ankylo', body: [2.2, 0.85], hip: 1.0, neck: [0.4, 0.42, 0.1], tail: [2.2, 0.32, 0.0], head: { type: 'ankylo', len: 0.6, w: 0.6, h: 0.4 }, legs: 'quad', hind: 0.95, fore: 0.85, armor: true, club: true, color: 0x8a7050, belly: 0xc8b090, pattern: 'scutes', pcolor: 0x5a4430, accent: 0xa8a090 },
+    name: 'Ankylosaurus', short: 'Ankylo', size: 6, rp: 6, element: 'earth',
+    look: { kind: 'ankylo', body: [2.2, 0.85], hip: 1.0, neck: [0.4, 0.42, 0.1], tail: [2.2, 0.32, 0.0], head: { type: 'ankylo', len: 0.6, w: 0.6, h: 0.4 }, legs: 'quad', hind: 0.95, fore: 0.85, armor: true, club: true, color: 0x8a7458, belly: 0xd8c098, pattern: 'scutes', pcolor: 0x5a4630, accent: 0xb0a898 },
     stats: { hp: 1100, speed: 1.6, run: 4.5, dmg: 50 },
     behaviour: { herd: [1, 2], sight: 14, defensive: true, tailWhip: true },
     diet: 'herbivore', foods: ['starchroot', 'cycadcone', 'mushroom_brown', 'redberry'], favorite: 'mushroom_brown',
@@ -110,8 +112,8 @@ export const SPECIES = {
     biomes: { badlands: 1.0, highland: 0.6, mountain: 0.5 }, call: 'grunt',
   },
   brachio: {
-    name: 'Brachiosaurus', short: 'Brachio', size: 22, rp: 10,
-    look: { kind: 'sauro', body: [5.2, 2.2], hip: 4.6, neck: [8.0, 0.7, 1.15], tail: [7.0, 0.9, 0.1], head: { type: 'sauro', len: 1.0, w: 0.55, h: 0.6 }, legs: 'quad', hind: 4.4, fore: 5.4, color: 0x8a9aa0, belly: 0xd8d8c8, pattern: 'mottle', pcolor: 0x5a6a74, accent: 0xb0a080 },
+    name: 'Brachiosaurus', short: 'Brachio', size: 22, rp: 10, element: 'grass',
+    look: { kind: 'sauro', body: [5.2, 2.2], hip: 4.6, neck: [8.0, 0.7, 1.15], tail: [7.0, 0.9, 0.1], head: { type: 'sauro', len: 1.0, w: 0.55, h: 0.6 }, legs: 'quad', hind: 4.4, fore: 5.4, color: 0x88b0a0, belly: 0xe8eedc, pattern: 'mottle', pcolor: 0x5a8a78, accent: 0x5aa84a },
     stats: { hp: 4000, speed: 1.8, run: 3.5, dmg: 80 },
     behaviour: { herd: [1, 3], gentle: true, sight: 40, huge: true },
     diet: 'herbivore', foods: ['cycadcone', 'cycad_roast', 'fiddlehead', 'palmfruit'], favorite: 'palmfruit',
@@ -122,8 +124,8 @@ export const SPECIES = {
     biomes: { river: 0.4, redwood: 0.6, prairie: 0.2 }, call: 'bellow',
   },
   raptor: {
-    name: 'Velociraptor', short: 'Raptor', size: 1.9, rp: 6,
-    look: { kind: 'theropod', body: [0.65, 0.22], hip: 0.7, neck: [0.4, 0.09, 0.85], tail: [1.0, 0.11, 0.0], head: { type: 'thero', len: 0.38, w: 0.17, h: 0.19 }, legs: 'biped', hind: 0.75, arms: 0.36, feathers: true, sickle: true, color: 0x9a6a3a, belly: 0xe8d4a8, pattern: 'stripes', pcolor: 0x4a2a1a, accent: 0xd84a2a },
+    name: 'Velociraptor', short: 'Raptor', size: 1.9, rp: 6, element: 'electric',
+    look: { kind: 'theropod', body: [0.65, 0.22], hip: 0.7, neck: [0.4, 0.09, 0.85], tail: [1.0, 0.11, 0.0], head: { type: 'thero', len: 0.38, w: 0.17, h: 0.19 }, legs: 'biped', hind: 0.75, arms: 0.36, feathers: true, sickle: true, color: 0x2c2c34, belly: 0xd8d0b8, pattern: 'saddle', pcolor: 0x16161c, accent: 0xffd83a },
     stats: { hp: 140, speed: 3.5, run: 11.5, dmg: 14, bite: 0.9 },
     behaviour: { predator: true, pack: [2, 4], nocturnal: true, sight: 34, smart: true },
     diet: 'carnivore', foods: ['meat_raw', 'meat_prime', 'meat_cooked', 'fish_raw'], favorite: 'meat_prime',
@@ -134,8 +136,8 @@ export const SPECIES = {
     biomes: { jungle: 0.7, redwood: 0.6, nesting: 0.8, prairie: 0.3 }, call: 'screech',
   },
   dilo: {
-    name: 'Dilophosaurus', short: 'Dilo', size: 4, rp: 6,
-    look: { kind: 'theropod', body: [1.2, 0.38], hip: 1.4, neck: [0.7, 0.16, 0.7], tail: [1.9, 0.2, 0.05], head: { type: 'thero', len: 0.62, w: 0.24, h: 0.26, crests: true, frillNeck: true }, legs: 'biped', hind: 1.4, arms: 0.55, color: 0x5a7a3a, belly: 0xe0d8a8, pattern: 'spots', pcolor: 0xd8b030, accent: 0xd84a7a },
+    name: 'Dilophosaurus', short: 'Dilo', size: 4, rp: 6, element: 'toxic',
+    look: { kind: 'theropod', body: [1.2, 0.38], hip: 1.4, neck: [0.7, 0.16, 0.7], tail: [1.9, 0.2, 0.05], head: { type: 'thero', len: 0.62, w: 0.24, h: 0.26, crests: true, frillNeck: true }, legs: 'biped', hind: 1.4, arms: 0.55, color: 0x5a3a86, belly: 0xe0d0f0, pattern: 'spots', pcolor: 0x8ad030, accent: 0xc040ff },
     stats: { hp: 320, speed: 3, run: 9, dmg: 22, spit: true },
     behaviour: { predator: true, sight: 24, pack: [1, 2], swampy: true },
     diet: 'carnivore', foods: ['fish_raw', 'meat_raw', 'meat_prime', 'fish_cooked'], favorite: 'fish_raw',
@@ -146,8 +148,8 @@ export const SPECIES = {
     biomes: { swamp: 1.2, jungle: 0.3, river: 0.4 }, call: 'hiss',
   },
   spino: {
-    name: 'Spinosaurus', short: 'Spino', size: 13, rp: 8,
-    look: { kind: 'theropod', body: [3.6, 1.0], hip: 3.0, neck: [1.6, 0.42, 0.5], tail: [5.0, 0.6, 0.2], head: { type: 'croc', len: 1.7, w: 0.45, h: 0.5 }, legs: 'biped', hind: 2.7, arms: 1.3, sail: 1.7, color: 0x6a5a4a, belly: 0xd8c8a8, pattern: 'bands', pcolor: 0x3a3028, accent: 0xd84a2a },
+    name: 'Spinosaurus', short: 'Spino', size: 13, rp: 8, element: 'water',
+    look: { kind: 'theropod', body: [3.6, 1.0], hip: 3.0, neck: [1.6, 0.42, 0.5], tail: [5.0, 0.6, 0.2], head: { type: 'croc', len: 1.7, w: 0.45, h: 0.5 }, legs: 'biped', hind: 2.7, arms: 1.3, sail: 1.7, color: 0x1e4a6a, belly: 0xd0e4f0, pattern: 'bands', pcolor: 0x10304a, accent: 0x40c8ff },
     stats: { hp: 2600, speed: 2.4, run: 7, dmg: 70, swim: true },
     behaviour: { predator: true, sight: 30, swimmer: true, river: true },
     diet: 'carnivore', foods: ['fish_raw', 'fish_cooked', 'meat_prime', 'meat_raw'], favorite: 'fish_cooked',
@@ -158,8 +160,8 @@ export const SPECIES = {
     biomes: { river: 0.6, swamp: 0.6 }, call: 'roar',
   },
   rex: {
-    name: 'Tyrannosaurus rex', short: 'T. rex', size: 12, rp: 12, boss: true,
-    look: { kind: 'theropod', body: [3.1, 1.15], hip: 3.0, neck: [1.0, 0.55, 0.55], tail: [4.6, 0.7, 0.15], head: { type: 'rex', len: 1.55, w: 0.85, h: 0.95 }, legs: 'biped', hind: 2.9, arms: 0.55, color: 0x6a4a34, belly: 0xd8b890, pattern: 'stripes', pcolor: 0x3a2618, accent: 0x9a2a1a },
+    name: 'Tyrannosaurus rex', short: 'T. rex', size: 12, rp: 12, element: 'fire', boss: true,
+    look: { kind: 'theropod', body: [3.1, 1.15], hip: 3.0, neck: [1.0, 0.55, 0.55], tail: [4.6, 0.7, 0.15], head: { type: 'rex', len: 1.55, w: 0.85, h: 0.95 }, legs: 'biped', hind: 2.9, arms: 0.55, color: 0x2a2220, belly: 0x7a4a34, pattern: 'stripes', pcolor: 0x1a1412, accent: 0xff5a14 },
     stats: { hp: 3500, speed: 2.6, run: 8.5, dmg: 90, bite: 1.8, roar: true },
     behaviour: { predator: true, boss: true, territorial: 60, sight: 45, home: 'rexnest' },
     diet: 'carnivore', foods: ['meat_prime', 'steak', 'meat_raw', 'meat_cooked'], favorite: 'steak',
@@ -170,8 +172,8 @@ export const SPECIES = {
     biomes: { nesting: 0.25 }, call: 'roar',
   },
   ptera: {
-    name: 'Pteranodon', short: 'Ptera', size: 3.2, rp: 6,
-    look: { kind: 'ptera', body: [0.55, 0.2], hip: 0.75, neck: [0.4, 0.08, 0.9], tail: [0.15, 0.04, 0], head: { type: 'ptera', len: 0.9, w: 0.14, h: 0.14, crest: 0.6 }, legs: 'quadwing', hind: 0.5, fore: 0.75, wingspan: 6, color: 0xe8e0d0, belly: 0xf8f4ea, pattern: 'tips', pcolor: 0x2a2a2a, accent: 0xd84a2a },
+    name: 'Pteranodon', short: 'Ptera', size: 3.2, rp: 6, element: 'wind',
+    look: { kind: 'ptera', body: [0.55, 0.2], hip: 0.75, neck: [0.4, 0.08, 0.9], tail: [0.15, 0.04, 0], head: { type: 'ptera', len: 0.9, w: 0.14, h: 0.14, crest: 0.6 }, legs: 'quadwing', hind: 0.5, fore: 0.75, wingspan: 6, color: 0xe8f0f4, belly: 0xffffff, pattern: 'tips', pcolor: 0x40c8b8, accent: 0x7af0d8 },
     stats: { hp: 180, speed: 1.6, run: 4, dmg: 12, fly: 14 },
     behaviour: { flyer: true, sight: 40, fishing: true, cliffs: true },
     diet: 'piscivore', foods: ['fish_raw', 'fish_cooked', 'meat_raw'], favorite: 'fish_raw',
@@ -188,6 +190,7 @@ for (const [id, s] of Object.entries(SPECIES)) {
   s.colorCss = '#' + s.look.color.toString(16).padStart(6, '0');
   s.jobName = s.job?.name;
   s.tameHow = s.tame.hint;
+  s.elementName = s.element ? s.element[0].toUpperCase() + s.element.slice(1) : null;
 }
 
 export const DINO_NAMES = ['Doug Jr.', 'Kevin II', 'Nugget', 'Waffles', 'Sir Chompsalot', 'Pebbles', 'Gerald', 'Mango', 'Toaster', 'Biscuit', 'Captain', 'Noodle', 'Pickles', 'Princess', 'Meatball', 'Spud', 'Taco', 'Dino Dan', 'Fluffy', 'Chewbacca', 'Tiny', 'Gravy', 'Turbo', 'Beans', 'Cronch', 'Marshmallow', 'Professor', 'Disco', 'Wobbles', 'Steve'];

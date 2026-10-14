@@ -10,7 +10,7 @@ export const ALPHAS = {
   gnasher: {
     sp: 'rex', poi: 'rexnest', name: 'Old Gnasher', title: 'King of the Nesting Grounds',
     size: 1.2, hp: 1.8, dmg: 1.2, torpor: 1.25,
-    look: { color: 0x3e3a36, pcolor: 0x7a2418, accent: 0xd8402a, belly: 0xb8a890 },
+    look: { color: 0x1e1a1c, pcolor: 0x3a1010, accent: 0xff3a10, belly: 0x5a2a20, glow: 0xff3010 },
     moves: { roar: 15, stomp: 8, charge: 11 },
     loot: [['trophy_gnasher', 1], ['meat_prime', 8], ['hide', 8], ['bone', 10], ['dna', 2]],
     rp: [['zoo', 40], ['paleo', 12]],
@@ -19,7 +19,7 @@ export const ALPHAS = {
   bigmomma: {
     sp: 'spino', poi: 'lake', name: 'Big Momma', title: 'Terror of Mirror Lake',
     size: 1.15, hp: 1.6, dmg: 1.1, torpor: 1.2,
-    look: { color: 0x3e5a52, pcolor: 0x1a2a26, accent: 0xe07a2a, belly: 0xd0c8a0 },
+    look: { color: 0x24485a, pcolor: 0x0e2430, accent: 0x50f0ff, belly: 0xc0d8e0, glow: 0x40ffd0 },
     moves: { roar: 18, sweep: 7, dive: 16 },
     loot: [['trophy_momma', 1], ['fish_raw', 10], ['meat_prime', 6], ['hide', 6], ['dna', 2]],
     rp: [['zoo', 35], ['bio', 10]],
@@ -28,7 +28,7 @@ export const ALPHAS = {
   razor: {
     sp: 'raptor', poi: 'raptorden', name: 'Razor', title: 'Alpha of the Raptor Den',
     size: 1.45, hp: 4.5, dmg: 1.6, torpor: 2.4,
-    look: { color: 0x3a3a46, pcolor: 0x16161c, accent: 0xe8d040, belly: 0xb8b0a0 },
+    look: { color: 0x1a1a24, pcolor: 0x6a50d0, accent: 0xb080ff, belly: 0xb8b0c8, glow: 0xb080ff },
     moves: { howl: 22, pounce: 6 },
     loot: [['trophy_razor', 1], ['feather', 8], ['hide', 4], ['meat_prime', 3], ['dna', 1]],
     rp: [['zoo', 25]],

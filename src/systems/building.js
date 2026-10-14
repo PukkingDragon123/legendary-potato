@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { patchMaterial } from '../gfx/shaderlib.js';
 import { boxUV } from '../entities/vanModel.js';
-import { bTex } from '../gfx/buildTextures.js';
+import { bTex, withMaps } from '../gfx/buildTextures.js';
 import { ITEMS } from '../data/items.js';
 
 const S = 2; // cell size (m)
@@ -54,7 +54,7 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _m4 = new THREE.Matrix
 
 // ------------------------------------------------------------------ materials per tier
 const matCache = {};
-function M(key, o) { return matCache[key] ?? (matCache[key] = patchMaterial(new THREE.MeshStandardMaterial(o), {})); }
+function M(key, o) { return matCache[key] ?? (matCache[key] = patchMaterial(new THREE.MeshStandardMaterial(withMaps(o)), {})); }
 function tierMats(mat) {
   const frame = M('b_bark', { map: bTex('bark'), roughness: 0.92 });
   switch (mat) {

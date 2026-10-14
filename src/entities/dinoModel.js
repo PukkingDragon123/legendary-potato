@@ -1,101 +1,40 @@
 // Parametric chunky dinosaurs. One smooth skinned "spine" mesh (tail -> body
 // -> neck) with a bone chain, plus rigid toy-like parts on the bones: heads
-// with tiny dot eyes, jaws and teeth, drumstick legs, arms, horns, frills,
-// plates, sails, armour, feathers and wings. Pixel-art scale textures with
-// countershading per species. DinoRig animates everything procedurally.
+// with big glossy eyes, jaws and teeth, drumstick legs, arms, horns, frills,
+// plates, sails, armour, feathers and wings. Smooth painted skins with
+// countershading per species; the species' element (elements.js) adds
+// glowing markings and extra parts. DinoRig animates everything procedurally.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { patchMaterial } from '../gfx/shaderlib.js';
-import { PixelPainter, ramp } from '../gfx/pixel.js';
-import { tileFbm, RNG } from '../core/rng.js';
+import { elementOf, paintBody, paintPart, creatureMat, decorate, buildEye } from './elements.js';
 
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion();
-const texCache = new Map(), matCache = new Map();
+const matCache = new Map();
 
-// ------------------------------------------------------------------ textures
-const mixCol = (a, b) => [(a[0] + b[0]) >> 1, (a[1] + b[1]) >> 1, (a[2] + b[2]) >> 1];
-function bodyPainter(L, seed) {
-  const W = 128, H = 64;
-  const p = new PixelPainter(W, H, seed);
-  const back = ramp(L.color, 5, { light: 0.14, hueShift: 0.1 });
-  const bel = ramp(L.belly, 4, { light: 0.1 });
-  const pat = ramp(L.pcolor, 3, { light: 0.1 });
-  const r = new RNG(seed);
-  const spots = [];
-  for (let i = 0; i < 26; i++) spots.push([r.next() * W, r.next() * H, 2 + r.next() * 4]);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const u = x / W, v = y / H; // u around (0 = spine top), v along body
-    const side = Math.cos(u * Math.PI * 2); // 1 at the top, -1 at the belly
-    const n = tileFbm(u * 6, v * 3, 6, 3, seed);
-    // scales: offset rows of small bumps
-    const sx = (x + (Math.floor(y / 3) % 2) * 2) % 4, sy = y % 3;
-    const scaleHi = sx === 1 && sy === 0, scaleLo = sx === 3 && sy === 2;
-    let col;
-    const bellyK = THREE.MathUtils.smoothstep(-side, 0.15, 0.55);
-    let k = 2 + (n > 0.62 ? 1 : n < 0.38 ? -1 : 0) + (scaleHi ? 1 : scaleLo ? -1 : 0);
-    if (side > 0.85) k -= 1; // darker dorsal line
-    col = back[Math.max(0, Math.min(4, k))];
-    // pattern on back + flanks
-    const onBack = side > -0.15;
-    let pk = 0;
-    switch (L.pattern) {
-      case 'stripes': pk = onBack && Math.sin(v * 50 + Math.sin(u * 12) * 1.5) > 0.55 && side > 0.05 ? 1 : 0; break;
-      case 'bands': pk = onBack && Math.sin(v * 24) > 0.5 ? 1 : 0; break;
-      case 'saddle': pk = side > 0.25 && v > 0.35 && v < 0.75 ? 1 : 0; break;
-      case 'spots': for (const [sx2, sy2, sr] of spots) { const dx = Math.min(Math.abs(x - sx2), W - Math.abs(x - sx2)); if (dx * dx + (y - sy2) ** 2 < sr * sr && side > -0.2) { pk = 1; break; } } break;
-      case 'mottle': pk = onBack && n > 0.58 ? 1 : 0; break;
-      case 'scutes': pk = onBack && (x % 8 < 2 || y % 6 < 1) ? 1 : 0; break;
-      case 'iridescent': pk = side > 0.3 && ((x + y) % 7 === 0 || n > 0.66) ? 1 : 0; break;
-      case 'tips': pk = 0; break;
-      default: break;
-    }
-    if (pk) col = pat[Math.max(0, Math.min(2, 1 + (scaleHi ? 1 : 0) - (n < 0.4 ? 1 : 0)))];
-    if (bellyK > 0) {
-      const bk = bel[Math.max(0, Math.min(3, 2 + (sy === 0 && sx < 2 ? 1 : 0) - (y % 4 === 0 ? 1 : 0)))];
-      col = bellyK > 0.62 ? bk : bellyK > 0.38 ? mixCol(bk, col) : col;
-    }
-    p.set(x, y, col);
-  }
-  return p;
-}
-function partPainter(L, seed) {
-  // limbs/heads: vertical gradient back -> belly with scales (v: 0 bottom, 1 top)
-  const p = new PixelPainter(32, 32, seed);
-  const back = ramp(L.color, 5, { light: 0.14, hueShift: 0.1 });
-  const bel = ramp(L.belly, 4, { light: 0.1 });
-  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
-    const v = y / 32;
-    const sx = (x + (Math.floor(y / 3) % 2) * 2) % 4, sy = y % 3;
-    const k = 2 + (sx === 1 && sy === 0 ? 1 : sx === 3 && sy === 2 ? -1 : 0);
-    p.set(x, y, v < 0.3 ? bel[Math.min(3, k)] : v < 0.36 ? mixCol(bel[2], back[k]) : back[k]);
-  }
-  return p;
-}
+// ------------------------------------------------------------------ materials
+const GLOW_K = { fire: 2.0, electric: 2.0, toxic: 1.8, water: 1.6, crystal: 1.5, earth: 1.8, grass: 1.0, wind: 0.9 };
 function speciesMats(sp) {
   const key = sp.matKey ?? sp.id;
   if (matCache.has(key)) return matCache.get(key);
   const L = sp.look;
-  const seed = [...sp.id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0;
-  const bp = bodyPainter(L, seed), pp = partPainter(L, seed + 1);
-  const mk = (painter, rough = 0.72) => {
-    const map = painter.texture({ anisotropy: 4 });
-    const m = new THREE.MeshStandardMaterial({ map, roughness: rough, metalness: 0, normalMap: painter.normalTexture(1.4) });
-    m.normalScale.set(0.55, 0.55);
-    patchMaterial(m, { wet: true });
+  const E0 = elementOf(sp);
+  const E = E0 && L.glow ? { ...E0, glow: L.glow, iris: L.glow } : E0;
+  const seed = [...key].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0;
+  const el = sp.element;
+  const skin = (sk, rough) => {
+    const m = creatureMat({ map: sk.map, normalMap: sk.normalMap, roughness: rough, metalness: 0, emissive: E?.glow ?? 0x000000, emissiveMap: sk.emissiveMap, emissiveIntensity: E ? GLOW_K[el] ?? 1.2 : 0 }, E, { pulse: el === 'electric' ? 3.5 : 1.4 });
+    m.normalScale.set(0.45, 0.45);
     return m;
   };
+  const plain = (color, rough, extra = {}) => creatureMat({ color, roughness: rough, ...extra }, E);
   const M = {
-    body: mk(bp), part: mk(pp),
-    accent: patchMaterial(new THREE.MeshStandardMaterial({ color: L.accent, roughness: 0.6 }), {}),
-    pat: patchMaterial(new THREE.MeshStandardMaterial({ color: L.pcolor, roughness: 0.7 }), {}),
-    belly: patchMaterial(new THREE.MeshStandardMaterial({ color: L.belly, roughness: 0.75 }), {}),
-    eye: patchMaterial(new THREE.MeshStandardMaterial({ color: 0x0c0a0a, roughness: 0.12, metalness: 0.1 }), {}),
-    tooth: patchMaterial(new THREE.MeshStandardMaterial({ color: 0xf2ecd8, roughness: 0.4 }), {}),
-    claw: patchMaterial(new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.45 }), {}),
-    mouth: patchMaterial(new THREE.MeshStandardMaterial({ color: 0x8a2a30, roughness: 0.6 }), {}),
-    horn: patchMaterial(new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.5 }), {}),
+    body: skin(paintBody(L, el, seed), 0.46), part: skin(paintPart(L, el, seed + 1), 0.5),
+    accent: plain(L.accent, 0.42), pat: plain(L.pcolor, 0.5), belly: plain(L.belly, 0.55),
+    eye: plain(0x0c0a0a, 0.12, { metalness: 0.1 }),
+    tooth: plain(0xf2ecd8, 0.3), claw: plain(0x2a2420, 0.3), mouth: plain(0x8a2a30, 0.5), horn: plain(0xe8dcc0, 0.35),
+    E,
   };
-  M.part.userData.painter = pp;
   matCache.set(key, M);
   return M;
 }
@@ -188,7 +127,7 @@ export function buildDino(sp, opt = {}) {
   for (let i = hipsI + 1; i < bones.length; i++) link(i, i - 1);
   bones[hipsI].position.copy(bonePos[hipsI]);
   // ---- skinned tube
-  const RINGS = 40, SEG = 14;
+  const RINGS = 48, SEG = 18;
   const pos = [], nrm = [], uv = [], si = [], sw = [], index = [];
   const frame = { t: new THREE.Vector3(), n: new THREE.Vector3(), b: new THREE.Vector3() };
   let prevN = null;
@@ -279,7 +218,7 @@ export function buildDino(sp, opt = {}) {
     }
   }
   // ---- extras along the spine
-  if (L.plates) {
+  if (L.plates && sp.element !== 'crystal') {
     // two staggered rows of plates from neck to tail
     const n = 15;
     for (let i = 0; i < n; i++) {
@@ -301,14 +240,16 @@ export function buildDino(sp, opt = {}) {
   if (L.thag) {
     const tipBone = bones[1] ?? bones[0];
     const tr = Math.max(0.05, radiusAt(boneSpec[1]?.f ?? 0.05, F, L, S));
-    for (const [sx, sz] of [[-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6]]) { const sp2 = cone(tr * 0.32, tr * 3.2, M.horn); sp2.position.set(sx * tr * 0.8, tr * 0.6, sz * tr * 2.2); sp2.rotation.z = sx * -1.0; sp2.rotation.x = 0.35; tipBone.add(sp2); }
+    parts.thag = [];
+    for (const [sx, sz] of [[-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6]]) { const sp2 = cone(tr * 0.32, tr * 3.2, M.horn); sp2.position.set(sx * tr * 0.8, tr * 0.6, sz * tr * 2.2); sp2.rotation.z = sx * -1.0; sp2.rotation.x = 0.35; tipBone.add(sp2); parts.thag.push(sp2); }
   }
-  if (L.club) { const c = sphere(L.tail[1] * S * 1.5, M.part, 1.4, 0.75, 1.15); bones[0].add(c); for (const sx of [-1, 1]) { const k = sphere(L.tail[1] * S * 0.7, M.horn, 1, 0.7, 1, 8); k.position.set(sx * L.tail[1] * S * 1.2, 0, 0); bones[0].add(k); } }
+  if (L.club) { const c = sphere(L.tail[1] * S * 1.5, M.part, 1.4, 0.75, 1.15); bones[0].add(c); parts.club = c; for (const sx of [-1, 1]) { const k = sphere(L.tail[1] * S * 0.7, M.horn, 1, 0.7, 1, 8); k.position.set(sx * L.tail[1] * S * 1.2, 0, 0); bones[0].add(k); } }
   if (L.armor) {
     for (let i = 0; i < 26; i++) {
       const f = F.tailBase * 0.7 + (F.chest - F.tailBase * 0.7) * ((i % 13) / 12);
       const c = sc.curve.getPointAt(f); const r = rAt(f);
       const side = i < 13 ? -1 : 1;
+      if (sp.element === 'earth') { if (i % 3 === 0) { const sp2 = cone(r * 0.1, r * 0.45, M.horn, 6); onBone(nearestBone(boneSpec, f), sp2, side * r * 0.95, c.y + r * 0.1, c.z); sp2.rotation.z = side * -1.4; } continue; }
       const k = sphere(r * 0.16, M.horn, 1, 0.7, 1, 6);
       onBone(nearestBone(boneSpec, f), k, side * r * (0.35 + (i % 2) * 0.3), c.y + r * (0.95 - (i % 2) * 0.12), c.z);
       if (i % 3 === 0) { const sp2 = cone(r * 0.1, r * 0.45, M.horn, 6); onBone(nearestBone(boneSpec, f), sp2, side * r * 0.95, c.y + r * 0.1, c.z); sp2.rotation.z = side * -1.4; }
@@ -326,7 +267,8 @@ export function buildDino(sp, opt = {}) {
     const g = new THREE.ShapeGeometry(shape); g.rotateY(Math.PI / 2);
     const sail = mesh(g, patchMaterial(new THREE.MeshStandardMaterial({ color: L.accent, roughness: 0.6, side: THREE.DoubleSide }), {}));
     const bp = bonePos[idx.hips]; sail.position.set(-bp.x, -bp.y, -bp.z); B.hips.add(sail);
-    for (const [z, y, h] of pts) { const sp2 = mesh(new THREE.CylinderGeometry(0.02 * S * 4, 0.03 * S * 4, h, 4), M.pat); sp2.position.set(0, y + h / 2 - bp.y, z - bp.z); B.hips.add(sp2); }
+    parts.sailRods = [];
+    for (const [z, y, h] of pts) { const sp2 = mesh(new THREE.CylinderGeometry(0.02 * S * 4, 0.03 * S * 4, h, 4), M.pat); sp2.position.set(0, y + h / 2 - bp.y, z - bp.z); B.hips.add(sp2); parts.sailRods.push(sp2); }
     parts.sail = sail;
   }
   if (L.feathers) {
@@ -366,6 +308,8 @@ export function buildDino(sp, opt = {}) {
       parts.wings.push(w);
     }
   }
+  // ---- the element: glowing bits, crystals, leaves, flames, fins, rocks, fluff
+  if (sp.element) decorate({ sp, L, S, E: M.E, el: sp.element, sc, F, rAt, onBone, near: (f) => nearestBone(boneSpec, f), bones, B, idx, bonePos, parts, M, br });
   root.userData.dino = true;
   const rig = { root, body, bones: B, boneSpec, bonePos, idx, parts, scale: S, sc, M, quad, baby, height: sc.neckEnd.y + H.h * hs, len: (L.tail[0] + L.body[0]) * S, br };
   return rig;
@@ -382,7 +326,10 @@ function buildHead(head, H, s, M, parts, sp, sc) {
   skull.rotation.x = -sc.neckDir.y * 0.6 + 0.15; // level the head regardless of neck angle
   parts.skull = skull;
   const jaw = new THREE.Group(); parts.jaw = jaw;
-  const eyeR = Math.max(0.014, h * 0.095);
+  parts.headDims = { len, w, h, frill: (H.frill ?? 0) * s };
+  const eyeR0 = Math.max(0.014, h * 0.095);
+  // big glossy eyes, a little smaller on the giants
+  const eyeR = Math.max(0.02, h * (sp.size > 6 ? 0.12 : 0.155));
   let eyeY = h * 0.22, eyeZ = -len * 0.18, eyeX = w * 0.5;
   const teeth = (n, x0, z0, z1, y, down = true) => { for (let i = 0; i < n; i++) { const t = cone(len * 0.025, len * 0.07, M.tooth, 5); t.position.set(x0, y, z0 + (z1 - z0) * (i / Math.max(1, n - 1))); t.rotation.x = down ? Math.PI : 0; skull.add(t); } };
   switch (type) {
@@ -397,7 +344,7 @@ function buildHead(head, H, s, M, parts, sp, sc) {
       const nT = big ? 7 : type === 'croc' ? 9 : 5;
       for (const sx of [-1, 1]) teeth(nT, sx * w * (type === 'croc' ? 0.2 : 0.33), -len * 0.22, -len * 0.22 - snoutL * 0.85, -h * 0.42);
       if (big) { for (const sx of [-1, 1]) { const brow = rbox(w * 0.28, h * 0.16, len * 0.2, h * 0.06, M.pat); brow.position.set(sx * w * 0.34, h * 0.42, -len * 0.18); brow.rotation.z = sx * 0.25; skull.add(brow); } }
-      if (H.crests) for (const sx of [-1, 1]) { const g = new THREE.CircleGeometry(len * 0.32, 10, 0, Math.PI); const c = mesh(g, M.accent); c.material = M.accent; c.rotation.y = Math.PI / 2; c.position.set(sx * w * 0.18, h * 0.42, -len * 0.25); c.scale.set(1, 0.7, 1); skull.add(c); const c2 = c.clone(); c2.rotation.y = -Math.PI / 2; skull.add(c2); }
+      if (H.crests) for (const sx of [-1, 1]) { const g = new THREE.CircleGeometry(len * 0.32, 10, 0, Math.PI); const c = mesh(g, M.accent); c.material = M.accent; c.rotation.y = Math.PI / 2; c.position.set(sx * w * 0.18, h * 0.42, -len * 0.25); c.scale.set(1, 0.7, 1); skull.add(c); const c2 = c.clone(); c2.rotation.y = -Math.PI / 2; skull.add(c2); (parts.crests ??= []).push(c, c2); }
       if (H.frillNeck) { const g = new THREE.CircleGeometry(h * 1.3, 14, Math.PI * 0.15, Math.PI * 1.7); const fr = mesh(g, patchMaterial(new THREE.MeshStandardMaterial({ color: sp.look.accent, roughness: 0.6, side: THREE.DoubleSide }), {})); fr.position.set(0, -h * 0.05, len * 0.25); fr.scale.setScalar(0.15); skull.add(fr); parts.neckFrill = fr; }
       eyeY = h * 0.28; eyeZ = -len * 0.2; eyeX = w * 0.5;
       if (sp.alpha) {
@@ -450,7 +397,7 @@ function buildHead(head, H, s, M, parts, sp, sc) {
     }
     case 'dome': {
       const cran = rbox(w * 0.9, h * 0.75, len * 0.7, h * 0.25, M.part); cran.position.set(0, -h * 0.1, -len * 0.15); skull.add(cran);
-      const dome = sphere(w * 0.6, M.horn, 1, 0.85, 1.05); dome.position.set(0, h * 0.32, -len * 0.05); skull.add(dome);
+      const dome = sphere(w * 0.6, M.horn, 1, 0.85, 1.05); dome.position.set(0, h * 0.32, -len * 0.05); skull.add(dome); parts.dome = dome;
       for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; const k = cone(h * 0.06, h * 0.16, M.pat, 5); k.position.set(Math.cos(a) * w * 0.55, h * 0.12, -len * 0.05 + Math.sin(a) * w * 0.55); k.rotation.set(Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2); skull.add(k); }
       const bk = cone(w * 0.22, len * 0.25, M.claw, 6); bk.rotation.x = -Math.PI / 2; bk.position.set(0, -h * 0.2, -len * 0.62); skull.add(bk);
       jaw.position.set(0, -h * 0.42, -len * 0.2); skull.add(jaw);
@@ -478,19 +425,21 @@ function buildHead(head, H, s, M, parts, sp, sc) {
     }
     default: skull.add(sphere(h * 0.6, M.part));
   }
-  // tiny dot eyes (+ lids for blinking, brows for moods)
+  // big glossy eyes with a glowing iris (+ brows for moods); the eye group's
+  // local Y stays up so blinking can squash it
+  const E = M.E ?? { iris: 0x3a2a1a, rim: 0xffffff };
   for (const sx of [-1, 1]) {
-    const e = sphere(eyeR, M.eye, 1, 1, 1, 10);
-    e.position.set(sx * eyeX * 0.98, eyeY, eyeZ);
+    const e = buildEye(eyeR, E, sx);
+    e.position.set(sx * (eyeX * 0.98 - eyeR * 0.3), eyeY, eyeZ);
+    e.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(sx, 0.12, -0.55).normalize());
     skull.add(e);
-    const hl = sphere(eyeR * 0.32, M.tooth, 1, 1, 1, 6); hl.position.set(sx * eyeR * 0.45, eyeR * 0.45, -eyeR * 0.5); e.add(hl);
     parts.eyes.push(e);
-    const brow = rbox(eyeR * 3.2, eyeR * 0.9, eyeR * 1.6, eyeR * 0.4, M.pat);
-    brow.position.set(sx * eyeX * 0.95, eyeY + eyeR * 1.7, eyeZ + eyeR * 0.2); skull.add(brow);
+    const brow = rbox(eyeR * 2.6, eyeR * 0.6, eyeR * 1.3, eyeR * 0.28, M.pat);
+    brow.position.set(sx * eyeX * 0.95, eyeY + eyeR * 1.2, eyeZ + eyeR * 0.2); skull.add(brow);
     parts.lids.push(brow);
   }
   // nostrils
-  for (const sx of [-1, 1]) { const n = sphere(eyeR * 0.5, M.claw, 1, 0.6, 1, 6); n.position.set(sx * w * 0.18, eyeY * 0.2, -len * (type === 'croc' ? 1.0 : 0.72)); skull.add(n); }
+  for (const sx of [-1, 1]) { const n = sphere(eyeR0 * 0.5, M.claw, 1, 0.6, 1, 6); n.position.set(sx * w * 0.18, eyeY * 0.2, -len * (type === 'croc' ? 1.0 : 0.72)); skull.add(n); }
 }
 
 // ------------------------------------------------------------------ legs / arms / wings
@@ -559,7 +508,12 @@ function buildWings(B, idx, bonePos, L, S, M) {
     const shape = new THREE.Shape();
     shape.moveTo(0, 0.0); shape.lineTo(span * 0.45, span * 0.06); shape.lineTo(span, -span * 0.02); shape.quadraticCurveTo(span * 0.6, -span * 0.16, span * 0.35, -span * 0.22); shape.quadraticCurveTo(span * 0.12, -span * 0.3, 0, -span * 0.32);
     const g = new THREE.ShapeGeometry(shape, 6); g.rotateX(-Math.PI / 2);
-    if (side < 0) g.scale(-1, 1, 1);
+    if (side < 0) {
+      // mirrored: flip the winding too so the top stays the front face
+      g.scale(-1, 1, 1);
+      const ix = g.index.array;
+      for (let i = 0; i < ix.length; i += 3) { const t = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = t; }
+    }
     const w = new THREE.Mesh(g, mat); w.castShadow = true; w.receiveShadow = true;
     const grp = new THREE.Group(); grp.position.set(side * L.body[1] * S * 0.5, L.body[1] * S * 0.4, 0); grp.add(w);
     // dark wing tips
@@ -719,6 +673,7 @@ export class DinoRig {
       const ty = closed ? 0.12 : this.ko > 0.5 ? 0.45 : s.mood === 'angry' ? 0.65 : s.mood === 'happy' ? 0.5 : 1;
       e.scale.y = ease(e.scale.y, ty, 25); e.scale.x = ease(e.scale.x, this.ko > 0.5 ? 1.4 : 1, 10);
     }
+    if (P.flames) { const k = Math.max(0.05, 1 - this.ko * 0.9 - (sleeping ? 0.45 : 0)); for (const f of P.flames) f.scale.setScalar(k); }
     for (const [i, lid] of P.lids.entries()) { const side = i ? 1 : -1; lid.rotation.z = ease(lid.rotation.z, s.mood === 'angry' || s.alert > 0.7 ? side * 0.45 : s.mood === 'happy' ? side * -0.2 : 0, 8); }
   }
   lieDrop() { const r = this.r; return r.quad ? (r.bonePos[r.idx.hips].y - r.br * 1.05) : r.bonePos[r.idx.hips].y - r.br * 1.0; }

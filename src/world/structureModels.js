@@ -4,12 +4,12 @@
 //   col: walkable/solid boxes in local space [{x,y,z,hx,hy,hz,walk}]
 import * as THREE from 'three';
 import { std, box, cyl, mk, at } from '../entities/vanModel.js';
-import { bTex } from '../gfx/buildTextures.js';
+import { bTex, withMaps } from '../gfx/buildTextures.js';
 import { textTexture } from '../gfx/vanTextures.js';
 import { PixelPainter } from '../gfx/pixel.js';
 
 // ------------------------------------------------------------------ materials
-const T = (key, o = {}) => std('st_' + key, o);
+const T = (key, o = {}) => std('st_' + key, withMaps(o));
 export const SM = {
   plank: () => T('plank', { map: bTex('plank'), roughness: 0.82 }),
   plankV: () => T('plankV', { map: bTex('plankV'), roughness: 0.82 }),

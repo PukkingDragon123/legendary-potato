@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { SPECIES, DINO_NAMES, BIOME_KEYS } from './dinoSpecies.js';
 import { buildDino, DinoRig } from './dinoModel.js';
+import { emitAura } from './elements.js';
 import { RNG, hash2i } from '../core/rng.js';
 import { ITEMS } from '../data/items.js';
 import { G } from '../gfx/shaderlib.js';
@@ -654,6 +655,8 @@ export class Dinos {
     }
     d.root.position.copy(d.pos);
     d.root.rotation.set(0, d.yaw, 0);
+    // a little elemental aura up close (embers, sparks, drips, leaves...)
+    if (dist2 < 45 * 45 && d.state !== 'dead' && this.g.fx) emitAura(this.g.fx, d, dt);
   }
 
   // ======================================================================== interaction raycast
