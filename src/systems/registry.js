@@ -21,7 +21,7 @@ export async function installExtras(game) {
   // ---------------------------------------------------------------- optional big systems (loaded lazily)
   const mods = await Promise.allSettled([
     import('./structures.js'), import('./building.js'), import('../entities/van.js'), import('./research.js'),
-    import('../ui/computer.js'), import('./journal.js'), import('./story.js'), import('./coop.js'), import('../entities/dinos.js'), import('./bosses.js'), import('./tracks.js'), import('./save.js'), import('../net/net.js'), import('./taming.js'), import('./weapons.js'),
+    import('../ui/computer.js'), import('./journal.js'), import('./story.js'), import('./coop.js'), import('../entities/dinos.js'), import('./bosses.js'), import('./tracks.js'), import('./volcano.js'), import('./save.js'), import('../net/net.js'), import('./taming.js'), import('./weapons.js'),
   ]);
   for (const m of mods) {
     if (m.status === 'fulfilled' && m.value.install) { try { await m.value.install(g); } catch (e) { console.error('install failed', e); } }

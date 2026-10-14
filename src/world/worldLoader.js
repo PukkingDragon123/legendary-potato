@@ -2,7 +2,7 @@
 // generated in a worker (falls back to the main thread).
 import { generateWorld } from './gen.js';
 
-export const GEN_VERSION = 7;
+export const GEN_VERSION = 8;
 const DB = 'prehistoric-cache';
 
 function openDB() {

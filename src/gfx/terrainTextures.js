@@ -286,7 +286,7 @@ const painters = {
   },
   basalt(seed) {
     const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x3d393b, 6, { light: 0.18, hueShift: 0.2 });
+    const pal = ramp(0x4c4746, 6, { light: 0.2, hueShift: 0.2 });
     voronoi(p, 18, seed, (x, y, edge, rnd, bx, by) => {
       const shade = 1 + Math.floor(rnd * 3);
       let c = pal[shade];
@@ -370,23 +370,35 @@ const painters = {
     return p;
   },
   basaltcols(seed) {
+    // basalt columns: slightly wavy, uneven widths, low contrast between
+    // neighbours, slanted fractures and big weathered patches
     const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x3e3a3c, 6, { light: 0.2, hueShift: 0.2 });
+    const pal = ramp(0x4d4849, 6, { light: 0.22, hueShift: 0.2 });
+    const r = p.rng;
     let x = 0;
     while (x < S) {
-      const w = 7 + Math.floor(p.rng.next() * 8);
-      const shade = 1 + Math.floor(p.rng.next() * 3);
+      const w = Math.min(S - x, 6 + Math.floor(r.next() * 9));
+      const shade = 2 + (r.next() < 0.3 ? -1 : r.next() < 0.3 ? 1 : 0);
       const breaks = [];
-      for (let k = 0; k < 4; k++) breaks.push(Math.floor(p.rng.next() * S));
-      for (let xx = x; xx < Math.min(S, x + w); xx++) for (let y = 0; y < S; y++) {
-        let c = pal[shade];
-        if (xx === x) c = pal[0];
-        else if (xx === x + 1) c = pal[Math.min(5, shade + 2)];
-        else if (xx === x + w - 1) c = pal[Math.max(0, shade - 1)];
-        if (breaks.some((b) => Math.abs(y - b) < 1)) c = pal[0];
-        else if (breaks.some((b) => y - b === 1)) c = pal[Math.min(5, shade + 1)];
-        if (tileNoise(xx / 3, y / 3, Math.ceil(S / 3), seed) > 0.82) c = pal[shade + 1];
-        p.set(xx, y, c);
+      for (let k = 0; k < 2 + Math.floor(r.next() * 2); k++) breaks.push({ y: Math.floor(r.next() * S), tilt: (r.next() - 0.5) * 0.5 });
+      const ph = r.next() * 6.28;
+      for (let y = 0; y < S; y++) {
+        const wob = Math.round(Math.sin((y / S) * Math.PI * 2 + ph) * 0.8);
+        for (let xx = x; xx < x + w; xx++) {
+          const lx = xx - x;
+          const big = tileFbm((xx / S) * 2, (y / S) * 2, 2, 3, seed + 3);
+          let c = pal[Math.max(0, Math.min(5, shade + (big < 0.35 ? -1 : big > 0.68 ? 1 : 0)))];
+          if (lx === 0 + Math.max(0, wob)) c = pal[0];
+          else if (lx === 1 + Math.max(0, wob)) c = pal[Math.min(5, shade + 2)];
+          else if (lx === w - 1) c = pal[Math.max(0, shade - 1)];
+          for (const b of breaks) {
+            const by = b.y + Math.round(lx * b.tilt);
+            if (y === by) c = pal[0];
+            else if (y === by + 1) c = pal[Math.min(5, shade + 1)];
+          }
+          if (tileNoise(xx / 3, y / 3, Math.ceil(S / 3), seed) > 0.84) c = pal[Math.min(5, shade + 1)];
+          p.set(xx, y, c);
+        }
       }
       x += w;
     }

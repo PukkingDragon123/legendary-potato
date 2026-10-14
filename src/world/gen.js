@@ -141,7 +141,10 @@ export function generateWorld(seed = 'prehistoric', onProgress = () => {}) {
       let cone = v.h * Math.pow(t, 1.55) + 8 * nC.noise2(x * 0.02, z * 0.02) * t;
       const ga = Math.atan2(z - v.z, x - v.x);
       cone -= Math.pow(Math.abs(Math.sin(ga * 7 + nB.noise2(vd * 0.02, 0) * 1.5)), 6) * 9 * t;
-      cone -= smoothstep(v.crater + 25, v.crater - 10, vd) * 46;
+      // summit crater: a bowl sunk below the rim (the lava lake sits in it)
+      const rimH = v.h * Math.pow(1 - v.crater / v.r, 1.55);
+      const bowl = rimH + 3 - 40 * (1 - Math.min(1, (vd / v.crater) ** 2));
+      cone = lerp(cone, Math.min(cone, bowl), smoothstep(v.crater + 12, v.crater - 8, vd));
       high = Math.max(high, high * (1 - t) + cone + 10 * t);
     }
     // ---- escarpment blend
