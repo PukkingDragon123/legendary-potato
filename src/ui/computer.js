@@ -87,7 +87,7 @@ export class Computer {
     let i = 0;
     const step = () => {
       if (!this.isOpen) return;
-      if (i < lines.length) { pre.innerHTML += lines[i++] + '\n'; this.g.audio?.play('tick', { vol: 0.2 }); setTimeout(step, 160); }
+      if (i < lines.length) { pre.innerHTML += lines[i++] + '\n'; this.g.audio?.play('ui_tick', { vol: 0.2 }); setTimeout(step, 160); }
       else setTimeout(() => this.isOpen && this.go('desk'), 500);
     };
     step();
@@ -111,7 +111,7 @@ export class Computer {
     for (const el of this.inner.querySelectorAll('[data-i]')) { el.onmouseenter = () => { if (this.sel !== +el.dataset.i) { this.sel = +el.dataset.i; this.highlight(); } }; el.onclick = () => { this.sel = +el.dataset.i; this.enter(); }; }
     for (const el of this.inner.querySelectorAll('[data-act]')) el.onclick = () => this.action(el.dataset.act);
   }
-  highlight() { for (const el of this.inner.querySelectorAll('[data-i]')) el.classList.toggle('sel', +el.dataset.i === this.sel); this.renderDetail?.(); this.g.audio?.play('tick', { vol: 0.15 }); }
+  highlight() { for (const el of this.inner.querySelectorAll('[data-i]')) el.classList.toggle('sel', +el.dataset.i === this.sel); this.renderDetail?.(); this.g.audio?.play('ui_tick', { vol: 0.15 }); }
   count() { return this.inner.querySelectorAll('[data-i]').length; }
   onKey(e) {
     if (!this.isOpen) return;
@@ -327,7 +327,7 @@ function microscope(host, done, g) {
   };
   const loop = () => { if (!run) return; t += 1 / 30; draw(); setTimeout(loop, 33); };
   loop();
-  const wheel = (e) => { e.preventDefault(); focus = Math.max(0, Math.min(1, focus + Math.sign(e.deltaY) * 0.025)); g.audio?.play('tick', { vol: 0.1, gap: 40 }); };
+  const wheel = (e) => { e.preventDefault(); focus = Math.max(0, Math.min(1, focus + Math.sign(e.deltaY) * 0.025)); g.audio?.play('ui_tick', { vol: 0.1, gap: 40 }); };
   c.addEventListener('wheel', wheel, { passive: false });
   c.onclick = (e) => {
     const r = c.getBoundingClientRect(); const x = ((e.clientX - r.left) / r.width) * 160, y = ((e.clientY - r.top) / r.height) * 120;
@@ -356,7 +356,7 @@ function dnaGame(host, done, g) {
     key: (e) => {
       const k = e.key?.toUpperCase();
       if (!'ATCG'.includes(k) || k.length !== 1) return false;
-      if (pairs[seq[i]] === k) { i++; g.audio?.play('tick', { vol: 0.3 }); if (i >= seq.length && run) { run = false; render(); setTimeout(() => done(Math.max(0.4, 1 - errors * 0.08)), 300); } }
+      if (pairs[seq[i]] === k) { i++; g.audio?.play('ui_tick', { vol: 0.3 }); if (i >= seq.length && run) { run = false; render(); setTimeout(() => done(Math.max(0.4, 1 - errors * 0.08)), 300); } }
       else { errors++; g.audio?.play('error', { vol: 0.3 }); }
       render();
       return true;

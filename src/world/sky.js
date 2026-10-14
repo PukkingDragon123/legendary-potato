@@ -5,8 +5,8 @@ import { GLSL_HASH } from './terrain.js';
 
 const KEYS = [
   // elev, zenith, horizon, ground, sun color, sun intensity, hemi sky, hemi ground, hemi intensity, fog density
-  { e: -0.35, zen: 0x070b1d, hor: 0x16203a, gnd: 0x07090f, sun: 0x8ea8e0, si: 0.55, hs: 0x2a3c66, hg: 0x10141c, hi: 0.55, fog: 0.0024 },
-  { e: -0.12, zen: 0x141d48, hor: 0x5b4a6e, gnd: 0x0d0f18, sun: 0x9ab0e8, si: 0.25, hs: 0x3c4a7a, hg: 0x161820, hi: 0.5, fog: 0.0024 },
+  { e: -0.35, zen: 0x0a1028, hor: 0x1e2c4c, gnd: 0x0a0c14, sun: 0x9ab4ec, si: 0.8, hs: 0x3a5288, hg: 0x182030, hi: 0.95, fog: 0.0022 },
+  { e: -0.12, zen: 0x162252, hor: 0x5b4a6e, gnd: 0x10121c, sun: 0x9ab0e8, si: 0.35, hs: 0x48588e, hg: 0x1c1e2a, hi: 0.75, fog: 0.0022 },
   { e: -0.02, zen: 0x2a3b78, hor: 0xd8735a, gnd: 0x1a1414, sun: 0xff8a50, si: 0.6, hs: 0x6c6a96, hg: 0x2a2018, hi: 0.6, fog: 0.0022 },
   { e: 0.06, zen: 0x3a5ea8, hor: 0xffa66a, gnd: 0x2a2018, sun: 0xffb27a, si: 2.0, hs: 0x8fa2c8, hg: 0x3c3220, hi: 0.75, fog: 0.002 },
   { e: 0.22, zen: 0x4a82d0, hor: 0xc8d8e4, gnd: 0x3a3428, sun: 0xffe6c4, si: 3.0, hs: 0xa8c4ec, hg: 0x5a5236, hi: 1.25, fog: 0.0017 },

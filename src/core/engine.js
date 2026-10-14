@@ -279,8 +279,10 @@ void main() {
   float vig = 1.0 - dot( vc, vc ) * uVignette;
   col *= vig;
   if ( uDamage > 0.0 ) {
-    float edge = smoothstep( 0.15, 0.75, length( vc ) * 1.4 );
-    col = mix( col, vec3( 0.55, 0.03, 0.02 ), edge * uDamage * 0.8 );
+    // blood-red rim that leaves the middle of the screen readable
+    float edge = smoothstep( 0.32, 0.95, length( vc * vec2( 1.0, 1.25 ) ) * 1.35 );
+    col = mix( col, vec3( 0.5, 0.02, 0.02 ), edge * edge * uDamage * 0.85 );
+    col *= 1.0 - uDamage * 0.12;
   }
   col += ( hash12( gl_FragCoord.xy + fract( uTime * 7.13 ) * 100.0 ) - 0.5 ) * uGrain;
   col = mix( col, uFadeColor, uFade );

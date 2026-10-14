@@ -203,6 +203,6 @@ export async function install(g) {
   g.heldHandlers.whistle = () => { if (g.input.pressed('use')) W.whistle(); return true; };
   // melee on dinos via the normal swing: route Interaction onHit for dino targets
   const prevTarget = g.taming?.target?.bind(g.taming);
-  if (g.taming && prevTarget) g.taming.target = (d, dist) => { const t = prevTarget(d, dist); t.onHit = ({ hdef, kind }) => W.melee(d, hdef, kind); t.use = t.use ?? (d.state === 'dead' ? null : 'Hit'); t.tool = 'any'; return t; };
+  if (g.taming && prevTarget) g.taming.target = (d, dist) => { const t = prevTarget(d, dist); if (d.tamed || d.state === 'dead') return t; t.onHit = ({ hdef, kind }) => W.melee(d, hdef, kind); t.use = t.use ?? 'Hit'; t.tool = 'any'; return t; };
   return W;
 }

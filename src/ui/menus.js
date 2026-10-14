@@ -69,7 +69,7 @@ export class Title {
   clear(title) { this.menu.innerHTML = title ? `<h2>${title}</h2>` : ''; }
   main() {
     this.clear();
-    if (this.opt.hasSave) this.btn('Continue Expedition', () => this.opt.onStart({ mode: 'continue' }), 'primary');
+    if (this.opt.hasSave) this.btn('Continue Expedition', () => this.opt.onStart({ mode: 'continue', host: !!this.opt.serverAvailable }), 'primary');
     this.btn(this.opt.hasSave ? 'New Expedition' : 'Start Expedition', () => this.newGame(), this.opt.hasSave ? '' : 'primary');
     this.btn('Join Friends', () => this.join());
     this.btn('Customise Explorer', () => this.customise());

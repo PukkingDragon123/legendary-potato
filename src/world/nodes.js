@@ -3,7 +3,7 @@
 // around the players, rendered with one InstancedMesh per node type, with
 // colliders and persistent depletion state (networked by id).
 import * as THREE from 'three';
-import { RNG, Simplex } from '../core/rng.js';
+import { RNG, Simplex, tileFbm } from '../core/rng.js';
 import { BIOME, MAT } from './gen.js';
 import { patchMaterial } from '../gfx/shaderlib.js';
 import { PixelPainter, ramp, makeArrayTexture } from '../gfx/pixel.js';
@@ -145,17 +145,21 @@ function rockTextures() {
     const p = new PixelPainter(64, 64, seed);
     const pal = ramp(base, 5, { light: 0.2 });
     for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
-      const n = Math.sin(x * 0.3 + Math.sin(y * 0.2) * 2) * 0.1 + Math.random() * 0.15;
-      p.set(x, y, pal[2 + (n > 0.18 ? 1 : n < 0.02 ? -1 : 0)]);
+      // soft strata + blotches + grain
+      const strata = Math.sin(y * 0.45 + Math.sin(x * 0.11) * 2.2) * 0.5 + 0.5;
+      const blot = tileFbm(x / 64 * 4, y / 64 * 4, 4, 3, seed);
+      const n = strata * 0.35 + blot * 0.65 + (Math.random() - 0.5) * 0.12;
+      p.set(x, y, pal[Math.max(0, Math.min(4, Math.round(n * 3.2)))]);
     }
     for (let k = 0; k < cracks; k++) p.crack(Math.random() * 64, Math.random() * 64, 6 + Math.random() * 12, pal[0], pal[4], { wiggle: 0.6 });
     p.scatter(40, (x, y) => p.set(x, y, pal[4]));
     return p;
   };
   const moss = new PixelPainter(64, 64, 9);
-  const mp = ramp(0x4f8a2c, 5, { light: 0.24 });
+  const mp = ramp(0x5c7a36, 5, { light: 0.18, sat: 0.1 });
   moss.fill(mp[1]);
-  moss.scatter(300, (x, y, i, r) => { const rr = 1 + r.next() * 1.6; moss.blob(x, y, rr, rr * 0.8, mp.slice(1)); });
+  moss.scatter(420, (x, y, i, r) => { const rr = 0.6 + r.next() * 1.1; moss.blob(x, y, rr, rr * 0.8, mp.slice(0, 4)); });
+  moss.scatter(60, (x, y) => moss.set(x, y, mp[4]));
   return makeArrayTexture([mk(0x8a8780, 1, 10), moss]);
 }
 
@@ -185,7 +189,7 @@ function makeRockMaterial(tex, opt = {}) {
         vec2 ruv = an.y > max( an.x, an.z ) ? vRW.xz : an.x > an.z ? vRW.zy : vRW.xy;
         ruv *= 0.5;
         vec3 rc = texture( tRockArr, vec3( ruv, 0.0 ) ).rgb;
-        float mossAmt = smoothstep( 0.45, 0.8, vRN.y + ( vnoise( vRW.xz * 1.7 ) - 0.5 ) * 0.5 ) * uMoss;
+        float mossAmt = smoothstep( 0.62, 0.95, vRN.y + ( vnoise( vRW.xz * 1.3 ) - 0.5 ) * 0.6 ) * uMoss;
         vec3 mc = texture( tRockArr, vec3( vRW.xz * 0.5, 1.0 ) ).rgb;
         float pick = step( 0.5, mossAmt + ( hash21( floor( ruv * 64.0 ) ) - 0.5 ) * 0.3 );
         diffuseColor.rgb *= mix( rc, mc, pick );`,

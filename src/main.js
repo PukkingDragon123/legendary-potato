@@ -74,11 +74,17 @@ async function boot() {
   loading.set(1, 'Ready');
   // ---- main loop
   let last = performance.now();
+  const seen = new Set();
   const loop = () => {
     const now = performance.now();
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    game.update(dt);
+    // one broken frame must never freeze the game: log each new error once
+    try { game.update(dt); } catch (e) {
+      const k = String(e?.stack ?? e).slice(0, 300);
+      if (!seen.has(k)) { seen.add(k); console.error('frame error', e); }
+      input.endFrame();
+    }
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);
@@ -93,7 +99,7 @@ async function boot() {
   };
   // ---- title over the live world
   let title = null;
-  if (qs.get('autostart')) { start({ mode: qs.get('mode') || 'new' }); }
+  if (qs.get('autostart')) { start({ mode: qs.get('mode') || 'new', host: qs.get('host') === '1', code: (qs.get('code') || '').toUpperCase() }); }
   else {
     game.titleMode = true;
     title = new Title(document.getElementById('ui'), {

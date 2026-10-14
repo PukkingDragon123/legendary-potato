@@ -216,7 +216,7 @@ export class Journal {
       for (const gl of ch.goals) {
         const key = ch.id + ':' + gl.id;
         if (this.done.has(key)) continue;
-        if (this.evalGoal(gl).done) { this.done.add(key); g.audio?.play('tick', { vol: 0.5 }); g.ui?.toast('✓ ' + gl.text, '', 'star', 2500); }
+        if (this.evalGoal(gl).done) { this.done.add(key); g.audio?.play('craft_done', { vol: 0.45 }); g.ui?.toast('✓ ' + gl.text, '', 'star', 2500); }
         else all = false;
       }
       if (all) this.completeChapter(ch);

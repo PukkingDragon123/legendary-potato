@@ -21,7 +21,7 @@ export async function installExtras(game) {
   // ---------------------------------------------------------------- optional big systems (loaded lazily)
   const mods = await Promise.allSettled([
     import('./structures.js'), import('./building.js'), import('../entities/van.js'), import('./research.js'),
-    import('../ui/computer.js'), import('./journal.js'), import('../entities/dinos.js'), import('./save.js'), import('../net/net.js'), import('./taming.js'), import('./weapons.js'),
+    import('../ui/computer.js'), import('./journal.js'), import('./story.js'), import('./coop.js'), import('../entities/dinos.js'), import('./save.js'), import('../net/net.js'), import('./taming.js'), import('./weapons.js'),
   ]);
   for (const m of mods) {
     if (m.status === 'fulfilled' && m.value.install) { try { await m.value.install(g); } catch (e) { console.error('install failed', e); } }
@@ -187,17 +187,21 @@ export async function installExtras(game) {
   // ---------------------------------------------------------------- start flow
   g.start = async (opt) => {
     g.uiOpen = false;
-    if (opt.mode === 'continue' && g.loadGame) await g.loadGame();
-    else if (opt.mode === 'join' && g.netJoin) await g.netJoin(opt.code);
+    if (g.profile?.name) g.local.name = g.profile.name; // typed on the title screen
+    if (opt.mode === 'join' && g.netJoin) await g.netJoin(opt.code);
     else {
-      if (opt.host && g.netHost) await g.netHost();
-      g.newGame?.();
-      // starting kit: crash supplies
-      if (!g.inventory.count('scanner')) {
-        g.give('noodles', 2, { quiet: true });
-        g.give('energybar', 2, { quiet: true });
-        g.give('canteen', 1, { quiet: true });
+      if (opt.mode === 'continue' && g.loadGame) await g.loadGame();
+      else {
+        g.newGame?.();
+        // starting kit: crash supplies
+        if (!g.inventory.count('scanner')) {
+          g.give('noodles', 2, { quiet: true });
+          g.give('energybar', 2, { quiet: true });
+          g.give('canteen', 1, { quiet: true });
+        }
       }
+      // open the room once the world is ready, so joiners get the real state
+      if (opt.host && g.netHost) await g.netHost();
     }
     g.events.emit('started', opt);
     g.ui?.banner('66 MILLION YEARS AGO', 'Day ' + g.time.day, 'Somewhere very, very far from home');

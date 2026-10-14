@@ -139,6 +139,7 @@ r('spare_tire', 'spare_tire', 1, { resin: 6, hide: 4, tar: 4 }, { ...VN, cat: 'v
 r('axle', 'axle', 1, { ingot_iron: 6, log: 2 }, { ...VN, cat: 'van', time: 5, unlock: 'mechanics' });
 r('temporal_coil', 'temporal_coil', 1, { wire: 20, amber: 4, ingot_copper: 4 }, { ...VN, cat: 'van', time: 8, unlock: 'temporal_theory' });
 r('flux_crystal', 'flux_crystal', 1, { crystal: 3, circuit: 2, obsidian: 4 }, { ...VN, cat: 'van', time: 8, unlock: 'crystal_resonance' });
+r('power_core', 'power_core', 1, { capacitor: 1, battery: 4, crystal: 1, wire: 6 }, { ...VN, cat: 'van', time: 8, unlock: 'lightning' });
 r('stabilizer', 'stabilizer', 1, { ingot_iron: 6, amber_bug: 1, circuit: 4, mineral: 4 }, { ...VN, cat: 'van', time: 8, unlock: 'timeline_math' });
 
 export const RECIPES = R;

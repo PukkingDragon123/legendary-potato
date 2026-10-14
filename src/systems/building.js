@@ -34,6 +34,7 @@ const COST = {
   gate: { thatch: { stick: 5, rope: 2 }, wood: { plank: 4, rope: 1 }, stone: { brick: 3, plank: 3 }, metal: { scrap: 5 } },
   ladder: { thatch: { stick: 6, rope: 2 }, wood: { plank: 3, rope: 1 }, stone: { plank: 3, rope: 1 }, metal: { scrap: 3 } },
 };
+export const COSTS = COST;
 export const PIECES = [
   { id: 'foundation', name: 'Foundation', slot: 'cell' },
   { id: 'floor', name: 'Floor', slot: 'cell' },
