@@ -1,6 +1,9 @@
-// Loading screen + title screen + character customiser.
+// Loading screen + the main menu (laid over the lab scene, see world/lab.js)
+// + the wardrobe: colours and fabrics are free, gear unlocks with achievements.
 import { PRESETS, PALETTE, TEETH, FABRIC_IDS, normalizeOutfit } from '../entities/character.js';
 import { FABRICS } from '../entities/humanModel.js';
+import { ACCESSORIES, ACC_SLOTS, isUnlocked } from '../entities/accessories.js';
+import { ACH } from '../systems/journal.js';
 
 const TIPS = [
   'Tip: Punching trees works. It just takes a while and hurts a bit.',
@@ -57,96 +60,183 @@ export class Loading {
   done() { clearInterval(this.tipT); clearInterval(this.anim); this.el.style.transition = 'opacity 0.6s'; this.el.style.opacity = 0; setTimeout(() => this.el.remove(), 650); }
 }
 
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+const hex = (v) => '#' + (v >>> 0).toString(16).padStart(6, '0');
+const ACH_BY_ID = Object.fromEntries(ACH.map(([id, title, text]) => [id, { title, text }]));
+
+// a little swatch of each fabric's weave, drawn in pixels
+function fabricSwatch(id, col) {
+  const c = document.createElement('canvas'); c.width = c.height = 24;
+  const x = c.getContext('2d');
+  const base = hex(col);
+  x.fillStyle = base; x.fillRect(0, 0, 24, 24);
+  const dark = 'rgba(0,0,0,0.28)', lite = 'rgba(255,255,255,0.22)';
+  const px = (a, b, s) => { x.fillStyle = s; x.fillRect(a, b, 1, 1); };
+  for (let j = 0; j < 24; j++) for (let i = 0; i < 24; i++) {
+    if (id === 'quilted' && ((i + j) % 8 === 0 || (i - j + 24) % 8 === 0)) px(i, j, dark);
+    if (id === 'puffer' && j % 6 === 0) px(i, j, dark); if (id === 'puffer' && j % 6 === 2) px(i, j, lite);
+    if (id === 'ripstop' && (i % 6 === 0 || j % 6 === 0)) px(i, j, dark);
+    if (id === 'hex' && ((j % 8 === 0 && (i + (j % 16 ? 4 : 0)) % 8 < 4) || ((i + (Math.floor(j / 8) % 2) * 4) % 8 === 0))) px(i, j, dark);
+    if (id === 'leather' && ((i * 7 + j * 13) % 11 === 0)) px(i, j, dark);
+    if (id === 'canvas' && ((i + j) % 2 === 0)) px(i, j, 'rgba(0,0,0,0.12)');
+    if (id === 'nylon' && i === j % 24) px(i, j, lite);
+  }
+  if (id === 'camo') for (const [a, b, r, s] of [[5, 6, 4, dark], [16, 4, 3, lite], [12, 15, 5, dark], [3, 19, 3, lite], [20, 18, 3, dark]]) { x.fillStyle = s; x.beginPath(); x.arc(a, b, r, 0, 7); x.fill(); }
+  return c.toDataURL();
+}
+
 export class Title {
   constructor(root, opt) {
     this.opt = opt;
-    this.el = document.createElement('div');
-    this.el.id = 'title';
-    this.el.innerHTML = `<div class="logo">PREHIST<span>O</span>RIC</div><div class="tag shadow-text">You built a time machine in a van. It worked. Sort of. Survive, tame critters, build a base and fix the van before something eats you.</div>`;
-    const m = document.createElement('div'); m.className = 'menu px';
-    this.menu = m;
-    this.el.appendChild(m);
-    const ver = document.createElement('div'); ver.className = 'ver'; ver.textContent = 'V0.9 · MADE OF 100% PROCEDURAL PIXELS · NO CRITTERS WERE HARMED';
-    this.el.appendChild(ver);
+    this.el = el('div'); this.el.id = 'title'; this.el.className = 'lab';
+    this.el.innerHTML = `<div class="lab-left"><div class="logo">PREHIST<span>O</span>RIC</div><div class="lab-sub">A CHRONO-VAN EXPEDITION</div><div class="lab-menu"></div></div>
+      <div class="lab-hint"><i></i>Click your scientist to customise</div>
+      <div class="ver">V1.0 · THE LAB · 66,000,000 YEARS TO GO</div>`;
+    this.menu = this.el.querySelector('.lab-menu');
     root.appendChild(this.el);
     this.main();
   }
-  btn(label, fn, cls = '') { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = label; b.onclick = () => { this.opt.click?.(); fn(); }; this.menu.appendChild(b); return b; }
-  clear(title) { this.menu.innerHTML = title ? `<h2>${title}</h2>` : ''; }
-  main() {
-    this.clear();
-    if (this.opt.hasSave) this.btn('Continue Expedition', () => this.opt.onStart({ mode: 'continue', host: !!this.opt.serverAvailable }), 'primary');
-    this.btn(this.opt.hasSave ? 'New Expedition' : 'Start Expedition', () => this.newGame(), this.opt.hasSave ? '' : 'primary');
-    this.btn('Join Friends', () => this.join());
-    this.btn('Customise Your Bean', () => this.customise());
-    this.btn('How to Play', () => this.help());
+  btn(label, fn, cls = '', sub = '') {
+    const b = el('button', 'lab-btn ' + cls, `<b>${label}</b>${sub ? `<span>${sub}</span>` : ''}`);
+    b.onclick = () => { this.opt.click?.(); fn(); };
+    this.menu.appendChild(b);
+    return b;
   }
-  newGame() {
-    this.clear('New Expedition');
+  clear(title) { this.menu.innerHTML = title ? `<h2>${title}</h2>` : ''; }
+  // the three big buttons
+  main() {
+    this.closeWardrobe(true);
+    this.clear();
+    this.btn('HOST', () => this.host(), 'primary', this.opt.hasSave ? 'Continue or start an expedition' : 'Start an expedition, friends can join');
+    this.btn('JOIN', () => this.join(), '', 'Hop into a friend\'s expedition');
+    this.btn('QUIT', () => this.quit(), 'warn', 'Leave the lab');
+    const small = el('div', 'lab-small');
+    const how = el('a', '', 'HOW TO PLAY'); how.onclick = () => { this.opt.click?.(); this.help(); };
+    const look = el('a', '', 'WARDROBE'); look.onclick = () => { this.opt.click?.(); this.customise(); };
+    small.append(how, look);
+    this.menu.appendChild(small);
+  }
+  host() {
+    this.clear('HOST AN EXPEDITION');
     const name = this.field('Your name', this.opt.profile.name);
-    const host = document.createElement('label'); host.innerHTML = '<span>Host co-op room</span>';
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!this.opt.serverAvailable; cb.disabled = !this.opt.serverAvailable; host.appendChild(cb); this.menu.appendChild(host);
-    if (!this.opt.serverAvailable) this.menu.insertAdjacentHTML('beforeend', '<div class="small">Co-op needs the game server (npm start). Playing solo.</div>');
-    this.btn('Begin!', () => { this.opt.profile.name = name.value.trim() || 'Explorer'; this.opt.onStart({ mode: 'new', host: cb.checked }); }, 'primary');
-    this.btn('Back', () => this.main());
+    const row = el('label', 'lab-check'); row.innerHTML = '<span>Open a co-op room</span>';
+    const cb = el('input'); cb.type = 'checkbox'; cb.checked = !!this.opt.serverAvailable; cb.disabled = !this.opt.serverAvailable; row.appendChild(cb); this.menu.appendChild(row);
+    if (!this.opt.serverAvailable) this.menu.appendChild(el('div', 'small', 'Co-op needs the game server (npm start). Playing solo.'));
+    const go = (mode) => { this.opt.profile.name = name.value.trim() || 'Explorer'; this.opt.onStart({ mode, host: cb.checked }); };
+    if (this.opt.hasSave) this.btn('CONTINUE', () => go('continue'), 'primary', 'Back to where you left off');
+    this.btn(this.opt.hasSave ? 'NEW EXPEDITION' : 'OPEN THE PORTAL', () => go('new'), this.opt.hasSave ? '' : 'primary', 'Fire up the time machine');
+    this.btn('BACK', () => this.main(), 'ghost');
   }
   join() {
-    this.clear('Join Friends');
+    this.clear('JOIN FRIENDS');
     const name = this.field('Your name', this.opt.profile.name);
     const code = this.field('Room code', '');
     code.style.textTransform = 'uppercase';
-    if (!this.opt.serverAvailable) this.menu.insertAdjacentHTML('beforeend', '<div class="small">No server detected. Run the game with "npm start" and open the address it prints.</div>');
-    this.btn('Join', () => { this.opt.profile.name = name.value.trim() || 'Explorer'; this.opt.onStart({ mode: 'join', code: code.value.trim().toUpperCase() }); }, 'primary');
-    this.btn('Back', () => this.main());
+    if (!this.opt.serverAvailable) this.menu.appendChild(el('div', 'small', 'No server detected. Run the game with "npm start" and open the address it prints.'));
+    this.btn('JOIN', () => { this.opt.profile.name = name.value.trim() || 'Explorer'; this.opt.onStart({ mode: 'join', code: code.value.trim().toUpperCase() }); }, 'primary');
+    this.btn('BACK', () => this.main(), 'ghost');
   }
-  field(label, val) { const l = document.createElement('label'); l.innerHTML = `<span>${label}</span>`; const i = document.createElement('input'); i.type = 'text'; i.value = val ?? ''; i.maxLength = 16; l.appendChild(i); this.menu.appendChild(l); return i; }
+  quit() {
+    const q = el('div', 'lab-quit', '<div><b>SHUTTING DOWN THE LAB...</b><p>The portal powers down. Timmy waves goodbye.<br>You can close this tab now.</p></div>');
+    const back = el('button', 'lab-btn', '<b>BACK TO THE LAB</b>'); back.onclick = () => { this.opt.click?.(); q.remove(); };
+    q.firstChild.appendChild(back);
+    this.el.appendChild(q);
+    this.opt.onQuit?.();
+    try { window.close(); } catch { /* not a script-opened window */ }
+  }
+  field(label, val) { const l = el('label', 'lab-field'); l.innerHTML = `<span>${label}</span>`; const i = el('input'); i.type = 'text'; i.value = val ?? ''; i.maxLength = 16; l.appendChild(i); this.menu.appendChild(l); return i; }
+  // ---------------------------------------------------------------- the wardrobe (a panel on the right; the lab camera walks up to you)
   customise() {
-    this.clear('Customise Your Scientist');
     const prof = this.opt.profile;
-    const row = (label, key, opts, fmt = (v) => v) => {
-      const l = document.createElement('label'); l.innerHTML = `<span>${label}</span>`;
-      const wrap = document.createElement('span');
-      const prev = document.createElement('button'); prev.className = 'btn'; prev.textContent = '<'; prev.style.cssText = 'width:auto;padding:4px 10px;margin:0 4px';
-      const val = document.createElement('span'); val.style.minWidth = '110px'; val.style.display = 'inline-block'; val.style.textAlign = 'center';
-      const next = prev.cloneNode(); next.textContent = '>';
-      const upd = () => { val.textContent = fmt(prof.outfit[key]); this.opt.onPreview?.(prof.outfit); };
-      const step = (d) => { const i = opts.indexOf(prof.outfit[key]); prof.outfit[key] = opts[(i + d + opts.length) % opts.length]; upd(); this.opt.click?.(); };
-      prev.onclick = () => step(-1); next.onclick = () => step(1);
-      wrap.append(prev, val, next); l.appendChild(wrap); this.menu.appendChild(l); upd();
-    };
-    const presetRow = document.createElement('div'); presetRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
-    PRESETS.forEach((p) => { const b = document.createElement('button'); b.className = 'btn'; b.style.cssText = 'width:auto;font-size:15px;padding:5px 9px'; b.textContent = p.name; b.onclick = () => { prof.outfit = { ...p }; this.customise(); this.opt.onPreview?.(prof.outfit); }; presetRow.appendChild(b); });
-    this.menu.appendChild(presetRow);
     prof.outfit = normalizeOutfit(prof.outfit);
-    const colours = (label, key) => {
-      const list = PALETTE[key];
-      // a colour the palette does not list (an old save) still shows up as its own entry
-      const vals = list.map((c) => c[0]);
-      if (!vals.includes(prof.outfit[key])) vals.unshift(prof.outfit[key]);
-      row(label, key, vals, (v) => list.find((c) => c[0] === v)?.[1] ?? '#' + v.toString(16).padStart(6, '0'));
-    };
-    colours('Suit', 'suit');
-    colours('Trim', 'trim');
-    colours('Gloves & boots', 'gear');
-    colours('Bean', 'skin');
-    colours('Eyes', 'eye');
-    colours('Chrono glow', 'glow');
-    row('Fabric', 'fabric', FABRIC_IDS, (v) => FABRICS[v]?.name ?? v);
-    row('Smile', 'teeth', TEETH.map((_, i) => i), (v) => TEETH[v]);
-    this.btn('Done', () => { this.opt.onSaveProfile?.(prof); this.main(); this.opt.onPreview?.(null); }, 'primary');
-    this.opt.onPreview?.(prof.outfit);
+    this.el.classList.add('wardrobe-on');
+    this.opt.onWardrobe?.(true);
+    this.clear();
+    this.btn('DONE', () => { this.opt.onSaveProfile?.(prof); this.main(); }, 'primary', 'Looking sharp');
+    if (!this.ward) { this.ward = el('div', 'wardrobe'); this.el.appendChild(this.ward); }
+    this.tab = this.tab ?? 'colours';
+    this.renderWardrobe();
+  }
+  closeWardrobe(quiet) {
+    if (!this.ward) return;
+    this.ward.remove(); this.ward = null;
+    this.el.classList.remove('wardrobe-on');
+    if (!quiet) this.opt.click?.();
+    this.opt.onWardrobe?.(false);
+  }
+  renderWardrobe() {
+    const W = this.ward, prof = this.opt.profile, o = prof.outfit;
+    const preview = () => this.opt.onPreview?.(o);
+    W.innerHTML = '<div class="w-head"><b>WARDROBE</b><span>Colours and fabrics are free. Gear unlocks with achievements.</span></div>';
+    // presets
+    const pr = el('div', 'w-presets');
+    for (const p of PRESETS) { const b = el('button', 'w-chip', p.name); b.onclick = () => { this.opt.click?.(); const keep = Object.fromEntries(ACC_SLOTS.map((k) => [k, o[k]])); prof.outfit = normalizeOutfit({ ...p, ...keep }); this.renderWardrobe(); this.opt.onPreview?.(prof.outfit); }; pr.appendChild(b); }
+    W.appendChild(pr);
+    const tabs = el('div', 'w-tabs');
+    for (const [k, label] of [['colours', 'COLOURS'], ['fabric', 'FABRIC'], ['gear', 'GEAR']]) { const t = el('button', 'w-tab' + (this.tab === k ? ' on' : ''), label); t.onclick = () => { this.opt.click?.(); this.tab = k; this.renderWardrobe(); }; tabs.appendChild(t); }
+    W.appendChild(tabs);
+    const body = el('div', 'w-body');
+    W.appendChild(body);
+    if (this.tab === 'colours') {
+      for (const [key, label] of [['suit', 'SUIT'], ['trim', 'TRIM'], ['gear', 'GLOVES & BOOTS'], ['skin', 'BEAN'], ['eye', 'EYES'], ['glow', 'CHRONO GLOW']]) {
+        const row = el('div', 'w-row');
+        const cur = PALETTE[key].find((c) => c[0] === o[key]);
+        row.appendChild(el('div', 'w-label', `${label}<i>${cur ? cur[1] : hex(o[key])}</i>`));
+        const sw = el('div', 'w-swatches');
+        for (const [c, name] of PALETTE[key]) {
+          const b = el('button', 'w-sw' + (o[key] === c ? ' on' : '')); b.style.setProperty('--c', hex(c)); b.title = name;
+          b.onclick = () => { this.opt.click?.(); o[key] = c; preview(); this.renderWardrobe(); };
+          sw.appendChild(b);
+        }
+        row.appendChild(sw); body.appendChild(row);
+      }
+      const row = el('div', 'w-row');
+      row.appendChild(el('div', 'w-label', `SMILE<i>${TEETH[o.teeth] ?? ''}</i>`));
+      const sw = el('div', 'w-swatches');
+      TEETH.forEach((t, i) => { const b = el('button', 'w-chip' + (o.teeth === i ? ' on' : ''), t); b.onclick = () => { this.opt.click?.(); o.teeth = i; preview(); this.renderWardrobe(); }; sw.appendChild(b); });
+      row.appendChild(sw); body.appendChild(row);
+    } else if (this.tab === 'fabric') {
+      const grid = el('div', 'w-grid');
+      for (const id of FABRIC_IDS) {
+        const b = el('button', 'w-tile' + (o.fabric === id ? ' on' : ''), `<img src="${fabricSwatch(id, o.suit)}"><b>${FABRICS[id]?.name ?? id}</b>`);
+        b.onclick = () => { this.opt.click?.(); o.fabric = id; preview(); this.renderWardrobe(); };
+        grid.appendChild(b);
+      }
+      body.appendChild(grid);
+    } else {
+      let icons = {};
+      try { icons = this.opt.accIcons?.() ?? {}; } catch (e) { console.warn('accessory icons', e); }
+      for (const slot of ACC_SLOTS) {
+        body.appendChild(el('div', 'w-label', ({ hat: 'HEAD', face: 'FACE', neck: 'NECK', back: 'BACK' })[slot]));
+        const grid = el('div', 'w-grid gear');
+        for (const a of ACCESSORIES[slot]) {
+          const open = isUnlocked(slot, a.id);
+          const ach = a.ach ? ACH_BY_ID[a.ach] : null;
+          const ic = icons[slot + ':' + a.id];
+          const b = el('button', 'w-tile' + (o[slot] === a.id ? ' on' : '') + (open ? '' : ' locked'), `${ic ? `<img src="${ic}">` : `<i class="w-none"></i>`}<b>${a.name}</b>${open ? '' : `<span>LOCKED · ${ach ? ach.title : ''}</span>`}`);
+          b.title = open ? a.name : `Unlock: ${ach?.title ?? a.ach} — ${ach?.text ?? ''}`;
+          b.onclick = () => {
+            if (!open) { this.opt.error?.(); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); return; }
+            this.opt.click?.(); o[slot] = a.id; preview(); this.renderWardrobe();
+          };
+          grid.appendChild(b);
+        }
+        body.appendChild(grid);
+      }
+    }
+    W.appendChild(el('div', 'w-foot', 'Drag in the lab to spin your scientist'));
+    preview();
   }
   help() {
-    this.clear('How to Play');
-    this.menu.insertAdjacentHTML('beforeend', `<div style="font-size:15px;line-height:20px">
-      <p>You and your friends crashed a homemade time-machine van 66 million years ago.</p>
-      <p><b>Survive</b>: eat, drink, sleep, stay warm. <b>Gather</b>: punch bushes, chop trees, mine rocks. <b>Craft</b> in your CHRONO-PAL (Tab).</p>
-      <p><b>Build</b> a base with the hammer (B). <b>Tame</b> critters: study, knock out or befriend, then feed them what they like.</p>
-      <p><b>Track</b> them: look at the ground for footprints and scan them to follow the trail. Bait a <b>snare trap</b> with a critter's favourite food and wait.</p>
-      <p><b>Research</b> at the van computer to unlock tech and repair the time machine. Then go home. Maybe.</p>
-      <p>Three <b>alphas</b> rule their lairs. Bring friends.</p>
-      <p class="small">WASD move · Shift sprint · Space jump · E use · LMB swing/scan · RMB aim · Z ride/carry · Tab backpack · M map · J journal · B build · V talk</p></div>`);
-    this.btn('Back', () => this.main());
+    this.clear('HOW TO PLAY');
+    this.menu.insertAdjacentHTML('beforeend', `<div class="lab-help">
+      <p>Your homemade time machine worked. Sort of. You, your van and Timmy the robot land 66 million years ago.</p>
+      <p><b>Travel light:</b> one tool slot and three pockets. Lift logs, rocks and barrels with the <b>gravity gun</b> and drop them in the <b>van rack</b>.</p>
+      <p><b>Survive</b>, <b>craft</b> (Tab), <b>build</b> (B) and <b>scan</b> everything with Timmy (R).</p>
+      <p><b>Catch pals:</b> knock a creature out, then feed it the treat it likes. Train them, level them, and take control with the Mind Link.</p>
+      <p><b>Fix the van</b>, find oil for fuel and drive to the research base far away. It is your only way home.</p>
+      <p class="small">WASD move · Shift sprint · Space jump · E use · LMB use/lift · RMB throw · R scan · Z command · Tab Chrono-Link · M map · B build · V talk</p></div>`);
+    this.btn('BACK', () => this.main(), 'ghost');
   }
-  close() { this.el.style.transition = 'opacity 0.5s'; this.el.style.opacity = 0; setTimeout(() => this.el.remove(), 520); }
+  close() { this.closeWardrobe(true); this.el.style.transition = 'opacity 0.5s'; this.el.style.opacity = 0; setTimeout(() => this.el.remove(), 520); }
 }

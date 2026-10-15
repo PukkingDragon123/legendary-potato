@@ -78,7 +78,9 @@ export class SaveSystem {
     const P = d.player;
     if (P) { g.local.teleport(P.x, P.y + 0.05, P.z); g.local.yaw = P.yaw; g.rig.yaw = P.yaw; }
     g.vitals?.load(d.vitals);
-    g.inventory.load(d.inventory);
+    // an old 32-slot backpack pours into the explorer's pockets; the rest waits in the van rack
+    let spill = null;
+    g.inventory.load(d.inventory, (arr) => { spill = arr; });
     g.crafting?.load(d.crafted);
     for (const [i, regrowAt] of d.trees ?? []) { const t = g.flora.trees[i]; if (t && t.alive) { t.alive = false; t.regrowAt = regrowAt; g.flora.detach(t); } }
     g.nodes.load(d.nodes);
@@ -92,6 +94,12 @@ export class SaveSystem {
     const order = ['research', 'structures', 'building', 'van', 'dinos', 'journal', 'computer'];
     const keys = [...new Set([...order, ...Object.keys(d.sys ?? {})])];
     for (const k of keys) { const s = g.saveables?.[k]; if (s && d.sys?.[k] !== undefined) { try { s.load(d.sys[k]); } catch (e) { console.warn('load failed for', k, e); } } }
+    if (spill && g.van?.storage) {
+      let lost = 0;
+      for (const s of spill) { const { id, n, ...extra } = s; lost += g.van.storage.add(id, n, Object.keys(extra).length ? extra : null, true); }
+      g.van.storage.changed();
+      setTimeout(() => g.ui?.toast(lost ? 'Your old backpack went into the van rack (some did not fit)' : 'Your old backpack went into the van rack', 'info'), 1500);
+    }
     g.events.emit('loaded', d);
     return true;
   }
@@ -123,7 +131,7 @@ export async function install(g) {
     if (g.vitals) { g.vitals.hp = 40; g.vitals.hunger = Math.max(30, g.vitals.hunger); g.vitals.thirst = Math.max(30, g.vitals.thirst); }
     // drop a "backpack" of half your stuff where you fell
     const half = [];
-    for (let i = 8; i < g.inventory.size; i++) { const s = g.inventory.slots[i]; if (s && Math.random() < 0.5) { half.push(s); g.inventory.slots[i] = null; } }
+    for (let i = 0; i < g.inventory.size; i++) { const s = g.inventory.slots[i]; if (s && i !== g.inventory.toolSlot && Math.random() < 0.5) { half.push(s); g.inventory.slots[i] = null; } }
     g.inventory.changed();
     for (const s of half) g.drops?.spawn(s.id, s.n, p.pos.clone().add(new THREE.Vector3(0, 0.6, 0)), null, { dur: s.dur });
     p.teleport(r.x, r.y + 0.3, r.z);

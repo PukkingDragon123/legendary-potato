@@ -744,6 +744,43 @@ DESIGNS.rex = (b, L) => {
 
 // ======================================================================== fallback
 // A plain soft quadruped for any species still waiting for its sculpt.
+// ======================================================================== SCALYDODO
+// A plump pear of a bird in teal scales with a cream tummy, a huge hooked
+// beak, round curious eyes, stubby wings, a curly tail tuft and short yellow
+// legs. Licks everything it meets, which is how the intro starts.
+DESIGNS.dodo = (b, L) => {
+  b.size = 0.8; b.br = 0.24; b.res = 110;
+  b.pal = { light: 0xfff4d8, horn: L.horn ?? 0xf2cf6a, claw: 0x4a3a2a, mouth: 0x7a2a34, tongue: 0xff7a9a, inner: 0xffd8a0 };
+  b.eyeStyle = { iris: 0x3a2a1a, iris2: 0x8a5a2a, irisR: 0.55, glow: 0 };
+  b.anim = { stride: 0.55, lift: 0.22, bob: 0.09, jaw: 0.7, stabilize: 0.5, tailUp: 0.6 };
+  torso(b, { hips: [0, 0.4, 0.1], spine: [[0, 0.44, 0.0]], chest: [0, 0.47, -0.1], neck: [[0, 0.57, -0.15]], head: [0, 0.67, -0.19], jaw: [0, 0.635, -0.29],
+    tail: [[0, 0.45, 0.3], [0, 0.52, 0.38]] });
+  const scales = { mat: { fur: 0, gloss: 0.35 } };
+  // the pear: a big round bottom and a cream tummy
+  b.ell([0, 0.41, 0.03], [0.25, 0.25, 0.29], { b: ['hips', 'spine1', 'chest'], k: 0.06, belly: 0.55, ...scales });
+  b.ell([0, 0.33, -0.05], [0.2, 0.16, 0.2], { b: ['hips', 'chest'], k: 0.06, belly: 1, ...scales });
+  // overlapping scale plates over the back and flanks
+  b.scatter([0, 0.43, 0.03], [0.25, 0.25, 0.29], 150, 0.05, { b: 'spine1', k: 0.012, col: 'pat', mat: { fur: 0, gloss: 0.45 }, filter: (x, y) => y > -0.15, seed: 21 });
+  // neck and a big round head
+  b.chain([[0, 0.5, -0.11], [0, 0.57, -0.15], [0, 0.66, -0.19]], [0.15, 0.12, 0.115], { b: ['chest', 'neck1', 'head'], k: 0.05, belly: 0.8, ...scales });
+  b.sph([0, 0.7, -0.21], 0.125, { b: 'head', k: 0.05, ...scales });
+  b.scatter([0, 0.72, -0.19], [0.12, 0.11, 0.12], 40, 0.03, { b: 'head', k: 0.008, col: 'pat', mat: { fur: 0, gloss: 0.45 }, filter: (x, y, z) => y > 0.1 && z > -0.4, seed: 22 });
+  // the beak: a banana with a hooked orange tip, and the lower half on the jaw
+  b.cone([0, 0.705, -0.31], [0, 0.665, -0.5], 0.072, 0.034, { b: 'head', k: 0.03, col: 'horn', cf: -0.4, cp: 2, mat: { gloss: 0.55, fur: 0 } });
+  b.cone([0, 0.665, -0.5], [0, 0.615, -0.525], 0.034, 0.012, { b: 'head', k: 0.02, col: 'accent', cf: -0.4, cp: 3, mat: { gloss: 0.6, fur: 0 } });
+  b.mirror((sd) => b.sph([sd * 0.024, 0.705, -0.45], 0.008, { b: 'head', op: 'sub', k: 0.004, col: 'mouth', cf: -0.4 }));
+  b.ell([0, 0.638, -0.31], [0.05, 0.022, 0.08], { op: 'sub', k: 0.01, col: 'mouth', cf: -0.4 });
+  b.cone([0, 0.632, -0.31], [0, 0.622, -0.45], 0.05, 0.02, { g: 'jaw', b: 'jaw', col: 'horn', mat: { gloss: 0.5, fur: 0 } });
+  b.tongue = { b: 'jaw', p: [0, 0.64, -0.36], r: [0.028, 0.012, 0.05] };
+  // big friendly eyes with heavy brows
+  eyePair(b, { c: [0.083, 0.745, -0.27], r: 0.046, dir: [0.62, 0.12, -0.78], socket: 0.86, brow: { r: [0.04, 0.013, 0.03], dy: 0.95, tilt: -0.25, col: 'pat' } });
+  // stubby wings and a curly tail tuft
+  b.mirror((sd) => spikes(b, [0, 1, 2].map((i) => ({ c: [sd * 0.24, 0.47 - i * 0.03, -0.02 + i * 0.05], k: 1 - i * 0.2 })), { b: 'chest', w: 0.07, h: 0.17, t: 0.018, col: 'pat', dir: [sd * 0.3, -0.5, 1], up: [sd, 0.2, 0], mat: { fur: 0.2, gloss: 0.3 } }));
+  spikes(b, [-1, 0, 1].map((i) => ({ c: [i * 0.035, 0.53, 0.38], k: 1 - Math.abs(i) * 0.15 })), { b: 'tail2', w: 0.05, h: 0.2, t: 0.014, col: 'accent', dirAt: (i) => [(i - 1) * 0.4, 1, 0.6], up: [0, 0.3, -1], mat: { fur: 0.4 } });
+  // short yellow legs, three toes
+  limbs(b, 'H', 'hips', [[0.1, 0.3, 0.08], [0.11, 0.2, 0.02], [0.1, 0.07, 0.06], [0.1, 0.0, 0.02]], [0.065, 0.045, 0.035, 0.032], { col: 'horn', mat: { fur: 0, gloss: 0.25 }, toes: 3, claws: true, toeLen: 2.1, toeSpread: 0.55 });
+};
+
 DESIGNS._fallback = (b, L, sp) => {
   b.size = 1; b.br = 0.2;
   b.bone('root', null, [0, 0, 0]);

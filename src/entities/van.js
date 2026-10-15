@@ -39,7 +39,8 @@ export class Van {
       repaired: {}, upgrades: {}, sockets: {}, glove: 'jammed', glovehits: 0, hood: false, radio: -1, hp: 100, odo: 0, firstPower: false,
     };
     this.pose = { x: 0, y: 0, z: 0, yaw, pitch: 0, roll: 0, vy: 0 };
-    this.storage = new Inventory(12, { hotbar: 0 });
+    // the rack behind the back doors: drop logs, barrels and parts in with the gravity gun
+    this.storage = new Inventory(30, { hotbar: 0 });
     this.fridge = new Inventory(8, { hotbar: 0 });
     this.shelf = new Inventory(6, { hotbar: 0 });
     this.dock = new Inventory(2, { hotbar: 0 });
@@ -183,7 +184,7 @@ export class Van {
   buildInteractables() {
     const P = this.parts, g = this.g, S = this.s;
     const ia = (o) => { o.box = new THREE.Box3(new THREE.Vector3(...o.min), new THREE.Vector3(...o.max)); this.ia.push(o); return o; };
-    const hasItem = (id) => g.inventory.count(id) > 0;
+    const hasItem = (id) => (g.materials ?? g.inventory).count(id) > 0;
     // doors ------------------------------------------------------------
     const doorBoxes = {
       door_cab_l: [[-0.06, 0.45, 0], [0.08, 2.0, 0.86]], door_cab_r: [[-0.08, 0.45, 0], [0.06, 2.0, 0.86]],
@@ -237,7 +238,7 @@ export class Van {
     // bobblehead + dice ---------------------------------------------------------
     ia({ id: 'bobble', obj: this.body, min: [0.15, 1.16, -2.0], max: [0.25, 1.32, -1.9], label: () => 'Critter Bobblehead', info: () => 'His name is Gerald', prompt: () => ({ text: 'Poke Gerald' }), act: () => { this.bobbleKick(3); g.audio?.play('squeak', { pos: this.localToWorld(_v.set(0.2, 1.25, -1.95)), vol: 0.5 }); }, hit: () => this.bobbleKick(5) });
     // storage ------------------------------------------------------------------
-    ia({ id: 'cabinet', obj: this.body, min: [-0.45, 0.58, -0.6], max: [-0.36, 0.98, 1.1], label: () => 'Van Lockers', prompt: () => ({ text: 'Open Lockers' }), act: () => g.ui?.openContainer({ inv: this.storage }, 'Van Lockers', { label: 'Lockers', cols: 4 }) });
+    ia({ id: 'cabinet', obj: this.body, min: [-0.45, 0.58, -0.6], max: [-0.36, 0.98, 1.1], label: () => 'Van Rack', prompt: () => ({ text: 'Open the Rack' }), act: () => g.ui?.openContainer({ inv: this.storage }, 'Van Rack', { label: 'Rack', cols: 6 }) });
     ia({ id: 'fridge', obj: this.body, min: [0.5, 0.58, 1.34], max: [0.94, 1.08, 1.86], label: () => 'Cooler', info: () => 'Food spoils 3x slower', prompt: () => ({ text: 'Open Cooler' }), act: () => g.ui?.openContainer({ inv: this.fridge }, 'Cooler', { label: 'Cooler', cols: 4 }) });
     ia({ id: 'shelf', obj: this.body, min: [0.56, 1.18, 0.52], max: [0.94, 1.75, 1.38], label: () => 'Specimen Shelf', info: () => 'Store specimens for the lab', prompt: () => ({ text: 'Open Specimen Shelf' }), act: () => g.ui?.openContainer({ inv: this.shelf }, 'Specimen Shelf', { label: 'Specimen Jars', cols: 3 }) });
     ia({ id: 'dock', obj: P.dock, min: [-0.11, 0, -0.16], max: [0.11, 0.1, 0.16], label: () => 'CHARGE-O-TRON 3000', info: () => this.dockInfo(), prompt: () => ({ text: 'Open Charging Dock' }), act: () => g.ui?.openContainer({ inv: this.dock }, 'Charge-O-Tron 3000', { label: 'Charging Slots', cols: 2, extra: () => this.dockPanel() }) });
@@ -265,8 +266,8 @@ export class Van {
         return null;
       },
     });
-    ia({ id: 'headlight', obj: this.body, min: [0.55, 0.7, -2.55], max: [0.9, 1.0, -2.4], enabled: () => !S.repaired.headlight, label: () => 'Smashed Headlight', prompt: () => (g.inventory.has(REPAIRS.headlight.cost) ? { text: 'Hold to replace (glass + scrap)', hold: true } : { text: 'Smashed headlight', key: '-', warn: 'Needs 1 glass + 1 scrap' }), hold: () => (g.inventory.has(REPAIRS.headlight.cost) ? { time: REPAIRS.headlight.time, anim: 'wrench', tick: (dt, t) => this.repairTick(dt, t, 'headlight'), done: () => this.request('repair', { id: 'headlight' }) } : null) });
-    ia({ id: 'windshield', obj: this.body, min: [-0.95, 1.15, -2.2], max: [0.95, 2.1, -1.85], enabled: () => !S.repaired.windshield && !this.driverIs(g.local), label: () => 'Cracked Windshield', prompt: () => (g.inventory.has(REPAIRS.windshield.cost) ? { text: 'Hold to patch (glass + resin)', hold: true } : { text: 'Cracked windshield', key: '-', warn: 'Needs 3 glass + 2 resin' }), hold: () => (g.inventory.has(REPAIRS.windshield.cost) ? { time: REPAIRS.windshield.time, anim: 'wrench', tick: (dt, t) => this.repairTick(dt, t, 'windshield'), done: () => this.request('repair', { id: 'windshield' }) } : null) });
+    ia({ id: 'headlight', obj: this.body, min: [0.55, 0.7, -2.55], max: [0.9, 1.0, -2.4], enabled: () => !S.repaired.headlight, label: () => 'Smashed Headlight', prompt: () => ((g.materials ?? g.inventory).has(REPAIRS.headlight.cost) ? { text: 'Hold to replace (glass + scrap)', hold: true } : { text: 'Smashed headlight', key: '-', warn: 'Needs 1 glass + 1 scrap' }), hold: () => ((g.materials ?? g.inventory).has(REPAIRS.headlight.cost) ? { time: REPAIRS.headlight.time, anim: 'wrench', tick: (dt, t) => this.repairTick(dt, t, 'headlight'), done: () => this.request('repair', { id: 'headlight' }) } : null) });
+    ia({ id: 'windshield', obj: this.body, min: [-0.95, 1.15, -2.2], max: [0.95, 2.1, -1.85], enabled: () => !S.repaired.windshield && !this.driverIs(g.local), label: () => 'Cracked Windshield', prompt: () => ((g.materials ?? g.inventory).has(REPAIRS.windshield.cost) ? { text: 'Hold to patch (glass + resin)', hold: true } : { text: 'Cracked windshield', key: '-', warn: 'Needs 3 glass + 2 resin' }), hold: () => ((g.materials ?? g.inventory).has(REPAIRS.windshield.cost) ? { time: REPAIRS.windshield.time, anim: 'wrench', tick: (dt, t) => this.repairTick(dt, t, 'windshield'), done: () => this.request('repair', { id: 'windshield' }) } : null) });
     // breaker panel itself (rewire) --------------------------------------------
     ia({ id: 'loom', obj: this.body, min: [-0.72, 0.85, -1.0], max: [-0.38, 1.3, -0.78], enabled: () => !S.repaired.wiring, label: () => 'Fried Wiring', info: () => 'Ignition + CHRONO circuits dead', prompt: () => (hasItem('wiring_harness') ? { text: 'Hold to rewire', hold: true } : { text: 'Sparking wires', key: '-', warn: 'Needs a Wiring Harness' }), hold: () => (hasItem('wiring_harness') ? { time: REPAIRS.wiring.time, anim: 'wrench', tick: (dt, t) => this.repairTick(dt, t, 'wiring'), done: () => this.request('repair', { id: 'wiring' }) } : null) });
     // time machine sockets + lever ----------------------------------------------
@@ -374,7 +375,7 @@ export class Van {
   pay(by, cost) {
     const g = this.g;
     if (by !== g.local.id) return true; // remote players pay on their side before asking
-    return g.inventory.take(cost);
+    return (g.materials ?? g.inventory).take(cost);
   }
 
   setDoor(name, open) {
@@ -481,9 +482,9 @@ export class Van {
   }
   upgradeList() {
     const g = this.g, S = this.s;
-    return UPGRADES.map((u) => ({ ...u, have: !!S.upgrades[u.id], locked: !!(u.unlock && !g.research?.has?.(u.unlock)), blocked: u.needs && !u.needs.every((r) => S.repaired[r]), afford: g.inventory.has(u.cost) }));
+    return UPGRADES.map((u) => ({ ...u, have: !!S.upgrades[u.id], locked: !!(u.unlock && !g.research?.has?.(u.unlock)), blocked: u.needs && !u.needs.every((r) => S.repaired[r]), afford: (g.materials ?? g.inventory).has(u.cost) }));
   }
-  installUpgrade(id) { const u = upgradeById[id]; if (!u || !this.g.inventory.has(u.cost)) return false; this.request('upgrade', { id }); return true; }
+  installUpgrade(id) { const u = upgradeById[id]; if (!u || !(this.g.materials ?? this.g.inventory).has(u.cost)) return false; this.request('upgrade', { id }); return true; }
 
   // ======================================================================== power
   cap() { return this.s.upgrades.battery2 ? 200 : 100; }
@@ -926,7 +927,7 @@ export class Van {
         const grp = buildUpgrade(u.id);
         this.body.add(grp); this.upGroups[u.id] = grp;
         if (u.id === 'storage' && grp.userData.rearBox) P.doors.door_rear_l.g.add(at(grp.userData.rearBox, 0.48, 1.25, 0.15));
-        if (u.id === 'storage') { const inv = new Inventory(24, { hotbar: 0 }); inv.slots.splice(0, this.storage.size, ...this.storage.slots); inv.slots.length = 24; for (let i = 0; i < 24; i++) inv.slots[i] = inv.slots[i] ?? null; this.storage = inv; }
+        if (u.id === 'storage' && this.storage.size < 48) { const inv = new Inventory(48, { hotbar: 0 }); inv.slots.splice(0, this.storage.size, ...this.storage.slots); inv.slots.length = 48; for (let i = 0; i < 48; i++) inv.slots[i] = inv.slots[i] ?? null; this.storage = inv; }
         if (u.id === 'dish') { P.dish.children[1].rotation.set(-0.6, 0, 0); P.dish.userData.fixed = true; }
         if (u.id === 'wheels') { this.lift = 0.22; this.body.position.y = this.lift; for (const w of P.wheels) { w.pivot.position.y = VAN.wheelR * 1.35; w.spin.scale.setScalar(1.35); } }
       }
@@ -1221,6 +1222,7 @@ export class Van {
 }
 
 // ========================================================================== install
+const _rk = new THREE.Vector3();
 export async function install(g) {
   const van = new Van(g);
   g.van = van;
@@ -1234,6 +1236,19 @@ export async function install(g) {
   g.netHandlers.vanPose = (d, from) => { van.applyNetPose(d); if (g.isHost) g.net?.broadcast?.('vanPose', d, from); };
   g.netHandlers.vanHorn = () => g.audio?.play('horn', { pos: van.pos, vol: 0.9 });
   g.netHandlers.timeJump = () => { van.jumping = 0.001; g.events.emit('timeJump', { van }); };
+  // props dropped behind the back doors go onto the rack
+  const rackZone = (p) => { const l = van.worldToLocal(p, _rk); return Math.abs(l.x) < 1.05 && l.y > -0.2 && l.y < 2.4 && l.z > 1.5 && l.z < 3.3; };
+  const store = (P) => {
+    if (!P.item || !rackZone(P.pos)) return false;
+    const left = van.storage.add(P.item, P.n);
+    if (left >= P.n) { if (!P._full) { P._full = true; g.ui?.toast('The van rack is full!', 'warn'); } return false; }
+    g.ui?.toast(`+${P.n - left} ${ITEMS[P.item]?.name ?? P.item} on the van rack`, '', P.item);
+    g.events.emit('rackStored', { id: P.item, n: P.n - left, prop: P.type });
+    return true;
+  };
+  const hook = () => { if (g.props) g.props.stores.push(store); else setTimeout(hook, 200); };
+  hook();
+  g.rackZone = rackZone;
   // when the local player is inside, the van counts as shelter (rain/cold)
   g.isInVan = (p = g.local.pos) => van.isInside(p);
   g.events.on('started', () => van.applyPose());

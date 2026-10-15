@@ -1,7 +1,7 @@
-// The screens inside the Pocket Prof (comms, backpack, crafting, pals, map,
-// log and whatever crate you opened), plus the few bits of HUD that are left
-// (crosshair, prompt, name tags, chat) and the pause menu. Floating HUD panels
-// still exist for tests and old code paths but the device hides them.
+// The HUD widgets (crosshair, prompt, target, loadout, vitals, compass, tasks,
+// notices, chat, name tags) and the screens of the CHRONO-LINK hologram
+// (Timmy's log, pack, crafting, pals, dex, map and whatever crate you opened),
+// plus the pause menu. The hologram look comes from ui/holo.css and holo.js.
 import * as THREE from 'three';
 import { ITEMS } from '../data/items.js';
 import { RECIPES, STATIONS } from '../data/recipes.js';
@@ -243,12 +243,13 @@ export class UI {
   renderHotbar() {
     const inv = this.game.inventory;
     const hb = this.el.hotbar;
-    if (!this._slots) {
+    const n = inv.hotbarSize;
+    if (!this._slots || this._slots.length !== n) {
       hb.innerHTML = '';
       this._slots = [];
-      for (let i = 0; i < 8; i++) { const s = h('div', 'slot'); hb.appendChild(s); this._slots.push(s); }
+      for (let i = 0; i < n; i++) { const s = h('div', 'slot'); hb.appendChild(s); this._slots.push(s); }
     }
-    for (let i = 0; i < 8; i++) this.fillSlot(this._slots[i], inv.slots[i], i + 1, i === inv.selected);
+    for (let i = 0; i < n; i++) this.fillSlot(this._slots[i], inv.slots[i], i + 1, i === inv.selected, inv.toolSlot === i);
     const held = inv.held();
     const name = held ? ITEMS[held.id]?.name ?? '' : '';
     if (name !== this._heldName) {
@@ -259,12 +260,13 @@ export class UI {
       this._heldT = setTimeout(() => (this.el.held.style.opacity = 0), 1600);
     }
   }
-  fillSlot(el, s, keyN, sel) {
-    const key = s ? s.id + ':' + s.n + ':' + (s.dur ?? '') + ':' + Math.round(s.ch ?? -1) + ':' + sel : 'empty:' + sel;
+  fillSlot(el, s, keyN, sel, tool = false) {
+    const key = s ? s.id + ':' + s.n + ':' + (s.dur ?? '') + ':' + Math.round(s.ch ?? -1) + ':' + sel + tool : 'empty:' + sel + tool;
     if (el._k === key) return;
     el._k = key;
-    el.className = 'slot' + (sel ? ' sel' : '');
+    el.className = 'slot' + (sel ? ' sel' : '') + (tool ? ' tool' : '');
     el.innerHTML = '';
+    if (tool) el.appendChild(h('span', 'lbl', 'TOOL'));
     if (keyN) el.appendChild(h('span', 'k', keyN));
     if (!s) return;
     const img = h('img'); img.src = this.icon(s.id); img.draggable = false; el.appendChild(img);
@@ -358,14 +360,14 @@ export class UI {
     const g = this.game;
     g.uiOpen = true;
     g.input.unlock();
-    // the device comes up in front of you (third person snaps into your eyes while it is up)
+    // your wrist gadget projects the screen in front of you (third person snaps into your eyes while it is up)
     if (g.device) { g.device.raised = true; g.device.peek = false; this._fpWas = g.forceFirstPerson; g.forceFirstPerson = true; }
-    const P = h('div', 'dev'); P.id = 'pda';
-    P.innerHTML = `<div class="dev-top"><div class="dev-brand">POCKET PROF <b>3000</b></div><div class="pda-tabs"></div><div class="dev-sig"><i></i><i></i><i></i></div></div><div class="pda-screen"></div><div class="dev-scan"></div>`;
+    const P = h('div', 'holo'); P.id = 'pda';
+    P.innerHTML = `<div class="holo-top"><div class="holo-brand">CHRONO-LINK <b>2.0</b></div><div class="pda-tabs"></div><div class="holo-sig">LINK OK</div></div><div class="pda-screen"></div>`;
     this.root.appendChild(P);
     this.pda = P;
     const tabs = P.querySelector('.pda-tabs');
-    const list = [['comms', 'COMMS'], ['bag', 'PACK'], ['craft', 'CRAFT'], ['dinos', 'PALS'], ['dex', 'DEX'], ['map', 'MAP'], ['log', 'LOG']];
+    const list = [['comms', 'TIMMY'], ['bag', 'PACK'], ['craft', 'CRAFT'], ['dinos', 'PALS'], ['dex', 'DEX'], ['map', 'MAP'], ['log', 'LOG']];
     if (this.container) list.unshift(['box', (this.container.title ?? 'BOX').toUpperCase().slice(0, 10)]);
     for (const [k, label] of list) {
       const b = h('div', 'pda-tab', label); b.dataset.tab = k;
@@ -432,25 +434,41 @@ export class UI {
     const S = this.screen;
     S.innerHTML = '';
     const pane = h('div', 'pane');
-    const left = h('div');
-    left.appendChild(h('div', 'section-title', 'HOTBAR'));
-    const hot = h('div', 'grid'); hot.style.gridTemplateColumns = 'repeat(8, 44px)';
-    left.appendChild(hot);
-    left.appendChild(h('div', 'section-title', 'BACKPACK'));
-    const bag = h('div', 'grid'); bag.style.gridTemplateColumns = 'repeat(8, 44px)';
-    left.appendChild(bag);
+    const left = h('div', 'bag-col');
+    // the van rack holds everything bulky; it opens up here when you are close to the van
+    const van = g.van, rack = van && van.pos.distanceTo(g.local.pos) < 10 ? van.storage : null;
+    const top = h('div', 'loadout');
     for (let i = 0; i < inv.size; i++) {
-      const el = h('div', 'slot' + (i < 8 ? ' hot' : ''));
-      this.fillSlot(el, inv.slots[i], i < 8 ? i + 1 : null, false);
-      if (this.bagSel === i) el.classList.add('picked');
-      this.bindSlot(el, inv, i);
-      (i < 8 ? hot : bag).appendChild(el);
+      const tool = i === inv.toolSlot;
+      const el = h('div', 'slot');
+      this.fillSlot(el, inv.slots[i], i < inv.hotbarSize ? i + 1 : null, false, tool);
+      if (this.bagSel === i && this.bagInv !== rack) el.classList.add('picked');
+      this.bindSlot(el, inv, i, { other: rack });
+      top.appendChild(el);
+      if (tool) top.appendChild(h('div', 'loadout-gap'));
+    }
+    left.appendChild(h('div', 'section-title', 'TOOL + POCKETS'));
+    left.appendChild(top);
+    if (rack) {
+      left.appendChild(h('div', 'section-title', `VAN RACK  ·  ${rack.slots.filter(Boolean).length}/${rack.size}  ·  SHIFT-CLICK TO MOVE`));
+      const grid = h('div', 'grid rack'); grid.style.gridTemplateColumns = 'repeat(8, 50px)';
+      for (let i = 0; i < rack.size; i++) {
+        const el = h('div', 'slot');
+        this.fillSlot(el, rack.slots[i], null, false);
+        if (this.bagSel === i && this.bagInv === rack) el.classList.add('picked');
+        this.bindSlot(el, rack, i, { other: inv });
+        grid.appendChild(el);
+      }
+      left.appendChild(grid);
+    } else {
+      left.appendChild(h('div', 'hint-card', '<b>TRAVEL LIGHT</b><br>One tool and three pockets. Logs, rock chunks, barrels and parts are too big for pockets: lift them with the <b>gravity gun</b> and drop them into the <b>van rack</b> behind the back doors. Get close to the van to sort the rack here.'));
     }
     pane.appendChild(left);
     const det = h('div', 'detail');
     pane.appendChild(det);
     S.appendChild(pane);
-    this.renderItemDetail(det, inv.slots[this.bagSel] ?? null, inv, this.bagSel);
+    const di = this.bagInv === rack && rack ? rack : inv;
+    this.renderItemDetail(det, di.slots[this.bagSel] ?? null, di, this.bagSel);
   }
   renderItemDetail(det, s, inv, idx) {
     det.innerHTML = '';
@@ -465,7 +483,9 @@ export class UI {
     const row = h('div');
     const g = this.game;
     if (d.food || d.med) { const b = h('button', 'btn green', d.food ? (['water_clean', 'water_dirty', 'coffee'].includes(d.id) ? 'Drink' : 'Eat') : 'Use'); b.onclick = () => { if (inv.remove(d.id, 1)) { if (d.food) g.vitals.eat(d.id); else g.vitals.useMed(d.id); g.audio?.play(d.food ? 'munch' : 'heal'); } }; row.appendChild(b); }
-    if (idx >= 8) { const b = h('button', 'btn', 'To hotbar'); b.onclick = () => { const e = inv.slots.slice(0, 8).findIndex((x) => !x); if (e >= 0) inv.swap(idx, e); else inv.swap(idx, inv.selected); this.bagSel = null; }; row.appendChild(b); }
+    if (inv === g.inventory && inv.toolSlot !== null && idx !== inv.toolSlot && inv.acceptAt(inv.toolSlot, s.id)) { const b = h('button', 'btn', 'Equip'); b.onclick = () => { if (inv.swap(idx, inv.toolSlot)) { inv.selected = inv.toolSlot; inv.changed(); } this.bagSel = null; }; row.appendChild(b); }
+    if (inv !== g.inventory && g.inventory.acceptAt(1, s.id)) { const b = h('button', 'btn', 'Take'); b.onclick = () => { inv.moveTo(g.inventory, idx); this.bagSel = null; this.renderBag(); }; row.appendChild(b); }
+    if (inv === g.inventory && g.van && g.van.pos.distanceTo(g.local.pos) < 10) { const b = h('button', 'btn', 'To rack'); b.onclick = () => { inv.moveTo(g.van.storage, idx); this.bagSel = null; this.renderBag(); }; row.appendChild(b); }
     if (s.n > 1) { const b = h('button', 'btn', 'Split'); b.onclick = () => this.split(inv, idx); row.appendChild(b); }
     const drop = h('button', 'btn red', 'Drop'); drop.onclick = () => { const out = inv.removeAt(idx, s.n); if (out && g.drops) g.drops.throwFromPlayer(out); this.bagSel = null; }; row.appendChild(drop);
     det.appendChild(row);
@@ -487,7 +507,7 @@ export class UI {
       if (e.button === 2) { this.split(inv, i); return; }
       if (e.shiftKey && opt.other) { inv.moveTo(opt.other, i); this.game.audio?.play('ui_click'); return; }
       if (!s) { this.bagSel = null; if (this.pdaTab === 'bag' && this.pda) this.renderBag(); return; }
-      this.bagSel = i;
+      this.bagSel = i; this.bagInv = inv;
       this.drag = { inv, i, start: [e.clientX, e.clientY], moved: false, el: null };
     };
     el.oncontextmenu = (e) => e.preventDefault();
@@ -518,7 +538,12 @@ export class UI {
     if (target && target._inv) {
       const ti = +target.dataset.slot, tinv = target._inv;
       const a0 = d.inv.slots[d.i], b0 = tinv.slots[ti];
-      if (tinv !== d.inv && ((a0 && tinv.accept && !tinv.accept(a0.id)) || (b0 && d.inv.accept && !d.inv.accept(b0.id)))) { this.game.audio?.play('error', { vol: 0.5 }); this.toast('That doesn\'t go in there.', 'warn'); this.bagSel = null; return; }
+      if (!tinv.acceptAt(ti, a0?.id) || !d.inv.acceptAt(d.i, b0?.id)) {
+        const bulky = (a0 && ITEMS[a0.id]?.bulk) || (b0 && ITEMS[b0.id]?.bulk);
+        this.game.audio?.play('error', { vol: 0.5 });
+        this.toast(ti === tinv.toolSlot || d.i === d.inv.toolSlot ? 'Only tools go in the tool slot.' : bulky ? 'Too big for your pockets. It lives in the van rack.' : 'That doesn\'t go in there.', 'warn');
+        this.bagSel = null; if (this.pda && this.pdaTab === 'bag') this.renderBag(); return;
+      }
       if (tinv === d.inv) d.inv.swap(d.i, ti);
       else {
         const a = d.inv.slots[d.i], b = tinv.slots[ti];
@@ -532,6 +557,7 @@ export class UI {
       if (out && this.game.drops) this.game.drops.throwFromPlayer(out);
     }
     this.bagSel = null;
+    if (this.pda && this.pdaTab === 'bag') this.renderBag();
   }
   cancelDrag() { if (this.drag?.el) this.drag.el.remove(); this.drag = null; }
   showTooltip(e, text) { this.hideTooltip(); const t = h('div', 'tooltip px-dark', esc(text)); document.body.appendChild(t); t.style.left = e.clientX + 14 + 'px'; t.style.top = e.clientY + 14 + 'px'; this.tooltip = t; }

@@ -9,7 +9,7 @@ const def = (id, name, cat, opt = {}) => { I[id] = { id, name, cat, stack: opt.s
 def('stick', 'Stick', 'resource', { desc: 'The humble stick. Civilisation starts here.', model: 'stick', fuel: 8 });
 def('stone', 'Stone', 'resource', { desc: 'A rock. Throw it, build with it, talk to it.', model: 'stone', ammo: 'sling' });
 def('fiber', 'Plant Fiber', 'resource', { desc: 'Stringy plant bits. Weave them into everything.', model: 'fiber', stack: 100, fuel: 3 });
-def('log', 'Log', 'resource', { desc: 'Heavy, honest wood.', model: 'log', stack: 20, fuel: 40 });
+def('log', 'Log', 'resource', { desc: 'Heavy, honest wood. Too big for your pockets: drag logs with the gravity gun into the van rack or a crate.', model: 'log', stack: 20, fuel: 40, bulk: 'log' });
 def('plank', 'Wood Plank', 'resource', { desc: 'Flat wood. Very buildable.', model: 'plank', fuel: 15 });
 def('thatch', 'Thatch Bundle', 'resource', { desc: 'Woven fronds. Keeps most of the rain out.', model: 'thatch', fuel: 6 });
 def('flint', 'Flint', 'resource', { desc: 'Sharp stone. Makes better edges and nice sparks.', model: 'flint' });
@@ -37,6 +37,7 @@ def('obsidian', 'Obsidian', 'resource', { desc: 'Volcanic glass. Wickedly sharp.
 def('tar', 'Tar', 'resource', { desc: 'Sticky black goo from the tar pits.', model: 'tar', fuel: 30 });
 def('dung', 'Critter Dung', 'resource', { desc: 'Fertiliser. Fuel. Regret.', model: 'dung', fuel: 20 });
 def('charcoal', 'Charcoal', 'resource', { desc: 'Burnt wood. Burns hotter.', model: 'charcoal', fuel: 50 });
+def('crude_oil', 'Crude Oil', 'resource', { desc: 'Thick black oil from an oil vein, in a heavy barrel. Drag it to the van with the gravity gun and refine it into fuel.', model: 'tar', stack: 20, fuel: 60, bulk: 'barrel_oil', color: 0x1a1612 });
 def('biofuel', 'Dung-o-Diesel', 'resource', { desc: 'Refined critter dung. The van loves it. Nobody else does.', model: 'jerrycan', stack: 10 });
 def('crystal', 'Chrono Crystal', 'special', { desc: 'Hums at the frequency of next Tuesday.', model: 'crystal', stack: 5 });
 def('salt', 'Salt', 'resource', { desc: 'Preserves food. Seasons regret.', model: 'salt' });
@@ -97,6 +98,7 @@ def('tranq_dart', 'Tranquilizer Dart', 'ammo', { desc: 'Snoozeberry-dipped. Adds
 T('tranq_rifle', 'Tranq Rifle', { kind: 'rifle', tier: 3, dmg: 6, ammo: 'tranq_bullet', dur: 300 }, { desc: 'Built from a lawn chair and a fire extinguisher. Drops a Magmaw. Eventually.', model: 'rifle', cat: 'weapon' });
 def('tranq_bullet', 'Tranq Shell', 'ammo', { desc: 'Heavy-duty sleepy juice.', model: 'shell', stack: 20, torpor: 160 });
 T('hammer', 'Builder\'s Hammer', { kind: 'hammer', tier: 1, dmg: 4, dur: 999 }, { desc: 'Opens the build menu. Also repairs.', model: 'hammer' });
+T('gravgun', 'Gravity Gun', { kind: 'gravgun', tier: 1, dur: 9999 }, { desc: 'Hold the trigger on logs, rocks, crates and parts to lift them. Right click throws. Heavy things need a friend or a creature.', model: 'gravgun', unique: true, durability: 0 });
 T('scanner', 'Chrono-Scanner', { kind: 'scanner', tier: 1, dur: 9999 }, { charge: 100, desc: 'Handheld science gun from the van. Scans footprints, plants, fossils and critters.', model: 'scanner' });
 T('shovel', 'Shovel', { kind: 'shovel', tier: 1, dmg: 5, dur: 160 }, { desc: 'Dig up fossils, clay and roots.', model: 'shovel' });
 T('canteen', 'Canteen', { kind: 'canteen', tier: 0, dur: 9999 }, { desc: 'Holds water. Fill it at rivers.', model: 'canteen' });

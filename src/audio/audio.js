@@ -343,6 +343,10 @@ S.creak = (A, o, t, r) => { A.osc(o, 'sawtooth', 90 * r, 55 * r, t, 1.3, 0.28, {
 S.quake = (A, o, t) => { A.osc(o, 'sine', 60, 24, t, 0.9, 1.6); A.osc(o, 'triangle', 90, 40, t, 0.35, 0.8); A.noise(o, t, 1.6, 1.3, { color: 'brown', type: 'lowpass', f: 380, f1: 90 }); for (let i = 0; i < 8; i++) A.noise(o, t + 0.05 + Math.random() * 0.6, 0.06, 0.35, { f: 900 + Math.random() * 1600, q: 1.2 }); };
 S.tree_crash = (A, o, t) => { A.osc(o, 'sine', 70, 30, t, 0.7, 1.6); A.noise(o, t, 1.4, 1.2, { color: 'brown', type: 'lowpass', f: 700, f1: 200 }); for (let i = 0; i < 10; i++) A.noise(o, t + Math.random() * 0.8, 0.05, 0.4, { f: 1500 + Math.random() * 2500, q: 1.5 }); };
 S.timber = (A, o, t) => { A.osc(o, 'sawtooth', 300, 220, t, 0.35, 0.3, { filter: { type: 'bandpass', f: 900, q: 3 } }); A.osc(o, 'sawtooth', 340, 250, t + 0.32, 0.5, 0.3, { filter: { type: 'bandpass', f: 900, q: 3 } }); };
+// gravity gun: a rising charged sweep on grab, a falling one on release
+S.grav_on = (A, o, t, r) => { A.osc(o, 'sawtooth', 160 * r, 640 * r, t, 0.22, 0.12, { filter: { type: 'lowpass', f: 1800 } }); A.osc(o, 'sine', 320 * r, 1280 * r, t, 0.2, 0.18); A.noise(o, t, 0.18, 0.12, { f: 2400, f1: 5200, q: 3 }); };
+S.grav_off = (A, o, t, r) => { A.osc(o, 'sine', 900 * r, 180 * r, t, 0.18, 0.14); A.noise(o, t, 0.1, 0.08, { f: 3000, f1: 800, q: 2 }); };
+S.rack = (A, o, t, r) => { A.osc(o, 'square', 660 * r, 660 * r, t, 0.05, 0.1, { filter: { type: 'lowpass', f: 3000 } }); A.osc(o, 'square', 990 * r, 990 * r, t + 0.07, 0.07, 0.1, { filter: { type: 'lowpass', f: 3000 } }); A.osc(o, 'sine', 120 * r, 60, t, 0.14, 0.4); };
 S.scan = (A, o, t) => { A.osc(o, 'square', 1200, 1200, t, 0.04, 0.12, { filter: { type: 'lowpass', f: 4000 } }); };
 S.scan_done = (A, o, t) => { for (const [f, d] of [[880, 0], [1175, 0.07], [1760, 0.14]]) A.osc(o, 'square', f, f, t + d, 0.08, 0.13, { filter: { type: 'lowpass', f: 4000 } }); };
 S.beep = (A, o, t, r) => A.osc(o, 'square', 880 * r, 880 * r, t, 0.08, 0.15, { filter: { type: 'lowpass', f: 3500 } });

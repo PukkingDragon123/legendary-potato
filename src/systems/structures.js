@@ -720,6 +720,21 @@ export async function install(g) {
   g.addSystem(S);
   g.interaction.handlers.push((o, d, reach) => S.raycast(o, d, reach));
   g.heldHandlers.placeable = () => { if (g.input.pressed('use')) S.tryPlace(); return true; };
+  // props dropped onto a storage crate are packed into it
+  const crateStore = (P) => {
+    for (const s of S.list.values()) {
+      if (!s.inv || s.def.accept) continue;
+      if ((s.x - P.pos.x) ** 2 + (s.z - P.pos.z) ** 2 > 0.9 * 0.9 || Math.abs(P.pos.y - s.y - 0.5) > 1.1) continue;
+      const left = s.inv.add(P.item, P.n);
+      if (left >= P.n) continue;
+      S.syncInv(s);
+      g.ui?.toast(`+${P.n - left} ${ITEMS[P.item]?.name ?? P.item} into the ${s.def.name}`, '', P.item);
+      return true;
+    }
+    return false;
+  };
+  const hook = () => { if (g.props) g.props.stores.push(crateStore); else setTimeout(hook, 200); };
+  hook();
   g.stationProviders.push((p) => {
     const out = [];
     for (const s of S.list.values()) if (s.def.station && (s.x - p.x) ** 2 + (s.z - p.z) ** 2 < 16 && Math.abs(s.y - p.y) < 2.5 && S.isLit(s)) out.push(s.def.station);

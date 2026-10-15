@@ -8,6 +8,7 @@
 // around whatever the hands hold, and the face blinks, glances, talks and
 // pulls expressions with the creatures' shader eyes and a drawn mouth.
 // Front is -Z, feet at y = 0.
+import { ACCESSORIES, ACC_SLOTS, dressAccessories } from './accessories.js';
 import * as THREE from 'three';
 import { buildHuman, dressHuman, FABRICS } from './humanModel.js';
 import { BEAN } from './humanDesign.js';
@@ -25,7 +26,7 @@ export const PALETTE = {
 };
 export const TEETH = ['Grin', 'Buck teeth', 'Gap tooth', 'Fangs'];
 export const FABRIC_IDS = Object.keys(FABRICS);
-export const OPTIONS = { hat: ['none'], back: ['chrono'], face: ['none'], neck: ['none'] };
+export const OPTIONS = Object.fromEntries(ACC_SLOTS.map((k) => [k, ACCESSORIES[k].map((a) => a.id)]));
 export const PRESETS = [
   { name: 'Doug', suit: 0xd8742a, trim: 0x2e3440, gear: 0x6a4a30, skin: 0xf2cfa8, eye: 0x4a7ab0, glow: 0x46e0ff, fabric: 'quilted', teeth: 1, hat: 'none', back: 'chrono', face: 'none', neck: 'none' },
   { name: 'Kev', suit: 0x3a6ea5, trim: 0xe8c34a, gear: 0x22252b, skin: 0xb87a4e, eye: 0x7a4a2a, glow: 0xffa83a, fabric: 'ripstop', teeth: 0, hat: 'none', back: 'chrono', face: 'none', neck: 'none' },
@@ -148,11 +149,17 @@ export class Character {
     this.mode = 0; this.modeK = 0;
     this.pose = {}; this.fxT = 0; this.flash = 0; this.lod = 0;
     this.heldGroup = null;
+    this.gear = dressAccessories(this.H, this.outfit);
     this.root.traverse((m) => { if (m.isMesh) m.userData.charPart = true; });
   }
   dispose() { this.H.dispose(); }
   // recolour in place (menus, the lab wardrobe)
-  setOutfit(o) { this.outfit = normalizeOutfit(o); dressHuman(this.H, this.outfit); }
+  setOutfit(o) {
+    const prev = this.outfit;
+    this.outfit = normalizeOutfit(o);
+    dressHuman(this.H, this.outfit);
+    if (!this.gear || ['hat', 'face', 'neck', 'back'].some((k) => prev?.[k] !== this.outfit[k])) this.gear = dressAccessories(this.H, this.outfit, this.gear);
+  }
   setLod(i) {
     if (i === this.lod || this.H.lods.length < 2) return;
     this.lod = i;
@@ -182,6 +189,7 @@ export class Character {
     if (s.lod !== undefined) this.setLod(s.lod);
     const speed = s.speed ?? 0;
     const grounded = s.grounded ?? true;
+    this.gear?.update(dt, t, { speed, air: grounded ? 0 : 1 });
     const ease = (cur, target, k) => cur + (target - cur) * Math.min(1, dt * k);
     // ---- how the bean moves through the world
     const wp = this.root.getWorldPosition(_w);

@@ -1,96 +1,37 @@
 // First-person viewmodel: your own suit sleeves and gloves in front of the
 // camera (the character's mesh, cut down to each arm, with fingers that curl
-// around what they hold). The right hand holds whatever is on your hotbar and
-// swings, chops, eats and pokes with it; the left hand holds the Pocket Prof
-// (the egg-shaped professor gadget) with its live little screen, and brings
-// it up in front of you when you use it. Bobs, sways and lags as you move.
+// around what they hold). The right hand holds whatever is in your tool slot
+// or pockets and swings, chops, eats and pokes with it; the left wrist carries
+// the CHRONO-LINK gadget, which you raise to project the hologram screens (a
+// beam of light fans out from it). Bobs, sways and lags as you move.
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { patchMaterial } from '../gfx/shaderlib.js';
 import { buildItemModel } from '../gfx/itemModels.js';
 import { ITEMS } from '../data/items.js';
-import { paintSet, sstep, rgb, mix3, mul3 } from '../gfx/paint.js';
-import { tileFbm } from '../core/rng.js';
 import { buildFPArm } from './humanModel.js';
 import { BEAN } from './humanDesign.js';
 import { handQuat, HANDS } from './character.js';
 
-const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
-const mesh = (g, m) => { const x = new THREE.Mesh(g, m); x.castShadow = false; x.receiveShadow = true; return x; };
-const mats = new Map();
-const M = (key, make) => { if (!mats.has(key)) mats.set(key, patchMaterial(make(), {})); return mats.get(key); };
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion();
 
-// ------------------------------------------------------------------ the Pocket Prof
-// An egg of glossy mint bakelite with a cream face plate, a chrome-ringed
-// green phosphor screen, three fat buttons, an antenna with a bulb, a speaker
-// grille, a little signal needle gauge and a keyring loop.
-export const LCD_W = 160, LCD_H = 120;
-function bakelite() {
-  return paintSet(256, 256, (u, v) => {
-    const n = tileFbm(u * 6, v * 6, 6, 4, 77), n2 = tileFbm(u * 24, v * 24, 24, 2, 78);
-    // mottled bakelite swirls
-    const sw = 0.5 + 0.5 * Math.sin((u * 9 + n * 3.5) * Math.PI);
-    const c = mix3(rgb(0x6fbf9e), rgb(0x8fd8b8), sw * 0.35 + n * 0.25);
-    return { c: mul3(c, 0.94 + n2 * 0.08), h: n2 * 0.1, r: 0.3 };
-  }, { normal: 0.6, rough: 0.3 });
-}
-function plate() {
-  return paintSet(256, 256, (u, v) => {
-    const n = tileFbm(u * 5, v * 5, 5, 3, 79);
-    let c = mul3(rgb(0xf0e4c4), 0.95 + n * 0.08);
-    // a printed brand strip with a cartoon atom above the buttons + rivets
-    const ax = u - 0.5, ay = v - 0.23;
-    const ring = (rx, ry, rot) => { const c2 = Math.cos(rot), s2 = Math.sin(rot); const x = ax * c2 + ay * s2, y = -ax * s2 + ay * c2; return Math.abs(Math.hypot(x / rx, y / ry) - 1); };
-    if (Math.min(ring(0.09, 0.03, 0), ring(0.09, 0.03, 1.05), ring(0.09, 0.03, -1.05)) < 0.12) c = rgb(0xd8502e);
-    if (Math.hypot(ax, ay) < 0.012) c = rgb(0xd8502e);
-    for (const [rx, ry] of [[0.12, 0.08], [0.88, 0.08], [0.12, 0.92], [0.88, 0.92]]) { const d = Math.hypot(u - rx, v - ry); if (d < 0.02) c = mix3(rgb(0x9a9a92), rgb(0xe8e8e0), sstep(0.02, 0.0, d)); }
-    return { c, h: n * 0.1, r: 0.45 };
-  }, { normal: 0.5, rough: 0.45 });
-}
-export function buildDevice() {
-  const g = new THREE.Group();
-  const bk = bakelite(), pl = plate();
-  const shell = M('dev:shell', () => new THREE.MeshPhysicalMaterial({ map: bk.map, normalMap: bk.normalMap, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 }));
-  const face = M('dev:face', () => new THREE.MeshPhysicalMaterial({ map: pl.map, normalMap: pl.normalMap, roughness: 0.45, clearcoat: 0.4 }));
-  const chrome = M('dev:chrome', () => new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.18, metalness: 1 }));
-  // egg body: a flattened, top-narrow ellipsoid
-  const eg = new THREE.SphereGeometry(1, 40, 28);
-  const p = eg.attributes.position;
-  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const k = 1 - y * 0.1; p.setXYZ(i, x * 0.074 * k, y * 0.09, z * 0.032); }
-  eg.computeVertexNormals();
-  const body = mesh(eg, shell); g.add(body);
-  // the cream face plate on the front (+Z faces the player)
-  const fp = mesh(new THREE.CircleGeometry(1, 40).scale(0.066, 0.08, 1), face); fp.position.z = 0.0295; g.add(fp);
-  // screen bezel + the screen itself
-  const SW = 0.084, SH = 0.063, SY = 0.014;
-  const bez = mesh(new RoundedBoxGeometry(SW + 0.012, SH + 0.012, 0.008, 3, 0.005), chrome); bez.position.set(0, SY, 0.031); g.add(bez);
-  const canvas = document.createElement('canvas'); canvas.width = LCD_W; canvas.height = LCD_H;
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.colorSpace = THREE.SRGBColorSpace;
-  // the phosphor glows a bit (emissive) so it reads at night
-  const scrMat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.85, roughness: 0.25 });
-  patchMaterial(scrMat, {});
-  const scr = mesh(new THREE.PlaneGeometry(SW, SH), scrMat); scr.position.set(0, SY, 0.0355); g.add(scr);
-  const glass = mesh(new THREE.PlaneGeometry(SW, SH), M('dev:glass', () => new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.12, roughness: 0.02, clearcoat: 1, depthWrite: false })));
-  glass.position.set(0, SY, 0.0365); glass.renderOrder = 4; g.add(glass);
-  // three fat buttons
-  const btns = [];
-  for (const [i, col] of [[0, 0xd8402e], [1, 0xe8b830], [2, 0x4aa85a]]) {
-    const b = mesh(new THREE.CylinderGeometry(0.0085, 0.009, 0.007, 18).rotateX(Math.PI / 2), M('dev:btn' + col, () => new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.3, clearcoat: 0.8 })));
-    b.position.set((i - 1) * 0.022, -0.05 + (i === 1 ? -0.004 : 0), 0.031); g.add(b); btns.push(b);
-  }
-  // antenna with a bulb, a keyring loop, a speaker grille and a little needle gauge
-  const ant = mesh(new THREE.CylinderGeometry(0.0018, 0.0025, 0.05, 6), chrome); ant.position.set(0.034, 0.098, 0); ant.rotation.z = -0.35; g.add(ant);
-  const bulbMat = new THREE.MeshStandardMaterial({ color: 0x501010, emissive: 0xff3020, emissiveIntensity: 0.2, roughness: 0.3 });
-  patchMaterial(bulbMat, {});
-  const bulb = mesh(new THREE.SphereGeometry(0.0055, 10, 8), bulbMat); bulb.position.set(0.043, 0.122, 0); g.add(bulb);
-  const loop = mesh(new THREE.TorusGeometry(0.009, 0.0022, 6, 14), chrome); loop.position.set(-0.02, 0.092, 0); g.add(loop);
-  for (let k = 0; k < 9; k++) { const h = mesh(new THREE.CircleGeometry(0.0018, 6), M('dev:hole', () => new THREE.MeshStandardMaterial({ color: 0x1a1a18, roughness: 0.9 }))); h.position.set(-0.05 + (k % 3) * 0.0055, -0.052 + Math.floor(k / 3) * 0.0055, 0.0302); g.add(h); }
-  const gauge = mesh(new THREE.CircleGeometry(0.009, 16), M('dev:gauge', () => new THREE.MeshStandardMaterial({ color: 0xfff6dc, roughness: 0.5 }))); gauge.position.set(0.05, -0.048, 0.0305); g.add(gauge);
-  const needle = mesh(new THREE.PlaneGeometry(0.0012, 0.008).translate(0, 0.004, 0), M('dev:needle', () => new THREE.MeshBasicMaterial({ color: 0xc02a1a }))); needle.position.set(0.05, -0.051, 0.0309); g.add(needle);
-  g.userData.device = { canvas, ctx: canvas.getContext('2d'), tex, scr, btns, bulb, needle, SW, SH, screenZ: 0.0355, screenY: SY };
-  g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
-  return g;
+// the projector beam: a soft fan of light from the gadget towards the screen
+function beamMesh() {
+  const g = new THREE.CylinderGeometry(0.42, 0.012, 1, 24, 1, true);
+  g.translate(0, -0.5, 0); g.rotateX(-Math.PI / 2); // narrow end at the origin, opening along -Z
+  const m = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    uniforms: { uK: { value: 0 }, uT: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `varying vec2 vUv; uniform float uK, uT;
+      void main(){
+        float along = 1.0 - vUv.y;
+        float lines = 0.55 + 0.45 * sin(vUv.x * 120.0 + uT * 3.0) * sin(along * 40.0 - uT * 9.0);
+        float a = uK * smoothstep(0.0, 0.08, along) * (1.0 - smoothstep(0.55, 1.0, along)) * lines * 0.22;
+        gl_FragColor = vec4(vec3(0.35, 0.92, 1.0) * a, a);
+      }`,
+  });
+  const mesh = new THREE.Mesh(g, m);
+  mesh.frustumCulled = false; mesh.renderOrder = 8;
+  return mesh;
 }
 
 // ------------------------------------------------------------------ the viewmodel
@@ -105,9 +46,9 @@ export class Viewmodel {
     this.sway = new THREE.Vector2(); this.swayV = new THREE.Vector2();
     this.dip = 0; this.dipV = 0;
     this.prevYaw = null; this.prevPitch = 0;
-    this.raise = 0; // 0 = device at your side, 1 = up in front of you
+    this.raise = 0; // 0 = arm at your side, 1 = wrist up, projecting the hologram
     this.heldId = undefined;
-    this.device = buildDevice();
+    this.beam = beamMesh(); this.inner.add(this.beam);
     this.build();
   }
   build() {
@@ -117,8 +58,9 @@ export class Viewmodel {
     this.R = this.makeHand(ch, 1);
     this.L = this.makeHand(ch, -1);
     this.inner.add(this.R.root, this.L.root);
-    this.L.grip.add(this.device);
-    this.device.position.set(0.012, 0.05, 0.02); this.device.rotation.set(0, 0, 0);
+    // where the gadget's screen sits on the left forearm (rest pose, relative to the elbow)
+    const G = ch.H.D.anim.gadget;
+    this.gadget = G ? { off: new THREE.Vector3(G.c[0] - G.el[0], G.c[1] - G.el[1], G.c[2] - G.el[2]), up: new THREE.Vector3(...G.up) } : null;
     this.heldId = undefined;
   }
   // a sleeve and glove (the character's own mesh) whose fist sits at the hand group's origin;
@@ -130,11 +72,11 @@ export class Viewmodel {
     const arm = buildFPArm(ch.H, n, ch.mat);
     const B = arm.bones;
     // the glove in the hand frame. Right: a fist round a handle that leans forward (the old tool
-    // grip), knuckles to the front-left, thumb on top. Left: cradling the gadget from below.
+    // grip), knuckles to the front-left, thumb on top. Left: a relaxed hand, back of the wrist up.
     const A = BEAN.armAngle;
     const d0 = new THREE.Vector3(side * Math.sin(A), -Math.cos(A), 0), t0 = new THREE.Vector3(0, 0, -1);
-    const t1 = side > 0 ? new THREE.Vector3(0.06, 0.88, -0.48).normalize() : new THREE.Vector3(0.45, 0.85, 0.25).normalize();
-    const d1 = side > 0 ? new THREE.Vector3(-0.95, 0.12, -0.32) : new THREE.Vector3(0.25, -0.15, -1);
+    const t1 = side > 0 ? new THREE.Vector3(0.06, 0.88, -0.48).normalize() : new THREE.Vector3(0.1, 0.55, -0.83).normalize();
+    const d1 = side > 0 ? new THREE.Vector3(-0.95, 0.12, -0.32) : new THREE.Vector3(0.9, -0.1, -0.4);
     d1.addScaledVector(t1, -d1.dot(t1)).normalize();
     const m0 = new THREE.Matrix4().makeBasis(d0, t0, d0.clone().cross(t0));
     const m1 = new THREE.Matrix4().makeBasis(d1, t1, d1.clone().cross(t1));
@@ -200,19 +142,17 @@ export class Viewmodel {
     const calm = 1 - this.raise;
     this.inner.position.set((this.sway.x * 0.6 + Math.sin(ph) * 0.012 * amp) * calm, (-Math.abs(Math.cos(ph)) * 0.018 * amp + this.dip * 0.06 + this.sway.y * 0.6 + Math.sin(t * 1.6) * 0.003) * calm, 0);
     this.inner.rotation.set(this.sway.y * 1.2 * calm, this.sway.x * 1.5 * calm, Math.sin(ph) * 0.03 * amp * calm);
-    // ---- device raise
-    const want = g.device?.raised ? 1 : g.device?.peek ? 0.45 : 0;
+    // ---- wrist up to project the hologram
+    const want = g.device?.raised ? 1 : 0;
     this.raise += (want - this.raise) * Math.min(1, dt * 9);
     const r = this.raise;
-    if (r < 0.001) this.device.scale.setScalar(1);
     // ---- pose the hands
     const act = p.action;
     const R = this.R, L = this.L;
-    // rest: right low right, left holding the device low left with its screen tipped up at you
+    // rest: right low right, left relaxed low left (mostly below the screen edge)
     R.pos.set(0.21, -0.19, -0.42); R.rot.set(-0.15, 0.05, 0.1);
-    L.pos.set(-0.21, -0.23, -0.4); L.rot.set(-0.5, 0.35, 0.15);
-    // short landscape phone screens: keep the gadget lower and out of the way
-    if (innerHeight < 520) { L.pos.set(-0.26, -0.27, -0.42); R.pos.set(0.24, -0.25, -0.42); }
+    L.pos.set(-0.24, -0.27, -0.4); L.rot.set(-0.2, 0.2, 0.1);
+    if (innerHeight < 520) { L.pos.set(-0.27, -0.3, -0.42); R.pos.set(0.24, -0.25, -0.42); }
     if (p.sprint && moving > 0.3) { const k = Math.sin(ph); R.pos.y += k * 0.04; R.pos.z += k * 0.05; L.pos.y -= k * 0.03; R.rot.x -= 0.3; }
     if (p.swim) { const k = Math.sin(t * 4.5); R.pos.set(0.18 + k * 0.08, -0.2, -0.5 + Math.cos(t * 4.5) * 0.08); L.pos.set(-0.18 - k * 0.08, -0.22, -0.5 + Math.cos(t * 4.5) * 0.08); R.rot.set(0.3, 0, 0.6); }
     if (act) {
@@ -244,25 +184,16 @@ export class Viewmodel {
     }
     const emo = p.emote;
     if (emo === 'wave' || emo === 'cheer' || emo === 'dance') { R.pos.set(0.24, 0.02 + Math.sin(t * 10) * 0.03, -0.5); R.rot.set(0.2, 0, 0.6 + Math.sin(t * 12) * 0.4); if (emo !== 'wave') { L.pos.set(-0.24, 0.02 + Math.cos(t * 10) * 0.03, -0.5); } }
-    // the device comes up in front of you
+    // the wrist comes up across the bottom of the view, gadget towards you, to project the screen
     if (r > 0.001) {
-      // put the screen in the middle of the view, big enough to read (bigger on small screens)
-      const s = 1 + r * 0.65;
-      this.device.scale.setScalar(s);
-      const frac = innerHeight < 520 ? 0.82 : 0.66;
-      const ta = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * frac;
-      const D0 = this.device.userData.device;
-      const dist = Math.max(0.085, (D0.SH * s) / 2 / ta);
-      const dpos = _v.set(-0.012, -0.07 - D0.screenY * s, -dist + 0.01 - D0.screenZ * s);
-      L.pos.lerp(dpos, r);
-      L.rot.set(L.rot.x * (1 - r) + 0.02 * r, L.rot.y * (1 - r), L.rot.z * (1 - r));
-      R.pos.lerp(_v.set(0.11, -0.13, -0.3), r * 0.9);
-      R.rot.set(R.rot.x * (1 - r) - 0.3 * r, R.rot.y * (1 - r) - 0.3 * r, R.rot.z * (1 - r));
+      L.pos.lerp(_v.set(-0.07, -0.2, -0.34), r);
+      L.rot.set(L.rot.x * (1 - r) + 0.55 * r, L.rot.y * (1 - r) - 0.25 * r, L.rot.z * (1 - r) - 0.35 * r);
+      R.pos.lerp(_v.set(0.26, -0.3, -0.38), r * 0.9);
     }
-    // fingers: a fist round whatever is held, open for waves and pokes, the left cradles the gadget
+    // fingers: a fist round whatever is held, open for waves and pokes; the projecting hand opens flat
     const busy = act?.name;
     const fR = busy === 'interact' || busy === 'pet' ? (busy === 'pet' ? HANDS.open : HANDS.point) : emo === 'wave' ? HANDS.open : this.held || busy ? HANDS.grip : HANDS.rest;
-    const fL = HANDS.claw;
+    const fL = r > 0.5 ? HANDS.open : act?.name === 'carry' ? HANDS.claw : HANDS.rest;
     for (const H of [R, L]) {
       const k = Math.min(1, dt * 16);
       H.hand.position.lerp(H.pos, k);
@@ -287,26 +218,22 @@ export class Viewmodel {
         bone.position.copy(off).applyQuaternion(_q3).add(wrist);
       }
     }
-    // with the device up, nothing in the right hand gets in the way
-    if (this.held) this.held.visible = r < 0.6;
-    // device bits
-    const D = this.device.userData.device;
-    D.bulb.material.emissiveIntensity = g.device?.alert ? (Math.sin(t * 9) > 0 ? 3 : 0.3) : 0.25;
-    D.needle.rotation.z = Math.sin(t * 0.7) * 0.4 + Math.sin(t * 5.3) * 0.08 + (g.device?.signal ?? 0.6) - 0.8;
-    void _e;
-  }
-  // where the device screen corners are on screen (for lining up the HTML screen)
-  screenQuad(out = []) {
-    const D = this.device.userData.device, cam = this.g.engine.camera;
-    this.device.updateWorldMatrix(true, false);
-    const w = D.SW / 2, h = D.SH / 2;
-    const pts = [[-w, h], [w, h], [w, -h], [-w, -h]];
-    out.length = 0;
-    for (const [x, y] of pts) {
-      _v.set(x, D.screenY + y, D.screenZ + 0.0015).applyMatrix4(this.device.matrixWorld).project(cam);
-      out.push([(_v.x * 0.5 + 0.5) * innerWidth, (-_v.y * 0.5 + 0.5) * innerHeight]);
+    // the projector beam fans out of the gadget towards the middle of the view
+    const B = this.beam;
+    B.material.uniforms.uK.value = Math.max(0, (r - 0.4) / 0.6) * (0.85 + 0.15 * Math.sin(t * 31));
+    B.material.uniforms.uT.value = t;
+    B.visible = r > 0.4 && !!this.gadget;
+    if (B.visible) {
+      const fb = L.B['forearmL'];
+      const o = _v.copy(this.gadget.off).applyQuaternion(fb.quaternion).add(fb.position);
+      B.position.copy(o);
+      _a.set(0, 0.02, -1.1).sub(o).normalize();
+      B.quaternion.setFromUnitVectors(_b.set(0, 0, -1), _a);
+      B.scale.set(1, 1, 1.15);
     }
-    return out;
+    // with the screen up, nothing in the right hand gets in the way
+    if (this.held) this.held.visible = r < 0.6;
+    void cam;
   }
 }
 const _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion(), _a = new THREE.Vector3(), _b = new THREE.Vector3();

@@ -17,6 +17,9 @@ import { Inventory } from './systems/inventory.js';
 import { ITEMS } from './data/items.js';
 import { G } from './gfx/shaderlib.js';
 
+// how many items one physical prop stands for
+const PROP_PER = { log: 2, log_small: 1, barrel_oil: 4 };
+
 export class Game {
   constructor(opt) {
     this.opt = opt;
@@ -62,7 +65,8 @@ export class Game {
     // local player + inventory
     const crash = this.world.pois.find((p) => p.id === 'crash');
     this.crash = crash;
-    this.inventory = new Inventory(32, { hotbar: 8 });
+    // a tool slot and three pockets: everything bulky gets carried with the gravity gun
+    this.inventory = new Inventory(4, { hotbar: 4, tool: 0, noBulk: true });
     this.local = new Player(this, { id: this.opt.playerId ?? 'local', name: this.opt.name ?? 'Explorer', outfit: this.opt.outfit, local: true });
     this.players.set(this.local.id, this.local);
     const sx = crash.x - 4, sz = crash.z + 6;
@@ -92,9 +96,25 @@ export class Game {
     return !!hit;
   }
 
-  // give items to the local player (spills to the ground if full)
+  // give items to the local player (spills to the ground if full). Bulky things (logs) come out
+  // as physical props where they were made (opt.at), for the gravity gun.
   give(id, n = 1, opt = {}) {
-    const left = this.inventory.add(id, n);
+    const D = ITEMS[id];
+    if (D?.bulk && this.props) {
+      const per = PROP_PER[D.bulk] ?? 1;
+      const at = opt.at ?? this.local.pos.clone().add(new THREE.Vector3(0, 1.2, 0));
+      const count = Math.max(1, Math.round(n / per));
+      for (let i = 0; i < count; i++) {
+        const p = at.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8 + (opt.dir?.x ?? 0) * i * 1.2, 0.3 + i * 0.45, (Math.random() - 0.5) * 0.8 + (opt.dir?.z ?? 0) * i * 1.2));
+        this.props.spawn(D.bulk, p, { yaw: opt.yaw ?? Math.random() * 6.28, n: per });
+      }
+      if (!opt.quiet) this.events.emit('loot', { id, n, from: opt.from, prop: true });
+      return n;
+    }
+    // full pockets: near the van it goes on the rack (or into a crate), otherwise onto the ground
+    const before = this.van?.storage?.count(id) ?? 0;
+    const left = this.materials ? this.materials.stash(id, n) : this.inventory.add(id, n);
+    if (!opt.quiet && (this.van?.storage?.count(id) ?? 0) > before) this.ui?.toast(`Pockets full: ${ITEMS[id]?.name ?? id} went on the van rack`, '', id, 2400);
     if (left > 0 && this.drops) this.drops.spawn(id, left, this.local.pos.clone().add(new THREE.Vector3(0, 1, 0)));
     if (!opt.quiet) this.events.emit('loot', { id, n: n - left, from: opt.from });
     return n - left;

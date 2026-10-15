@@ -233,7 +233,7 @@ export class Computer {
     this.renderDetail = () => {
       const u = list[this.sel], d = this.inner.querySelector('#caddet');
       if (!u || !d) return;
-      const cost = Object.entries(u.cost).map(([id, n]) => { const have = this.g.inventory.count(id); return `<div class="${have >= n ? '' : 'bad'}">${n} x ${esc(ITEMS[id]?.name ?? id)} (${have})</div>`; }).join('');
+      const cost = Object.entries(u.cost).map(([id, n]) => { const have = (this.g.materials ?? this.g.inventory).count(id); return `<div class="${have >= n ? '' : 'bad'}">${n} x ${esc(ITEMS[id]?.name ?? id)} (${have})</div>`; }).join('');
       d.innerHTML = `<div style="color:#c8ffc8">${esc(u.locked ? '???' : u.name.toUpperCase())}</div><div class="dim" style="margin:6px 0 10px">${esc(u.locked ? 'Requires research: ' + this.g.research.techName(u.unlock) : u.desc)}</div>${u.locked ? '' : cost}${u.blocked ? `<div class="bad">Repair first: ${u.needs.join(', ')}</div>` : ''}<div style="margin-top:12px">${u.have ? '<span class="dim">INSTALLED</span>' : u.locked ? '' : `<span class="btnt" data-act="upgrade">INSTALL</span>`}</div><pre class="dim" style="margin-top:16px">${esc(this.blueprint(u.id))}</pre>`;
       for (const el of d.querySelectorAll('[data-act]')) el.onclick = () => this.action(el.dataset.act);
     };

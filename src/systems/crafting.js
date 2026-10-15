@@ -23,7 +23,7 @@ export class Crafting {
   canCraft(r, mult = 1) {
     if (!this.isUnlocked(r)) return false;
     if (!this.nearStations().has(r.station)) return false;
-    const inv = this.game.inventory;
+    const inv = this.game.materials ?? this.game.inventory;
     for (const [id, n] of Object.entries(r.in)) if (inv.count(id) < n * mult) return false;
     return true;
   }
@@ -32,7 +32,7 @@ export class Crafting {
     const g = this.game;
     const req = {};
     for (const [id, n] of Object.entries(r.in)) req[id] = n * mult;
-    if (!g.inventory.take(req)) return false;
+    if (!(g.materials ?? g.inventory).take(req)) return false;
     this.job = { r, mult, t: 0, time: r.time * (1 + (mult - 1) * 0.6), req };
     g.audio?.play(r.station === 'campfire' || r.station === 'cooking_pot' ? 'sizzle' : 'craft_start', { vol: 0.6 });
     return true;

@@ -40,7 +40,9 @@ export class Interaction {
         if (by === g.local.id) {
           const big = t.height > 12;
           setTimeout(() => {
-            for (const [id, n] of Object.entries(sp.yield)) g.give(id, Math.max(1, Math.round(n * (big ? 1.3 : 1) * t.scale)), { from: sp.name });
+            // logs land along the fallen trunk
+            const at = new THREE.Vector3(t.x + dirX * 2.2, t.y + 0.5, t.z + dirZ * 2.2);
+            for (const [id, n] of Object.entries(sp.yield)) g.give(id, Math.max(1, Math.round(n * (big ? 1.3 : 1) * t.scale)), { from: sp.name, at, dir: { x: dirX, z: dirZ }, yaw: Math.atan2(-dirZ, dirX) });
           }, 900);
         } else if (g.net?.sendTo) g.net.sendTo(by, 'give', { items: Object.entries(sp.yield).map(([id, n]) => [id, Math.max(1, Math.round(n * t.scale))]), from: sp.name });
       } else if (g.net?.broadcast) g.net.broadcast('treeHp', { i, hp: t.hp });
@@ -76,10 +78,11 @@ export class Interaction {
     return { o: _o, d: _d, reach: REACH + 0.6 };
   }
 
-  // find what we're looking at
-  scan() {
+  // find what we're looking at (range: look further, e.g. for Timmy's scans)
+  scan(range) {
     const g = this.game;
-    const { o, d, reach } = this.aimRay();
+    const ray = this.aimRay();
+    const { o, d } = ray, reach = range ?? ray.reach;
     let best = null;
     const consider = (c) => { if (c && c.dist <= reach && (!best || c.dist < best.dist)) best = c; };
     // custom providers (van, structures, dinos, drops, players...)
@@ -121,8 +124,11 @@ export class Interaction {
     const g = this.game, p = g.local, inp = g.input;
     if (g.uiOpen || p.downed || p.sitting || p.sleeping) { this.target = null; if (!p.sitting) g.ui?.setPrompt(null); g.ui?.setTarget(null); return; }
     // hotbar selection
-    for (let i = 0; i < 8; i++) if (inp.pressed('hot' + (i + 1)) && !g.building?.active) this.select(i);
-    if (inp.wheel && !inp.down('crouch') && !g.building?.active) { this.select((g.inventory.selected + (inp.wheel > 0 ? 1 : 7)) % 8); g.wheelCaptured = true; } else g.wheelCaptured = !!g.building?.active;
+    const nh = g.inventory.hotbarSize;
+    for (let i = 0; i < nh; i++) if (inp.pressed('hot' + (i + 1)) && !g.building?.active) this.select(i);
+    // the gravity gun owns the wheel while it holds something (reel in / out)
+    const wheelBusy = g.building?.active || g.gravgun?.busy();
+    if (inp.wheel && !inp.down('crouch') && !wheelBusy) { this.select((g.inventory.selected + (inp.wheel > 0 ? 1 : nh - 1)) % nh); g.wheelCaptured = true; } else g.wheelCaptured = !!wheelBusy;
     const held = g.inventory.held();
     const hdef = held ? ITEMS[held.id] : null;
     p.setHeld(held?.id ?? null);
@@ -136,8 +142,10 @@ export class Interaction {
       if (tgt.interact) prompt = { key: inp.keyName('interact'), text: `${tgt.interact} ${tgt.label}` };
       if (tgt.use && (!prompt || tgt.kind === 'tree')) {
         const kind = hdef?.tool?.kind ?? 'hand';
+        const rock = held && (held.id === 'stone' || held.id === 'flint');
         const right = tgt.tool === 'any' || tgt.tool === kind || (tgt.tool === 'axe' && tgt.small);
-        prompt = { key: 'LMB', text: `${tgt.use} ${tgt.label}`, warn: right ? null : tgt.tool === 'axe' ? 'Needs a hatchet' : tgt.tool === 'pick' ? 'Needs a pickaxe' : null, alt: prompt };
+        const warn = right ? null : tgt.tool === 'axe' ? (rock ? 'A stone works. A hatchet works better' : 'Hold a stone or a hatchet') : tgt.tool === 'pick' ? 'Needs a pickaxe' : null;
+        prompt = { key: 'LMB', text: `${tgt.use} ${tgt.label}`, warn, alt: prompt };
       }
       if (tgt.prompt) prompt = tgt.prompt;
     }
@@ -228,11 +236,13 @@ export class Interaction {
     if (tgt.kind === 'tree') {
       const t = tgt.tree;
       const isAxe = kind === 'axe';
-      const dmg = isAxe ? hdef.tool.dmg : t.small ? 6 : kind === 'hand' ? 1 : 2.5;
+      // a hand-held stone is the first "axe": slow, but it gets there
+      const rock = held && (held.id === 'stone' || held.id === 'flint');
+      const dmg = isAxe ? hdef.tool.dmg : t.small ? 6 : kind === 'hand' ? 1 : rock ? 7 : 2.5;
       g.act('hitTree', { i: t.i, dmg, dirX, dirZ });
       g.fx.hitWood(point, dir.clone().negate());
       if (Math.random() < 0.6) g.fx.leaves(new THREE.Vector3(t.x, t.y + Math.min(t.height * 0.7, 9), t.z), t.small ? 3 : 7, t.key === 'ginkgo' && t.variant === 3 ? 0xd9a93a : 0x5a9a3a);
-      g.audio?.play(isAxe ? 'chop' : kind === 'hand' ? 'punch_wood' : 'thunk', { pos: point });
+      g.audio?.play(isAxe ? 'chop' : kind === 'hand' ? 'punch_wood' : rock ? 'clack' : 'thunk', { pos: point });
       g.rig.addTrauma(isAxe ? 0.12 : 0.06);
       if (!isAxe && !t.small && kind === 'hand' && Math.random() < 0.3) { g.vitals?.damage(1, { kind: 'punch' }); g.ui?.toast('Ouch. Trees are hard.', 'warn'); }
       used = true;

@@ -20,7 +20,7 @@ export async function installExtras(game) {
   g.addSystem({ name: 'lights', lateUpdate: (dt) => g.lightPool.update(dt, g.engine.camera.position) });
   // ---------------------------------------------------------------- optional big systems (loaded lazily)
   const mods = await Promise.allSettled([
-    import('../entities/viewmodel.js'), import('../ui/device.js'), import('../world/rapids.js'),
+    import('../entities/viewmodel.js'), import('./materials.js'), import('./props.js'), import('./gravgun.js'), import('./tutorial.js'), import('../ui/holo.js'), import('../entities/timmy.js'), import('../world/rapids.js'),
     import('./caves.js'), import('./structures.js'), import('./building.js'), import('../entities/van.js'), import('./research.js'),
     import('../ui/computer.js'), import('./journal.js'), import('./story.js'), import('./coop.js'), import('../entities/dinos.js'), import('./bosses.js'), import('./tracks.js'), import('./volcano.js'), import('./save.js'), import('../net/net.js'), import('./taming.js'), import('./weapons.js'), import('../ui/touch.js'),
   ]);
@@ -194,6 +194,7 @@ export async function installExtras(game) {
     update(dt) {
       if (!g.titleMode) return;
       this.t += dt;
+      if (g.lab?.active) { g.uiOpen = true; return; } // the lab has its own camera
       const a = this.t * 0.035 + 2.2;
       // customising your explorer: a slow close-up turntable around them
       if (g.titleLook) {
@@ -224,16 +225,17 @@ export async function installExtras(game) {
     if (opt.mode === 'join' && g.netJoin) {
       await g.netJoin(opt.code);
       // joiners crash-landed too: same pocket snacks as the host
-      if (!g.inventory.slots.some(Boolean)) { g.give('noodles', 2, { quiet: true }); g.give('energybar', 2, { quiet: true }); g.give('canteen', 1, { quiet: true }); }
+      if (!g.inventory.slots.some(Boolean)) { g.give('gravgun', 1, { quiet: true }); g.give('noodles', 2, { quiet: true }); g.give('canteen', 1, { quiet: true }); }
     } else {
       if (opt.mode === 'continue' && g.loadGame) await g.loadGame();
       else {
         g.newGame?.();
-        // starting kit: crash supplies
-        if (!g.inventory.count('scanner')) {
+        // starting kit: the gravity gun in the tool slot, a snack and a canteen in the pockets
+        if (!g.inventory.count('gravgun')) {
+          g.give('gravgun', 1, { quiet: true });
           g.give('noodles', 2, { quiet: true });
-          g.give('energybar', 2, { quiet: true });
           g.give('canteen', 1, { quiet: true });
+          g.van?.storage.add('energybar', 2, null, true);
         }
       }
       // open the room once the world is ready, so joiners get the real state

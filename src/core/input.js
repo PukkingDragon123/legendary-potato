@@ -7,7 +7,7 @@ export const DEFAULT_BINDS = {
   inventory: ['Tab', 'KeyI'], build: ['KeyB'], map: ['KeyM'], journal: ['KeyJ'], chat: ['Enter', 'KeyT'],
   emote: ['KeyG'], voice: ['KeyV'], camera: ['KeyF5', 'F5', 'KeyP'], pause: ['Escape'], whistle: ['KeyF'],
   horn: ['KeyH'], dismount: ['KeyX'], rotate: ['KeyR'], hot1: ['Digit1'], hot2: ['Digit2'], hot3: ['Digit3'], hot4: ['Digit4'],
-  hot5: ['Digit5'], hot6: ['Digit6'], hot7: ['Digit7'], hot8: ['Digit8'], command: ['KeyZ'], flashlight: ['KeyL'],
+  hot5: ['Digit5'], hot6: ['Digit6'], hot7: ['Digit7'], hot8: ['Digit8'], command: ['KeyZ'], flashlight: ['KeyL'], scan: ['KeyR', 'Mouse1'],
 };
 
 export class Input {

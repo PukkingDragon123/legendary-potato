@@ -90,6 +90,7 @@ DESIGNS.bean_scientist = (b) => {
   b.bone('pack', 'chest', [0, 0.62, 0.26]);
   const A = BEAN.armAngle, cA = Math.cos(A), sA = Math.sin(A);
   const J = {};
+  let gadgetAt = null, packAt = null;
   b.mirror((sd, n) => {
     const sh = [sd * 0.2, 0.735, 0.004];
     const el = add3(sh, [sd * sA * 0.165, -cA * 0.165, 0]);
@@ -182,6 +183,7 @@ DESIGNS.bean_scientist = (b) => {
       const c = add3(mid, mul3(up, 0.036));
       b.box(c, [0.031, 0.044, 0.013], 0.007, { g, b: 'forearm' + n, dir: up, up: dir, col: NONE, mat: M_GUN, k: 0.003, cf: -0.4, cp: 4 });
       b.box(add3(c, mul3(up, 0.011)), [0.022, 0.032, 0.004], 0.003, { g, b: 'forearm' + n, dir: up, up: dir, col: NONE, mat: M_GLOW, k: 0.0015, cf: -0.3, cp: 6 });
+      gadgetAt = { c: add3(c, mul3(up, 0.016)), up, el };
       b.cyl(add3(c, add3(mul3(up, 0.004), mul3(dir, -0.047))), 0.007, 0.003, 0.0015, { g, b: 'forearm' + n, dir, col: NONE, mat: M_METAL, k: 0.002, cf: -0.3, cp: 5 });
     }
     b.group(g, { hk: 0.75, hideIn: ['main', 'gearU'] });
@@ -250,6 +252,7 @@ DESIGNS.bean_scientist = (b) => {
     const pk = around(F, Math.PI, 0.615);
     const pc = add3(pk.p, mul3(pk.n, 0.048));
     const pg = { ...gU, b: 'pack' };
+    packAt = { c: pc, n: pk.n, top: add3(pc, [0, 0.135, 0]) };
     b.box(pc, [0.112, 0.118, 0.046], 0.034, { ...pg, dir: pk.n, col: NONE, mat: M_GUN, k: 0.004 });
     b.box(add3(pc, add3(mul3(pk.n, 0.012), [0, 0.098, 0])), [0.1, 0.03, 0.04], 0.022, { ...pg, dir: pk.n, col: TRIM, mat: M_FAB, k: 0.004, cf: -0.4, cp: 3 });
     for (const sx of [-1, 1]) {
@@ -314,7 +317,13 @@ DESIGNS.bean_scientist = (b) => {
   b.anim = {
     human: true,
     brows: [-1, 1].map((sd) => { const f = front(F, sd * 0.064, BEAN.browY); return { side: sd, p: f.p, n: f.n }; }),
-    cheek: BEAN.cheek, core: around(F, 0, BEAN.core[1]).p, eyes: eyeAt.map((e) => e.p),
+    cheek: BEAN.cheek, core: around(F, 0, BEAN.core[1]).p, eyes: eyeAt.map((e) => e.p), gadget: gadgetAt,
+    // where accessories sit: the hood is a round cone (bottom c/r, top c/r), the rest are surface points
+    acc: {
+      hood: { c0: [0, 0.7, 0], r0: 0.24, c1: [0, 0.93, 0.01], r1: 0.219 },
+      nose: front(F, 0, BEAN.eyeY - 0.02).p, lip: front(F, 0, BEAN.mouth[1] + 0.03).p,
+      neck: around(F, 0, 0.74), chest: around(F, 0.42, 0.64), pack: packAt,
+    },
   };
 };
 

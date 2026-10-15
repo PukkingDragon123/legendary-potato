@@ -1,4 +1,7 @@
 // Slot-based inventory with stacking, durability and change notifications.
+// The explorer's own one is tiny: a tool slot (tools and weapons only) and
+// three pockets that refuse bulky things (logs live in the van rack and in
+// crates; you drag those around with the gravity gun).
 import { ITEMS } from '../data/items.js';
 
 export class Inventory {
@@ -6,8 +9,20 @@ export class Inventory {
     this.size = size;
     this.slots = new Array(size).fill(null);
     this.hotbarSize = opt.hotbar ?? 8;
+    this.toolSlot = opt.tool ?? null;
+    this.noBulk = !!opt.noBulk;
     this.listeners = new Set();
     this.selected = 0;
+  }
+  // may this item sit in slot i?
+  acceptAt(i, id) {
+    if (!id) return true;
+    if (this.accept && !this.accept(id)) return false;
+    const d = ITEMS[id];
+    if (!d) return false;
+    if (this.toolSlot !== null && i === this.toolSlot) return d.cat === 'tool' || d.cat === 'weapon';
+    if (this.noBulk && d.bulk) return false;
+    return true;
   }
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   changed() { for (const f of this.listeners) f(this); }
@@ -29,7 +44,7 @@ export class Inventory {
     if (max > 1) {
       for (let i = 0; i < this.size && left > 0; i++) {
         const s = this.slots[i];
-        if (s && s.id === id && s.n < max && !s.unique) {
+        if (s && s.id === id && s.n < max && !s.unique && this.acceptAt(i, id)) {
           const k = Math.min(max - s.n, left);
           s.n += k; left -= k;
         }
@@ -40,7 +55,7 @@ export class Inventory {
     const order = preferHot ? [...Array(this.size).keys()] : [...Array(this.size).keys()].slice(this.hotbarSize).concat([...Array(this.hotbarSize).keys()]);
     for (const i of order) {
       if (left <= 0) break;
-      if (!this.slots[i]) {
+      if (!this.slots[i] && this.acceptAt(i, id)) {
         const k = Math.min(max, left);
         this.slots[i] = this.makeSlot(id, k, extra);
         left -= k;
@@ -69,7 +84,10 @@ export class Inventory {
   }
   take(req) { if (!this.has(req)) return false; for (const [id, n] of Object.entries(req)) this.remove(id, n, true); this.changed(); return true; }
   removeAt(i, n = 1) { const s = this.slots[i]; if (!s) return null; const k = Math.min(n, s.n); s.n -= k; const out = { ...s, n: k }; if (s.n <= 0) this.slots[i] = null; this.changed(); return out; }
-  swap(a, b) { [this.slots[a], this.slots[b]] = [this.slots[b], this.slots[a]]; this.changed(); }
+  swap(a, b) {
+    if (!this.acceptAt(a, this.slots[b]?.id) || !this.acceptAt(b, this.slots[a]?.id)) return false;
+    [this.slots[a], this.slots[b]] = [this.slots[b], this.slots[a]]; this.changed(); return true;
+  }
   moveTo(other, i) {
     const s = this.slots[i];
     if (!s) return;
@@ -98,6 +116,20 @@ export class Inventory {
   }
   firstEmpty() { return this.slots.findIndex((s) => !s); }
   serialize() { return { size: this.size, slots: this.slots.map((s) => (s ? { ...s } : null)), selected: this.selected }; }
-  load(d) { if (!d) return; this.size = d.size ?? this.size; this.slots = d.slots.map((s) => (s && ITEMS[s.id] ? { ...s } : null)); while (this.slots.length < this.size) this.slots.push(null); this.selected = d.selected ?? 0; this.changed(); }
+  // a save from a different layout (the old 32-slot backpack) is poured back in; what does not
+  // fit is handed to onOverflow (the van rack takes it)
+  load(d, onOverflow = null) {
+    if (!d) return;
+    const items = d.slots.filter((s) => s && ITEMS[s.id]);
+    if ((d.size ?? this.size) === this.size) { this.slots = d.slots.map((s) => (s && ITEMS[s.id] ? { ...s } : null)); while (this.slots.length < this.size) this.slots.push(null); }
+    else {
+      this.slots = new Array(this.size).fill(null);
+      const spill = [];
+      for (const s of items) { const { id, n, ...extra } = s; const left = this.add(id, n, Object.keys(extra).length ? extra : null, true); if (left > 0) spill.push({ ...s, n: left }); }
+      if (spill.length) onOverflow?.(spill);
+    }
+    this.selected = Math.min(d.selected ?? 0, this.size - 1);
+    this.changed();
+  }
   clear() { this.slots.fill(null); this.changed(); }
 }

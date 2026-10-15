@@ -108,6 +108,18 @@ const B = {
   rifle: () => G(at(box(0.05, 0.08, 0.6, PLASTIC(0xd0302a), 0.01), 0, 0.12, 0.15), at(cyl(0.035, 0.035, 0.4, std(0xc8c8c8, 0.4, 0.8), 10), 0, 0.17, 0.35, Math.PI / 2, 0, 0), at(box(0.04, 0.16, 0.05, W()), 0, 0.04, -0.1), at(box(0.12, 0.008, 0.04, std(0x2a6ab0, 0.6)), 0, 0.22, 0.1)),
   shell: () => G(at(cyl(0.012, 0.012, 0.05, std(0x7a3aa8, 0.4), 8), 0, 0.025, 0), at(cyl(0.013, 0.013, 0.012, std(0xd0a040, 0.3, 0.8), 8), 0, 0.006, 0)),
   hammer: () => G(handle(0.36), wrap(0.32), at(box(0.06, 0.06, 0.16, ST(), 0.01), 0, 0.36, 0.02)),
+  // the gravity gun: a chunky emitter with three prongs around a glowing core and coil rings
+  gravgun: () => {
+    const shell = std(0xe8ecee, 0.32, 0.1), dark = std(0x2a3036, 0.45, 0.4), core = GLOW(0x5ef2ff, 2.2), coil = std(0xf07a2a, 0.35, 0.2);
+    const g = G(at(box(0.05, 0.13, 0.06, dark, 0.012), 0, 0.065, -0.01), at(box(0.075, 0.07, 0.24, shell, 0.02), 0, 0.15, 0.08));
+    for (const z of [0.0, 0.07, 0.14]) g.add(at(mesh(new THREE.TorusGeometry(0.045, 0.009, 8, 20), coil), 0, 0.15, 0.04 + z));
+    g.add(at(cyl(0.032, 0.04, 0.05, dark, 14), 0, 0.15, 0.22, Math.PI / 2, 0, 0));
+    g.add(at(sph(0.024, core, 14, 10), 0, 0.15, 0.25));
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; g.add(at(box(0.012, 0.012, 0.09, METAL(), 0.004), Math.cos(a) * 0.04, 0.15 + Math.sin(a) * 0.04, 0.27, -Math.sin(a) * 0.35, Math.cos(a) * 0.35, 0)); }
+    g.add(at(box(0.04, 0.012, 0.06, core), 0, 0.19, 0.06));
+    const mz = new THREE.Object3D(); mz.name = 'muzzle'; mz.position.set(0, 0.15, 0.3); g.add(mz);
+    return g;
+  },
   scanner: () => {
     const g = G(at(box(0.09, 0.16, 0.05, PLASTIC(0xf2c230), 0.015), 0, 0.12, 0), at(box(0.07, 0.06, 0.006, GLOW(0x60ff90, 0.8)), 0, 0.15, 0.026), at(cyl(0.02, 0.025, 0.06, PLASTIC(0x2a2a2e), 8), 0, 0.22, 0.01, Math.PI / 2.5, 0, 0));
     g.add(at(box(0.02, 0.012, 0.01, PLASTIC(0xd02a2a)), -0.02, 0.09, 0.027)); g.add(at(box(0.02, 0.012, 0.01, PLASTIC(0x2a60d0)), 0.02, 0.09, 0.027));
@@ -170,50 +182,91 @@ export function buildItemModel(def, opt = {}) {
   return modelCache.get(key).clone();
 }
 
-// Render every item into a pixel-art icon atlas (data URLs keyed by item id).
-export function renderIcons(renderer, items, size = 40) {
+// Render every item into a pixel-art icon (data URLs keyed by item id). Each
+// model is rendered 4x supersampled, boiled down to a 32 x 32 sprite with a
+// limited, hue-shifted shading ramp (shadows drift cool, highlights warm), a
+// selective outline (a dark version of the colour it borders), a lit rim on
+// the top-left and a shaded one on the bottom-right. Shown at whole multiples
+// so every pixel stays square.
+// opt.build(def) makes the model (items by default), opt.rot its turn, opt.key(def) the output key
+export function renderIcons(renderer, items, size = 32, opt = {}) {
+  const SS = 4, big = size * SS;
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x5a5048, 1.7));
-  const d = new THREE.DirectionalLight(0xfff4e0, 2.6); d.position.set(-1.2, 2, 1.6); scene.add(d);
-  const rim = new THREE.DirectionalLight(0x9ad0ff, 1.2); rim.position.set(1.5, 0.5, -1.5); scene.add(rim);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x5a5048, 1.8));
+  const d = new THREE.DirectionalLight(0xfff4e0, 2.8); d.position.set(-1.2, 2, 1.6); scene.add(d);
+  const rim = new THREE.DirectionalLight(0x9ad0ff, 1.3); rim.position.set(1.5, 0.5, -1.5); scene.add(rim);
   const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 20);
-  const rt = new THREE.WebGLRenderTarget(size, size, { samples: 0 });
-  const buf = new Uint8Array(size * size * 4);
+  const rt = new THREE.WebGLRenderTarget(big, big, { samples: 4 });
+  const buf = new Uint8Array(big * big * 4);
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
   const out = {};
   const prevTone = renderer.toneMapping;
   renderer.toneMapping = THREE.NeutralToneMapping;
+  const N = size * size;
+  const cr = new Float32Array(N), cg = new Float32Array(N), cb = new Float32Array(N), ca = new Float32Array(N);
+  const LEVELS = [0.16, 0.3, 0.46, 0.64, 0.82, 1.0];
   for (const def of Object.values(items)) {
-    const g = buildItemModel(def, { fresh: true });
-    g.rotation.set(0.35, -0.75, 0.15);
+    const g = opt.build ? opt.build(def) : buildItemModel(def, { fresh: true });
+    if (!g) continue;
+    g.rotation.set(...(opt.rot ?? [0.35, -0.75, 0.15]));
     scene.add(g);
     const bb = new THREE.Box3().setFromObject(g);
     const c = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3());
-    const r = Math.max(sz.x, sz.y, sz.z) * 0.62 + 0.001;
+    const r = Math.max(sz.x, sz.y, sz.z) * 0.6 + 0.001;
     cam.position.set(c.x, c.y + r * 0.2, c.z + r / Math.tan((15 * Math.PI) / 180) * 1.0);
     cam.lookAt(c);
     renderer.setRenderTarget(rt);
     renderer.setClearColor(0x000000, 0);
     renderer.clear();
     renderer.render(scene, cam);
-    renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
+    renderer.readRenderTargetPixels(rt, 0, 0, big, big, buf);
     scene.remove(g);
-    // flip, posterize a touch, then add a dark 1px outline for readability
-    const img = ctx.createImageData(size, size);
-    const A = (x, y) => (x < 0 || y < 0 || x >= size || y >= size ? 0 : buf[((size - 1 - y) * size + x) * 4 + 3]);
+    // box-filter each 4x4 block (alpha weighted), flipping y
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      const k = ((size - 1 - y) * size + x) * 4, o = (y * size + x) * 4;
-      if (buf[k + 3] > 100) {
-        for (let ch = 0; ch < 3; ch++) img.data[o + ch] = Math.round(buf[k + ch] / 12) * 12;
-        img.data[o + 3] = 255;
-      } else if (A(x - 1, y) > 100 || A(x + 1, y) > 100 || A(x, y - 1) > 100 || A(x, y + 1) > 100) {
-        img.data[o] = 24; img.data[o + 1] = 18; img.data[o + 2] = 16; img.data[o + 3] = 255;
+      let R = 0, G = 0, B = 0, A = 0;
+      for (let j = 0; j < SS; j++) for (let i = 0; i < SS; i++) {
+        const k = ((big - 1 - (y * SS + j)) * big + x * SS + i) * 4, a = buf[k + 3] / 255;
+        R += buf[k] * a; G += buf[k + 1] * a; B += buf[k + 2] * a; A += a;
+      }
+      const o = y * size + x;
+      ca[o] = A / (SS * SS);
+      if (A > 0) { cr[o] = R / A / 255; cg[o] = G / A / 255; cb[o] = B / A / 255; } else cr[o] = cg[o] = cb[o] = 0;
+    }
+    const inside = (x, y) => x >= 0 && y >= 0 && x < size && y < size && ca[y * size + x] > 0.42;
+    const img = ctx.createImageData(size, size);
+    const put = (o, rr, gg, bb2) => { img.data[o * 4] = Math.max(0, Math.min(255, Math.round(rr * 255))); img.data[o * 4 + 1] = Math.max(0, Math.min(255, Math.round(gg * 255))); img.data[o * 4 + 2] = Math.max(0, Math.min(255, Math.round(bb2 * 255))); img.data[o * 4 + 3] = 255; };
+    // quantised, hue-shifted colour of an inside pixel
+    const shade = (o, bias = 0) => {
+      let rr = cr[o], gg = cg[o], bb2 = cb[o];
+      const l = 0.3 * rr + 0.59 * gg + 0.11 * bb2 + 1e-4;
+      let li = 0; while (li < LEVELS.length - 1 && l * 1.05 + bias > (LEVELS[li] + LEVELS[li + 1]) / 2) li++;
+      const lq = LEVELS[li], k = lq / l;
+      rr *= k; gg *= k; bb2 *= k;
+      // a little more saturation, cool shadows and warm lights
+      const m = (rr + gg + bb2) / 3;
+      rr = m + (rr - m) * 1.18; gg = m + (gg - m) * 1.18; bb2 = m + (bb2 - m) * 1.18;
+      const w = (lq - 0.55) * 0.12;
+      return [rr + w, gg + w * 0.6, bb2 - w];
+    };
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const o = y * size + x;
+      if (inside(x, y)) {
+        // lit rim on the top-left edge, shaded rim on the bottom-right
+        const lit = !inside(x - 1, y) || !inside(x, y - 1);
+        const dark = !inside(x + 1, y) || !inside(x, y + 1);
+        const [rr, gg, bb2] = shade(o, lit && !dark ? 0.12 : dark && !lit ? -0.1 : 0);
+        put(o, rr, gg, bb2);
+      } else {
+        // selective outline: a deep version of the colour it borders
+        let n = -1;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inside(x + dx, y + dy)) { n = (y + dy) * size + x + dx; break; }
+        if (n >= 0) { put(o, 0.06 + cr[n] * 0.18, 0.05 + cg[n] * 0.16, 0.07 + cb[n] * 0.2); }
       }
     }
     ctx.putImageData(img, 0, 0);
-    out[def.id] = canvas.toDataURL();
+    out[opt.key ? opt.key(def) : def.id] = canvas.toDataURL();
   }
   renderer.toneMapping = prevTone;
   renderer.setRenderTarget(null);

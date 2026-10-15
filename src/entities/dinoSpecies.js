@@ -195,6 +195,17 @@ export const SPECIES = {
     temper: 'Fishy show-off', blurb: 'Not technically a critter. Very touchy about it.',
     biomes: { beach: 0.8, highland: 0.6, mountain: 0.8, river: 0.3 }, call: 'squawk',
   },
+  dodo: {
+    name: 'Scalydodo', short: 'Scalydodo', sci: 'Raphus squamosus', size: 0.8, rp: 3, element: 'grass',
+    look: { color: 0x4f9a86, belly: 0xf4e6c0, accent: 0xff9a3a, pcolor: 0x2f6a5e, horn: 0xf2cf6a, dark: 0x1e3a34 },
+    stats: { hp: 40, speed: 1.5, run: 5.2, dmg: 2 },
+    behaviour: { herd: [2, 4], gentle: true, curious: true, sight: 14 },
+    diet: 'herbivore', foods: ['redberry', 'sunberry', 'blueberry', 'noodles', 'energybar'], favorite: 'redberry',
+    tame: { method: 'knockout', need: 3, hint: 'Bonk it gently until it naps, then feed it red berries. It forgives instantly.' },
+    job: { id: 'gather', name: 'Gatherer', desc: 'Waddles about camp picking up sticks and stones and drops them in a crate.' },
+    temper: 'Friendly licker', blurb: 'A plump, scaly dodo with a banana of a beak and no sense of personal space. It licks everything. Everything. You included.',
+    biomes: { jungle: 0.7, prairie: 0.8, beach: 0.7 }, call: 'honk',
+  },
 };
 // ---------------------------------------------------------------- the redesign
 // The island's creatures are their own species now (see creatureDesigns.js):

@@ -4,6 +4,7 @@ import '@fontsource/pixelify-sans/600.css';
 import '@fontsource/silkscreen/400.css';
 import '@fontsource/vt323/400.css';
 import './ui/ui.css';
+import './ui/holo.css';
 import * as THREE from 'three';
 import { Engine } from './core/engine.js';
 import { Input } from './core/input.js';
@@ -22,7 +23,8 @@ import { renderIcons, setStructureModelBuilder } from './gfx/itemModels.js';
 import { buildStructure } from './world/structureModels.js';
 import { ITEMS } from './data/items.js';
 import { PRESETS } from './entities/character.js';
-import { requestHuman } from './entities/humanModel.js';
+import { requestHuman, humanData } from './entities/humanModel.js';
+import { ACCESSORIES, ACC_SLOTS, buildAccessoryModel } from './entities/accessories.js';
 import { installExtras } from './systems/registry.js';
 import { isTouchDevice } from './ui/touch.js';
 
@@ -65,7 +67,7 @@ async function boot() {
   loading.set(0.96, 'Painting tiny pixel icons');
   await new Promise((r) => setTimeout(r, 0));
   setStructureModelBuilder(buildStructure);
-  game.icons = renderIcons(engine.renderer, ITEMS, 40);
+  game.icons = renderIcons(engine.renderer, ITEMS, 32);
   new UI(game);
   game.addSystem(game.ui);
   game.addSystem(new Audio(game));
@@ -100,25 +102,49 @@ async function boot() {
   requestAnimationFrame(loop);
   loading.done();
 
+  let lab = null;
   const start = async (opt) => {
     title?.close();
+    // a new expedition starts with the intro: the portal opens and swallows the van
+    if (lab) {
+      if (opt.mode === 'new' && game.playIntro && !qs.get('nointro')) await game.playIntro(lab, opt);
+      lab.exit(); lab.dispose(); lab = null; game.lab = null;
+    }
     game.titleMode = false;
     game.rig.override = null;
     await game.start?.(opt);
     if (!qs.get('nolock') && !touch) input.lock();
   };
-  // ---- title over the live world
+  // ---- the main menu: the scientists' lab
   let title = null;
   if (qs.get('autostart')) { start({ mode: qs.get('mode') || 'new', host: qs.get('host') === '1', code: (qs.get('code') || '').toUpperCase() }); }
   else {
     game.titleMode = true;
+    try {
+      const { Lab } = await import('./world/lab.js');
+      lab = new Lab(game, { profile, onCustomise: () => title?.customise() });
+      lab.enter();
+      game.addSystem({ name: 'lab', update: (dt) => lab?.update(dt) });
+    } catch (e) { console.warn('lab failed, using the world as the menu backdrop', e); lab = null; }
     title = new Title(document.getElementById('ui'), {
       profile, hasSave: !!game.hasSave?.(), serverAvailable: !!game.serverAvailable,
       click: () => game.audio?.play('ui_click'),
+      error: () => game.audio?.play('error', { vol: 0.5 }),
       onStart: (o) => { saveJSON('prehistoric-profile', profile); start(o); },
       onSaveProfile: (p) => { saveJSON('prehistoric-profile', p); game.local.setOutfit(p.outfit); },
-      onPreview: (o) => game.previewOutfit?.(o),
+      onPreview: (o) => { if (lab) { if (o) lab.dress(o); } else game.previewOutfit?.(o); },
+      onWardrobe: (on) => lab?.wardrobe(on),
+      // pixel icons of every accessory, rendered once from their 3D models
+      accIcons: () => {
+        if (game.accIcons) return game.accIcons;
+        const D = humanData();
+        if (!D) return {};
+        const defs = ACC_SLOTS.flatMap((sl) => ACCESSORIES[sl].filter((a) => a.id !== 'none' && a.id !== 'chrono').map((a) => ({ ...a, slot: sl })));
+        game.accIcons = renderIcons(engine.renderer, defs, 40, { build: (a) => buildAccessoryModel(a.slot, a.id, D), key: (a) => a.slot + ':' + a.id, rot: [0.3, -0.65, 0] });
+        return game.accIcons;
+      },
     });
+    game.titleUI = title;
   }
 }
 

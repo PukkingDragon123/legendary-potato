@@ -350,7 +350,7 @@ export class Building {
   registerActions() {
     const g = this.g, A = g.actionHandlers;
     A.b_place = (d) => {
-      if (d.by === g.local.id && !g.inventory.take(COST[d.kind][d.mat])) return;
+      if (d.by === g.local.id && !(g.materials ?? g.inventory).take(COST[d.kind][d.mat])) return;
       if (d.newBuilding && !this.buildings.has(d.bid)) this.addBuilding({ id: d.bid, x: d.bx, y: d.by_, z: d.bz, yaw: d.byaw });
       const pc = { id: d.pid, bid: d.bid, kind: d.kind, mat: d.mat, i: d.i, j: d.j, k: d.k, e: d.e, r: d.r, by: d.by };
       if (this.at(pc.bid, pc.kind, pc.i, pc.j, pc.k, pc.e)) return;
@@ -437,7 +437,7 @@ export class Building {
   renderInfo() {
     if (!this.bar) return;
     const g = this.g, p = PIECES[this.sel], cost = COST[p.id][this.mat];
-    const parts = Object.entries(cost).map(([id, n]) => { const have = g.inventory.count(id); return `<span style="color:${have >= n ? 'inherit' : '#ff7060'}"><img src="${g.ui.icon(id)}" style="width:18px;height:18px;vertical-align:-4px;image-rendering:pixelated"> ${n} <span class="small">(${have})</span></span>`; }).join(' ');
+    const parts = Object.entries(cost).map(([id, n]) => { const have = (g.materials ?? g.inventory).count(id); return `<span style="color:${have >= n ? 'inherit' : '#ff7060'}"><img src="${g.ui.icon(id)}" style="width:18px;height:18px;vertical-align:-4px;image-rendering:pixelated"> ${n} <span class="small">(${have})</span></span>`; }).join(' ');
     this.bar.info.innerHTML = `<b>${p.name}</b> · ${MATS[this.mat].name} &nbsp; ${parts} &nbsp;<span class="small">wheel/1-8 piece · F material · R rotate · LMB build · hold RMB remove · B exit</span>`;
   }
 
@@ -518,7 +518,7 @@ export class Building {
       if (w.y - lo > 4) return 'Too high for stilts';
       if (g.van && Math.hypot(w.x - g.van.pose.x, w.z - g.van.pose.z) < 3.8) return 'Too close to the van';
     }
-    if (!g.inventory.has(COST[pc.kind][pc.mat])) return 'Not enough materials';
+    if (!(g.materials ?? g.inventory).has(COST[pc.kind][pc.mat])) return 'Not enough materials';
     if (MATS[pc.mat].unlock && !g.research?.has?.(MATS[pc.mat].unlock)) return 'Material locked';
     // something solid (rocks, trees, structures) in the footprint
     const list = g.physics.query(w.x, w.z, 2, []);

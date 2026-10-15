@@ -536,14 +536,15 @@ export class Engine {
     if (this._patchT <= 0) { this._patchT = 1.0; this.ensurePatched(); }
     G.uTime.value = this.time;
     // sun screen position for god rays
-    const cam = this.camera;
+    // the lab (main menu) brings its own scene and camera
+    const cam = this.cameraOverride ?? this.camera;
     const sd = G.uSunDir.value;
     const p = this._tmpV.copy(cam.position).addScaledVector(sd, 1000).project(cam);
     const fwd = cam.getWorldDirection(new THREE.Vector3());
     const facing = fwd.dot(sd);
     this.post.sunUv.set(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5);
     const onScreen = Math.max(0, 1 - Math.max(Math.abs(p.x), Math.abs(p.y)) * 0.6);
-    this.post.sunVisible = facing > 0 ? Math.min(1, facing * 1.6) * onScreen * Math.min(1, Math.max(0, sd.y * 6 + 0.3)) * (this.raysScale ?? 1) : 0;
-    this.post.render(this.scene, cam, this.time);
+    this.post.sunVisible = this.sceneOverride ? 0 : facing > 0 ? Math.min(1, facing * 1.6) * onScreen * Math.min(1, Math.max(0, sd.y * 6 + 0.3)) * (this.raysScale ?? 1) : 0;
+    this.post.render(this.sceneOverride ?? this.scene, cam, this.time);
   }
 }

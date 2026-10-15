@@ -2,6 +2,7 @@
 // achievement toasts that land every 20-30 minutes, and the log of notes,
 // scans and lab reports shown in the CHRONO-PAL LOG tab.
 import { ITEMS } from '../data/items.js';
+import { unlock, unlockedBy } from '../entities/accessories.js';
 
 // objective checks receive (g, J) and return true/false or [have, need]
 const inv = (id, n = 1) => (g) => [Math.min(n, g.inventory.count(id)), n];
@@ -10,6 +11,17 @@ const built = (type) => (g) => !!g.structures && g.structures.all(type).length >
 const tech = (id) => (g) => !!g.research?.has(id) && g.research.done.has(id);
 
 export const CHAPTERS = [
+  {
+    id: 'first', title: 'First Steps', blurb: 'Timmy shows you the ropes: stones, trees, the gravity gun and the van rack.',
+    goals: [
+      { id: 'stone', text: 'Pick up a stone', check: (g) => !!g.tutorial?.goalDone('stone') },
+      { id: 'tree', text: 'Knock down a tree with the stone', check: (g) => !!g.tutorial?.goalDone('tree') },
+      { id: 'grav', text: 'Lift a log with the gravity gun', check: (g) => !!g.tutorial?.goalDone('grav') },
+      { id: 'rack', text: 'Drop logs into the van rack', check: (g) => !!g.tutorial?.goalDone('rack') || [Math.min(2, g.tutorial?.flags.racked ?? 0), 2] },
+      { id: 'hatchet', text: 'Craft a Stone Hatchet', check: (g, J) => !!g.tutorial?.goalDone('craft') || J.crafted.has('stone_hatchet') },
+    ],
+    reward: { title: 'TIMMY APPROVED', text: 'You can hit a tree with a rock. Civilisation is next.' },
+  },
   {
     id: 'crash', title: 'Crash Landing', blurb: 'The van works. Sort of. Time to get the lights on.',
     goals: [
@@ -25,7 +37,6 @@ export const CHAPTERS = [
   {
     id: 'stone', title: 'Stone Age Starter Pack', blurb: 'Tools, fire, food and a place to sleep.',
     goals: [
-      { id: 'hatchet', text: 'Craft a Stone Hatchet', check: (g, J) => J.crafted.has('stone_hatchet') },
       { id: 'pick', text: 'Craft a Stone Pickaxe', check: (g, J) => J.crafted.has('stone_pick') },
       { id: 'logs', text: 'Chop down trees for logs', check: ev('treeFelled', 2) },
       { id: 'fire', text: 'Build a Campfire', check: built('campfire') },
@@ -124,7 +135,7 @@ export const CHAPTERS = [
     reward: { title: 'BACK TO THE... PAST?', text: 'You did it. Probably.' },
   },
 ];
-const ACH = [
+export const ACH = [
   ['firstTree', 'TIMBER!', 'Felled your first tree.', (J) => (J.counts.treeFelled ?? 0) >= 1],
   ['bonk', 'NOT LIKE THIS', 'Got hit by your own falling tree.', (J) => (J.counts.treeBonk ?? 0) >= 1],
   ['scan20', 'SCANNER ENTHUSIAST', 'Scanned 20 different things.', (J, g) => (g.research?.scanned.size ?? 0) >= 20],
@@ -140,6 +151,12 @@ const ACH = [
   ['alpha1', 'GIANT SLAYER', 'Beat or tamed an alpha.', (J) => (J.counts.alpha ?? 0) >= 1],
   ['alpha3', 'APEX EXPLORER', 'Dealt with all three alphas.', (J) => (J.counts.alpha ?? 0) >= 3],
   ['alphaPet', 'WHO\'S A GOOD KING', 'Tamed an alpha.', (J) => (J.counts.alphaTamed ?? 0) >= 1],
+  ['tutorial', 'TIMMY\'S STAR PUPIL', 'Finished Timmy\'s lessons.', (J, g) => !!g.tutorial?.passed.has('done')],
+  ['rack20', 'HEAVY LIFTER', 'Put 20 big things on the van rack.', (J) => (J.counts.racked ?? 0) >= 20],
+  ['oil', 'BLACK GOLD', 'Filled your first barrel of oil.', (J) => (J.counts.oil ?? 0) >= 1],
+  ['level5', 'PERSONAL TRAINER', 'Trained a pal to level 5.', (J) => (J.counts.palLevel ?? 0) >= 5],
+  ['mind', 'BRAIN SWAP', 'Took control of a pal with the Mind Link.', (J) => (J.counts.mindLink ?? 0) >= 1],
+  ['base', 'ARE WE THERE YET?', 'Reached the research base.', (J) => (J.counts.baseReached ?? 0) >= 1],
 ];
 
 export class Journal {
@@ -172,6 +189,11 @@ export class Journal {
     E.on('eggHatched', () => inc('eggHatched'));
     E.on('alphaDown', ({ tamed }) => { inc('alpha'); if (tamed) inc('alphaTamed'); });
     E.on('vanCoffee', () => inc('coffee'));
+    E.on('rackStored', () => inc('racked'));
+    E.on('oilBarrel', () => inc('oil'));
+    E.on('palLevel', ({ level }) => { this.counts.palLevel = Math.max(this.counts.palLevel ?? 0, level); this.dirty = true; });
+    E.on('mindLink', () => inc('mindLink'));
+    E.on('baseReached', () => inc('baseReached'));
     E.on('snake', ({ score }) => { this.counts.snakeBest = Math.max(this.counts.snakeBest ?? 0, score); this.dirty = true; });
     E.on('vanSwitch', ({ i, on }) => { if (i === 1 && on && g.van && g.van.s.charge > 0 && !g.van.s.firstBoot) { g.van.s.firstBoot = true; this.dirty = true; } });
     E.on('note', (n) => this.addEntry({ id: 'note:' + n.id, kind: 'NOTE', title: n.title, html: `<p>${n.text}</p>` }));
@@ -231,7 +253,11 @@ export class Journal {
     for (const [id, title, text, fn] of ACH) {
       if (this.ach.has(id)) continue;
       let ok = false; try { ok = fn(this, g); } catch { ok = false; }
-      if (ok) { this.ach.add(id); g.ui?.toast(`ACHIEVEMENT: ${title} — ${text}`, '', 'star', 5000); g.audio?.jingle?.('discover'); this.addEntry({ id: 'ach:' + id, kind: 'ACHIEVEMENT', title, html: `<p>${text}</p>` }); }
+      if (ok) {
+        this.ach.add(id); g.ui?.toast(`ACHIEVEMENT: ${title} — ${text}`, '', 'star', 5000); g.audio?.jingle?.('discover'); this.addEntry({ id: 'ach:' + id, kind: 'ACHIEVEMENT', title, html: `<p>${text}</p>` });
+        // achievements unlock wardrobe accessories, for every expedition after this one
+        if (unlock(id)) for (const a of unlockedBy(id)) setTimeout(() => g.holo?.say(`New look unlocked: ${a.name}! Try it on in the lab wardrobe next time.`, { title: 'WARDROBE', expr: 'love' }), 2500);
+      }
     }
   }
   completeChapter(ch) {
@@ -245,8 +271,8 @@ export class Journal {
     g.research?.addRP?.(['bio', 'geo', 'zoo', 'paleo'][this.chapter % 4], 3, 'chapter bonus');
     setTimeout(() => this.showChapter(true), 4500);
   }
-  serialize() { return { chapter: this.chapter, done: [...this.done], counts: this.counts, crafted: [...this.crafted], ach: [...this.ach], log: this.log.slice(0, 120) }; }
-  load(d) { if (!d) return; this.chapter = d.chapter ?? 0; this.done = new Set(d.done ?? []); this.counts = d.counts ?? {}; this.crafted = new Set(d.crafted ?? []); this.ach = new Set(d.ach ?? []); this.log = d.log ?? []; this.showChapter(true); }
+  serialize() { return { ver: 2, chapter: this.chapter, done: [...this.done], counts: this.counts, crafted: [...this.crafted], ach: [...this.ach], log: this.log.slice(0, 120) }; }
+  load(d) { if (!d) return; this.chapter = (d.chapter ?? 0) + ((d.ver ?? 1) < 2 ? 1 : 0); /* saves from before First Steps */ this.done = new Set(d.done ?? []); this.counts = d.counts ?? {}; this.crafted = new Set(d.crafted ?? []); this.ach = new Set(d.ach ?? []); for (const a of this.ach) unlock(a); this.log = d.log ?? []; this.showChapter(true); }
 }
 
 export async function install(g) {
