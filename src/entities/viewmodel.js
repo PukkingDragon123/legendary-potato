@@ -1,8 +1,9 @@
-// First-person viewmodel: your own leather mitten hands in front of the
-// camera. The right hand holds whatever is on your hotbar and swings, chops,
-// eats and pokes with it; the left hand holds the Pocket Prof (the egg-shaped
-// professor gadget) with its live little screen, and brings it up in front of
-// you when you use it. Bobs, sways, lags and jiggles like the rest of the bean.
+// First-person viewmodel: your own suit sleeves and gloves in front of the
+// camera (the character's mesh, cut down to each arm, with fingers that curl
+// around what they hold). The right hand holds whatever is on your hotbar and
+// swings, chops, eats and pokes with it; the left hand holds the Pocket Prof
+// (the egg-shaped professor gadget) with its live little screen, and brings
+// it up in front of you when you use it. Bobs, sways and lags as you move.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { patchMaterial } from '../gfx/shaderlib.js';
@@ -10,8 +11,11 @@ import { buildItemModel } from '../gfx/itemModels.js';
 import { ITEMS } from '../data/items.js';
 import { paintSet, sstep, rgb, mix3, mul3 } from '../gfx/paint.js';
 import { tileFbm } from '../core/rng.js';
+import { buildFPArm } from './humanModel.js';
+import { BEAN } from './humanDesign.js';
+import { handQuat, HANDS } from './character.js';
 
-const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _m = new THREE.Matrix4();
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 const mesh = (g, m) => { const x = new THREE.Mesh(g, m); x.castShadow = false; x.receiveShadow = true; return x; };
 const mats = new Map();
 const M = (key, make) => { if (!mats.has(key)) mats.set(key, patchMaterial(make(), {})); return mats.get(key); };
@@ -108,25 +112,39 @@ export class Viewmodel {
   }
   build() {
     const ch = this.g.local.char;
-    this.leatherKey = ch.leatherColor + ':' + ch.outfit.top;
-    if (this.R) { this.inner.remove(this.R.root); this.inner.remove(this.L.root); }
-    this.R = this.makeHand(ch.leather, 1);
-    this.L = this.makeHand(ch.leather, -1);
+    this.charRef = ch;
+    if (this.R) for (const H of [this.R, this.L]) { this.inner.remove(H.root); H.arm.mesh.removeFromParent(); H.B['forearm' + H.n].removeFromParent(); H.B['upperArm' + H.n].removeFromParent(); }
+    this.R = this.makeHand(ch, 1);
+    this.L = this.makeHand(ch, -1);
     this.inner.add(this.R.root, this.L.root);
     this.L.grip.add(this.device);
-    this.device.position.set(0.012, 0.07, 0.0); this.device.rotation.set(0, 0, 0);
+    this.device.position.set(0.012, 0.05, 0.02); this.device.rotation.set(0, 0, 0);
     this.heldId = undefined;
   }
-  // a noodle arm from off screen to a leather mitten; grip = where things are held
-  makeHand(mat, side) {
+  // a sleeve and glove (the character's own mesh) whose fist sits at the hand group's origin;
+  // grip = where things are held, in the same frame the old mittens used
+  makeHand(ch, side) {
+    const n = side > 0 ? 'R' : 'L';
     const root = new THREE.Group();
     const hand = new THREE.Group(); root.add(hand);
-    const mit = mesh(new THREE.SphereGeometry(0.044, 16, 12), mat); mit.scale.set(1.0, 0.85, 1.25); hand.add(mit);
-    const thumb = mesh(new THREE.CapsuleGeometry(0.018, 0.035, 3, 8), mat); thumb.position.set(-side * 0.04, 0.018, -0.02); thumb.rotation.set(-0.6, 0, side * 0.9); hand.add(thumb);
-    const cuff = mesh(new THREE.TorusGeometry(0.04, 0.009, 6, 16), this.g.local.char.leatherDark); cuff.position.z = 0.055; hand.add(cuff);
-    const arm = mesh(new THREE.CylinderGeometry(0.03, 0.036, 1, 10, 1, true).translate(0, 0.5, 0).rotateX(Math.PI / 2), mat); root.add(arm);
-    const grip = new THREE.Group(); grip.position.set(0, 0.0, -0.01); hand.add(grip);
-    return { root, hand, arm, grip, side, pos: new THREE.Vector3(), rot: new THREE.Euler() };
+    const arm = buildFPArm(ch.H, n, ch.mat);
+    const B = arm.bones;
+    // the glove in the hand frame. Right: a fist round a handle that leans forward (the old tool
+    // grip), knuckles to the front-left, thumb on top. Left: cradling the gadget from below.
+    const A = BEAN.armAngle;
+    const d0 = new THREE.Vector3(side * Math.sin(A), -Math.cos(A), 0), t0 = new THREE.Vector3(0, 0, -1);
+    const t1 = side > 0 ? new THREE.Vector3(0.06, 0.88, -0.48).normalize() : new THREE.Vector3(0.45, 0.85, 0.25).normalize();
+    const d1 = side > 0 ? new THREE.Vector3(-0.95, 0.12, -0.32) : new THREE.Vector3(0.25, -0.15, -1);
+    d1.addScaledVector(t1, -d1.dot(t1)).normalize();
+    const m0 = new THREE.Matrix4().makeBasis(d0, t0, d0.clone().cross(t0));
+    const m1 = new THREE.Matrix4().makeBasis(d1, t1, d1.clone().cross(t1));
+    const Q0 = new THREE.Quaternion().setFromRotationMatrix(m1.multiply(m0.transpose()));
+    const ph = ch.H.grips[n].position.clone().applyQuaternion(Q0).negate();
+    B['hand' + n].position.copy(ph); B['hand' + n].quaternion.copy(Q0);
+    hand.add(B['hand' + n]);
+    this.inner.add(B['forearm' + n], B['upperArm' + n], arm.mesh);
+    const grip = new THREE.Group(); hand.add(grip);
+    return { root, hand, grip, side, n, arm, B, Q0, ph, pos: new THREE.Vector3(), rot: new THREE.Euler(), fist: {} };
   }
   setHeld(id) {
     if (id === this.heldId) return;
@@ -153,7 +171,7 @@ export class Viewmodel {
     const vis = this.visible();
     this.group.visible = vis;
     if (!vis) return;
-    if (this.leatherKey !== p.char.leatherColor + ':' + p.char.outfit.top) this.build();
+    if (this.charRef !== p.char) this.build();
     this.setHeld(p.heldId);
     this.t += dt;
     const t = this.t;
@@ -191,7 +209,7 @@ export class Viewmodel {
     const act = p.action;
     const R = this.R, L = this.L;
     // rest: right low right, left holding the device low left with its screen tipped up at you
-    R.pos.set(0.2, -0.22, -0.42); R.rot.set(-0.15, 0.05, 0.1);
+    R.pos.set(0.21, -0.19, -0.42); R.rot.set(-0.15, 0.05, 0.1);
     L.pos.set(-0.21, -0.23, -0.4); L.rot.set(-0.5, 0.35, 0.15);
     // short landscape phone screens: keep the gadget lower and out of the way
     if (innerHeight < 520) { L.pos.set(-0.26, -0.27, -0.42); R.pos.set(0.24, -0.25, -0.42); }
@@ -241,21 +259,33 @@ export class Viewmodel {
       R.pos.lerp(_v.set(0.11, -0.13, -0.3), r * 0.9);
       R.rot.set(R.rot.x * (1 - r) - 0.3 * r, R.rot.y * (1 - r) - 0.3 * r, R.rot.z * (1 - r));
     }
+    // fingers: a fist round whatever is held, open for waves and pokes, the left cradles the gadget
+    const busy = act?.name;
+    const fR = busy === 'interact' || busy === 'pet' ? (busy === 'pet' ? HANDS.open : HANDS.point) : emo === 'wave' ? HANDS.open : this.held || busy ? HANDS.grip : HANDS.rest;
+    const fL = HANDS.claw;
     for (const H of [R, L]) {
       const k = Math.min(1, dt * 16);
       H.hand.position.lerp(H.pos, k);
       _q.setFromEuler(H.rot);
       H.hand.quaternion.slerp(_q, k);
-      // the noodle arm runs from a shoulder below the screen edge to the cuff
-      const sh = _v.set(H.side * 0.42, -0.64, 0.12);
-      const cuff = new THREE.Vector3(0, 0, 0.06).applyQuaternion(H.hand.quaternion).add(H.hand.position);
-      const dir = cuff.clone().sub(sh);
-      const len = dir.length();
-      H.arm.position.copy(sh);
-      H.arm.scale.set(1, 1, len);
-      _m.lookAt(cuff, sh, _up);
-      H.arm.quaternion.setFromRotationMatrix(_m);
-      H.arm.visible = r < 0.6;
+      const sd = H.side, n = H.n, B = H.B, f = H.fist, want = sd > 0 ? fR : fL;
+      for (const key of ['c1', 'c2', 'ix', 'ix2', 'tx', 'ty']) f[key] = f[key] === undefined ? want[key] : f[key] + (want[key] - f[key]) * Math.min(1, dt * 14);
+      handQuat(sd, 0, 0, -f.c1, B['fng1' + n].quaternion); handQuat(sd, 0, 0, -f.c2, B['fng2' + n].quaternion);
+      handQuat(sd, 0, 0, -f.ix, B['idx1' + n].quaternion); handQuat(sd, 0, 0, -f.ix2, B['idx2' + n].quaternion);
+      handQuat(sd, f.tx, f.ty, 0, B['thb1' + n].quaternion); handQuat(sd, f.tx * 0.6, 0, 0, B['thb2' + n].quaternion);
+      // the sleeve runs from the wrist toward a shoulder below the screen edge (the wrist bends to suit)
+      H.hand.updateMatrix();
+      const wrist = _v.copy(H.ph).applyMatrix4(H.hand.matrix);
+      _q2.copy(H.hand.quaternion).multiply(H.Q0);
+      const back = _a.copy(H.arm.wristToElbow).normalize().applyQuaternion(_q2);
+      const toSh = _b.set(sd * 0.3, -0.72, 0.12).sub(wrist).normalize();
+      _q3.setFromUnitVectors(back, toSh).multiply(_q2);
+      _q3.slerp(_q2, 0.18);
+      for (const [bn, off] of [['forearm', H.arm.wristToElbow], ['upperArm', H.arm.wristToShoulder]]) {
+        const bone = B[bn + n];
+        bone.quaternion.copy(_q3);
+        bone.position.copy(off).applyQuaternion(_q3).add(wrist);
+      }
     }
     // with the device up, nothing in the right hand gets in the way
     if (this.held) this.held.visible = r < 0.6;
@@ -279,7 +309,7 @@ export class Viewmodel {
     return out;
   }
 }
-const _up = new THREE.Vector3(0, 1, 0);
+const _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
 
 export async function install(g) {
   const V = new Viewmodel(g);

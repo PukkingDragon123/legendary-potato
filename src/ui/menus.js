@@ -1,5 +1,6 @@
 // Loading screen + title screen + character customiser.
-import { PRESETS, OPTIONS, SKIN_TONES, LEATHER_NAMES, MOUTHS, normalizeOutfit } from '../entities/character.js';
+import { PRESETS, PALETTE, TEETH, FABRIC_IDS, normalizeOutfit } from '../entities/character.js';
+import { FABRICS } from '../entities/humanModel.js';
 
 const TIPS = [
   'Tip: Punching trees works. It just takes a while and hurts a bit.',
@@ -100,7 +101,7 @@ export class Title {
   }
   field(label, val) { const l = document.createElement('label'); l.innerHTML = `<span>${label}</span>`; const i = document.createElement('input'); i.type = 'text'; i.value = val ?? ''; i.maxLength = 16; l.appendChild(i); this.menu.appendChild(l); return i; }
   customise() {
-    this.clear('Customise Your Bean');
+    this.clear('Customise Your Scientist');
     const prof = this.opt.profile;
     const row = (label, key, opts, fmt = (v) => v) => {
       const l = document.createElement('label'); l.innerHTML = `<span>${label}</span>`;
@@ -116,16 +117,22 @@ export class Title {
     const presetRow = document.createElement('div'); presetRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
     PRESETS.forEach((p) => { const b = document.createElement('button'); b.className = 'btn'; b.style.cssText = 'width:auto;font-size:15px;padding:5px 9px'; b.textContent = p.name; b.onclick = () => { prof.outfit = { ...p }; this.customise(); this.opt.onPreview?.(prof.outfit); }; presetRow.appendChild(b); });
     this.menu.appendChild(presetRow);
-    const nice = (s) => (s ?? 'none').replace(/^./, (c) => c.toUpperCase());
     prof.outfit = normalizeOutfit(prof.outfit);
-    row('Leather', 'skin', SKIN_TONES.map((_, i) => i), (v) => LEATHER_NAMES[v] ?? `Tone ${v + 1}`);
-    row('Pattern', 'top', OPTIONS.top, nice);
-    row('Eyes', 'overlay', OPTIONS.overlay, nice);
-    row('Mouth', 'nose', MOUTHS.map((_, i) => i), (v) => MOUTHS[v]);
-    row('Hat', 'hat', OPTIONS.hat, nice);
-    row('Feet', 'bottom', OPTIONS.bottom, nice);
-    row('Pack', 'pack', OPTIONS.pack, nice);
-    row('Extra', 'extra', OPTIONS.extra, nice);
+    const colours = (label, key) => {
+      const list = PALETTE[key];
+      // a colour the palette does not list (an old save) still shows up as its own entry
+      const vals = list.map((c) => c[0]);
+      if (!vals.includes(prof.outfit[key])) vals.unshift(prof.outfit[key]);
+      row(label, key, vals, (v) => list.find((c) => c[0] === v)?.[1] ?? '#' + v.toString(16).padStart(6, '0'));
+    };
+    colours('Suit', 'suit');
+    colours('Trim', 'trim');
+    colours('Gloves & boots', 'gear');
+    colours('Bean', 'skin');
+    colours('Eyes', 'eye');
+    colours('Chrono glow', 'glow');
+    row('Fabric', 'fabric', FABRIC_IDS, (v) => FABRICS[v]?.name ?? v);
+    row('Smile', 'teeth', TEETH.map((_, i) => i), (v) => TEETH[v]);
     this.btn('Done', () => { this.opt.onSaveProfile?.(prof); this.main(); this.opt.onPreview?.(null); }, 'primary');
     this.opt.onPreview?.(prof.outfit);
   }

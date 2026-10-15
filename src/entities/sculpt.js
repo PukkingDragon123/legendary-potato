@@ -9,7 +9,7 @@
 // Shape (all lengths in metres):
 //   t: 'sph' | 'ell' | 'cone' | 'box'
 //   sph: c, r · ell: c, r:[x,y,z], m (world->local 3x3) · cone: a, b, ra, rb
-//   box: c, r:[half x,y,z], round, m
+//   box: c, r:[half x,y,z], round, m · cyl: c, r:[radius, half length], round, m (axis = local z)
 //   op: 'add' (default) | 'sub' (carve) | 'paint' (colour only)
 //   k: blend radius · amp/nf: lumpy noise · bw: [[bone, t], ...] weights
 //   along the shape's axis · wf: weight falloff · col: [r,g,b] linear
@@ -87,6 +87,20 @@ export function prepShape(s) {
       if (s.t === 'box') s.round = Math.min(s.round ?? 0, s.rad);
       break;
     }
+    case 'cyl': {
+      // a capped cylinder with rounded rims, its axis along local +Z
+      const m = s.m ?? (s.m = [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+      const [r, hh] = s.r;
+      lo = [0, 0, 0]; hi = [0, 0, 0];
+      for (let i = 0; i < 3; i++) {
+        const az = Math.abs(m[6 + i]);
+        const e = az * hh + Math.sqrt(Math.max(0, 1 - az * az)) * r;
+        lo[i] = s.c[i] - e; hi[i] = s.c[i] + e;
+      }
+      s.rad = Math.min(r, hh);
+      s.round = Math.min(s.round ?? 0, s.rad);
+      break;
+    }
     case 'tri': {
       // a rounded, extruded isosceles triangle: base centred on c, apex along local +Y
       const m = s.m ?? (s.m = [1, 0, 0, 0, 1, 0, 0, 0, 1]);
@@ -125,7 +139,7 @@ export function prepShape(s) {
   if (s.bw && s.bw.length > 1 && !s.axis) {
     if (s.t === 'cone') s.axis = [s.a, s.b];
     else {
-      const m2 = s.m ?? [1, 0, 0, 0, 1, 0, 0, 0, 1], rz = s.t === 'sph' ? s.r : s.r[2];
+      const m2 = s.m ?? [1, 0, 0, 0, 1, 0, 0, 0, 1], rz = s.t === 'sph' ? s.r : s.t === 'cyl' ? s.r[1] : s.r[2];
       const z = [m2[6] * rz, m2[7] * rz, m2[8] * rz];
       s.axis = [[s.c[0] - z[0], s.c[1] - z[1], s.c[2] - z[2]], [s.c[0] + z[0], s.c[1] + z[1], s.c[2] + z[2]]];
     }
@@ -174,6 +188,13 @@ export function shapeDist(s, x, y, z) {
       const dzz = Math.abs(lz) - r[2];
       const ox = Math.max(d2d, 0), oz = Math.max(dzz, 0);
       return Math.sqrt(ox * ox + oz * oz) + Math.min(Math.max(d2d, dzz), 0) - (s.round ?? 0);
+    }
+    case 'cyl': {
+      const dx = x - s.c[0], dy = y - s.c[1], dz = z - s.c[2], m = s.m, rd = s.round;
+      const lx = m[0] * dx + m[1] * dy + m[2] * dz, ly = m[3] * dx + m[4] * dy + m[5] * dz, lz = m[6] * dx + m[7] * dy + m[8] * dz;
+      const qx = Math.sqrt(lx * lx + ly * ly) - s.r[0] + rd, qy = Math.abs(lz) - s.r[1] + rd;
+      const ox = Math.max(qx, 0), oy = Math.max(qy, 0);
+      return Math.min(Math.max(qx, qy), 0) + Math.sqrt(ox * ox + oy * oy) - rd;
     }
     case 'box': {
       const dx = x - s.c[0], dy = y - s.c[1], dz = z - s.c[2], m = s.m, r = s.r, rd = s.round;

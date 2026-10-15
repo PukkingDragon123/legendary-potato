@@ -3,6 +3,7 @@
 // colours, mesh both levels of detail and measure the result.
 import { sculpt, prepShape, eulerToLocal, basisFromDir } from './sculpt.js';
 import { DESIGNS } from './creatureDesigns.js';
+import './humanDesign.js'; // registers the bean scientists
 
 const lin = (hex) => {
   const f = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -43,7 +44,7 @@ export class Builder {
     if (o.wf !== undefined) s.wf = o.wf;
     s.matSpec = o.mat ?? null;
     s.belly = o.belly ?? 0;
-    if (s.t === 'ell' || s.t === 'box' || s.t === 'tri') s.m = o.dir ? basisFromDir(o.dir[0], o.dir[1], o.dir[2], ...(o.up ?? [0, 1, 0]), o.roll ?? 0) : eulerToLocal(...(o.rot ?? [0, 0, 0]));
+    if (s.t === 'ell' || s.t === 'box' || s.t === 'tri' || s.t === 'cyl') s.m = o.dir ? basisFromDir(o.dir[0], o.dir[1], o.dir[2], ...(o.up ?? [0, 1, 0]), o.roll ?? 0) : eulerToLocal(...(o.rot ?? [0, 0, 0]));
     this.shapes.push(s);
     return s;
   }
@@ -51,6 +52,8 @@ export class Builder {
   ell(c, r, o = {}) { return this._add({ t: 'ell', c: c.slice(), r: r.slice() }, o); }
   cone(a, b, ra, rb, o = {}) { return this._add({ t: 'cone', a: a.slice(), b: b.slice(), ra, rb }, o); }
   box(c, r, round, o = {}) { return this._add({ t: 'box', c: c.slice(), r: r.slice(), round }, o); }
+  // a capped cylinder: centre, radius, half length, rim rounding; o.dir is its axis
+  cyl(c, r, hh, round, o = {}) { return this._add({ t: 'cyl', c: c.slice(), r: [r, hh], round }, o); }
   // flat rounded triangle (ears, fins, spikes, sails): base centre c, r = [half width, height, half thickness];
   // o.dir points the apex, o.up is the flat face's normal
   tri(c, r, round, o = {}) {

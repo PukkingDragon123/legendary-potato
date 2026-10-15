@@ -22,6 +22,7 @@ import { renderIcons, setStructureModelBuilder } from './gfx/itemModels.js';
 import { buildStructure } from './world/structureModels.js';
 import { ITEMS } from './data/items.js';
 import { PRESETS } from './entities/character.js';
+import { requestHuman } from './entities/humanModel.js';
 import { installExtras } from './systems/registry.js';
 import { isTouchDevice } from './ui/touch.js';
 
@@ -45,10 +46,12 @@ async function boot() {
   const engine = new Engine(app, settings.quality);
   const input = new Input(engine.renderer.domElement);
   const seed = qs.get('seed') || 'prehistoric';
-  // the ground textures paint in a worker while the island loads
+  // the ground textures paint and the scientists are sculpted in workers while the island loads
   const terrainTexP = paintTerrainInWorker();
+  const humanP = requestHuman();
   const world = await loadWorld(seed, (p, m) => loading.set(p * 0.45, m));
   const terrainTex = await terrainTexP;
+  await humanP;
   const game = new Game({ engine, world, input, outfit: profile.outfit, name: profile.name, dayLength: +(qs.get('day') || 1200), terrainTex });
   game.settings = settings;
   game.profile = profile;

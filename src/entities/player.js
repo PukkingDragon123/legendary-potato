@@ -45,22 +45,16 @@ export class Player {
     this.nameTag = null;
   }
 
+  // the suit is recoloured in place (one shared mesh dresses everyone)
   setOutfit(o) {
-    this.outfit = o;
-    const p = this.root.position.clone(), r = this.root.rotation.y;
-    this.root.removeFromParent();
-    this.char = new Character(o, { local: this.local });
-    this.char.fx = this.game.fx;
-    this.root = this.char.root;
-    this.root.position.copy(p); this.root.rotation.y = r;
-    this.game.engine.scene.add(this.root);
-    this.heldId = null;
+    this.char.setOutfit(o);
+    this.outfit = this.char.outfit;
   }
 
   teleport(x, y, z) { this.pos.set(x, y, z); this.vel.set(0, 0, 0); this.root.position.copy(this.pos); }
 
-  // eyes of a 1 m bean: the world feels big from down here (higher while swimming so you see over the water)
-  headPos(out = new THREE.Vector3()) { return out.copy(this.pos).add(_v.set(0, this.swim ? 1.02 : this.crouch ? 0.6 : 0.84, 0)); }
+  // eyes of a 1.15 m bean scientist: the world feels big from down here (higher while swimming so you see over the water)
+  headPos(out = new THREE.Vector3()) { return out.copy(this.pos).add(_v.set(0, this.swim ? 1.05 : this.crouch ? 0.74 : 0.95, 0)); }
 
   setHeld(id) {
     if (id === this.heldId) return;
@@ -231,7 +225,10 @@ export class Player {
     }
     const hspeed = Math.hypot(this.vel.x, this.vel.z);
     const panicking = this.panic > 0 && hspeed > 2;
+    // far-away friends use the lighter mesh
+    const lod = !this.local && this.game.engine.camera.position.distanceToSquared(this.pos) > 196 ? 1 : 0;
     this.char.update(dt, {
+      lod,
       speed: this.swim ? hspeed : this.grounded ? hspeed : 0,
       grounded: this.grounded || this.swim, vy: this.vel.y, crouch: this.crouch, sprint: this.sprint, swim: this.swim,
       action: this.action ? { name: this.action.name, t: Math.min(1, this.action.t), side: this.action.side } : this.emote ? { name: this.emote, t: 0.5 } : this.carrying ? { name: 'carry', t: 0.5 } : null,
