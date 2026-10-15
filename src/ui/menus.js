@@ -3,22 +3,22 @@ import { PRESETS, OPTIONS, SKIN_TONES, LEATHER_NAMES, MOUTHS, normalizeOutfit } 
 
 const TIPS = [
   'Tip: Punching trees works. It just takes a while and hurts a bit.',
-  'Tip: Snoozeberries keep knocked-out dinos asleep while you feed them.',
-  'Tip: Study a dino with binoculars to learn its favourite snack.',
+  'Tip: Snoozeberries keep knocked-out critters asleep while you feed them.',
+  'Tip: Study a critter with binoculars to learn its favourite snack.',
   'Tip: The van runs on Dung-o-Diesel. Do not ask how we found out.',
-  'Tip: Raptors hate bright light. Build lamps. Lots of lamps.',
+  'Tip: Voltfangs hate bright light. Build lamps. Lots of lamps.',
   'Tip: Carry downed friends back to the van to revive them faster.',
-  'Tip: Compys will steal food from your campfire. Little monsters.',
+  'Tip: Snatchets will steal food from your campfire. Little monsters.',
   'Tip: Rain fills your Rain Catchers with clean water.',
   'Tip: Research at the van computer unlocks new tech. Science!',
   'Tip: The Chrono-Scanner can read footprints. Follow the trail!',
-  'Tip: Bait a Snare Trap with a dino\'s favourite food, then hide behind a tree.',
-  'Tip: Dino dung feeds your crops AND your van. Nature is beautiful.',
+  'Tip: Bait a Snare Trap with a critter\'s favourite food, then hide behind a tree.',
+  'Tip: Critter dung feeds your crops AND your van. Nature is beautiful.',
   'Tip: Old Gnasher\'s stomp has a long reach. Do not stand still near him.',
   'Tip: Big Momma dives. Watch the water. Then watch the other water.',
   'Tip: Stampedes go around rocks, not around you.',
   'Fact: Nobody knows how the time machine works. Least of all us.',
-  'Fact: Triceratops is grumpy before breakfast. And after.',
+  'Fact: Grumblets are grumpy before breakfast. And after.',
 ];
 
 function vanPixelArt() {
@@ -61,11 +61,11 @@ export class Title {
     this.opt = opt;
     this.el = document.createElement('div');
     this.el.id = 'title';
-    this.el.innerHTML = `<div class="logo">PREHIST<span>O</span>RIC</div><div class="tag shadow-text">You built a time machine in a van. It worked. Sort of. Survive, tame dinosaurs, build a base and fix the van before something eats you.</div>`;
+    this.el.innerHTML = `<div class="logo">PREHIST<span>O</span>RIC</div><div class="tag shadow-text">You built a time machine in a van. It worked. Sort of. Survive, tame critters, build a base and fix the van before something eats you.</div>`;
     const m = document.createElement('div'); m.className = 'menu px';
     this.menu = m;
     this.el.appendChild(m);
-    const ver = document.createElement('div'); ver.className = 'ver'; ver.textContent = 'V0.9 · MADE OF 100% PROCEDURAL PIXELS · NO DINOSAURS WERE HARMED';
+    const ver = document.createElement('div'); ver.className = 'ver'; ver.textContent = 'V0.9 · MADE OF 100% PROCEDURAL PIXELS · NO CRITTERS WERE HARMED';
     this.el.appendChild(ver);
     root.appendChild(this.el);
     this.main();
@@ -134,8 +134,8 @@ export class Title {
     this.menu.insertAdjacentHTML('beforeend', `<div style="font-size:15px;line-height:20px">
       <p>You and your friends crashed a homemade time-machine van 66 million years ago.</p>
       <p><b>Survive</b>: eat, drink, sleep, stay warm. <b>Gather</b>: punch bushes, chop trees, mine rocks. <b>Craft</b> in your CHRONO-PAL (Tab).</p>
-      <p><b>Build</b> a base with the hammer (B). <b>Tame</b> dinosaurs: study, knock out or befriend, then feed them what they like.</p>
-      <p><b>Track</b> them: look at the ground for footprints and scan them to follow the trail. Bait a <b>snare trap</b> with a dino's favourite food and wait.</p>
+      <p><b>Build</b> a base with the hammer (B). <b>Tame</b> critters: study, knock out or befriend, then feed them what they like.</p>
+      <p><b>Track</b> them: look at the ground for footprints and scan them to follow the trail. Bait a <b>snare trap</b> with a critter's favourite food and wait.</p>
       <p><b>Research</b> at the van computer to unlock tech and repair the time machine. Then go home. Maybe.</p>
       <p>Three <b>alphas</b> rule their lairs. Bring friends.</p>
       <p class="small">WASD move · Shift sprint · Space jump · E use · LMB swing/scan · RMB aim · Z ride/carry · Tab backpack · M map · J journal · B build · V talk</p></div>`);

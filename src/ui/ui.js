@@ -7,6 +7,11 @@ import { ITEMS } from '../data/items.js';
 import { RECIPES, STATIONS } from '../data/recipes.js';
 import { iconCanvas, iconURL } from './pixelIcons.js';
 import { EFFECTS } from '../systems/vitals.js';
+import { creaturePortrait, speciesReady, requestSpecies } from '../entities/creatureModel.js';
+
+// the dex numbers creatures in the order you are likely to meet them
+const DEX_ORDER = ['mutton', 'compy', 'microraptor', 'proto', 'gallimimus', 'parasaur', 'pachy', 'raptor', 'dilo', 'ptera', 'trike', 'stego', 'ankylo', 'spino', 'brachio', 'rex'];
+const BIOME_LABEL = { jungle: 'Jungle', prairie: 'Prairie', redwood: 'Redwoods', swamp: 'Swamp', nesting: 'Nesting Grounds', highland: 'Highlands', badlands: 'Badlands', mountain: 'Mountains', beach: 'Beaches', river: 'Rivers', snow: 'Snowfields', volcanic: 'Volcano' };
 
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -360,7 +365,7 @@ export class UI {
     this.root.appendChild(P);
     this.pda = P;
     const tabs = P.querySelector('.pda-tabs');
-    const list = [['comms', 'COMMS'], ['bag', 'PACK'], ['craft', 'CRAFT'], ['dinos', 'PALS'], ['map', 'MAP'], ['log', 'LOG']];
+    const list = [['comms', 'COMMS'], ['bag', 'PACK'], ['craft', 'CRAFT'], ['dinos', 'PALS'], ['dex', 'DEX'], ['map', 'MAP'], ['log', 'LOG']];
     if (this.container) list.unshift(['box', (this.container.title ?? 'BOX').toUpperCase().slice(0, 10)]);
     for (const [k, label] of list) {
       const b = h('div', 'pda-tab', label); b.dataset.tab = k;
@@ -387,7 +392,7 @@ export class UI {
     for (const b of this.pda.querySelectorAll('.pda-tab')) b.classList.toggle('on', b.dataset.tab === tab);
     this.screen = this.pda.querySelector('.pda-screen');
     this.screen.innerHTML = '';
-    ({ comms: () => this.renderComms(), box: () => this.renderContainer(), bag: () => this.renderBag(), craft: () => this.renderCraft(), dinos: () => this.renderDinos(), map: () => this.renderMap(), log: () => this.renderLog() })[tab]?.();
+    ({ comms: () => this.renderComms(), box: () => this.renderContainer(), bag: () => this.renderBag(), craft: () => this.renderCraft(), dinos: () => this.renderDinos(), dex: () => this.renderDex(), map: () => this.renderMap(), log: () => this.renderLog() })[tab]?.();
   }
 
   // --- comms: Professor Nubbins' messages and the current to-do list
@@ -622,7 +627,7 @@ export class UI {
     const pane = h('div', 'pane');
     const list = h('div', 'list'); list.style.width = '220px';
     const tames = g.dinos ? g.dinos.tamed() : [];
-    if (!tames.length) list.innerHTML = '<p class="stats" style="padding:8px">No tamed dinosaurs yet.<br><br>Find one, study it with binoculars or the scanner, knock it out (or befriend it) and feed it what it likes.</p>';
+    if (!tames.length) list.innerHTML = '<p class="stats" style="padding:8px">No tamed critters yet.<br><br>Find one, study it with binoculars or the scanner, knock it out (or befriend it) and feed it what it likes.</p>';
     for (const d of tames) {
       const c = h('div', 'row-card' + (this.dinoSel === d.id ? ' on' : ''));
       c.innerHTML = `<div style="width:34px;height:34px;background:${d.sp.colorCss ?? '#4a8a40'};box-shadow:0 0 0 2px #17130e"></div><div><div>${esc(d.name)}</div><div class="meta">${esc(d.sp.name)} · ${esc(d.order)} · ${esc(d.personality ?? '')}</div></div>`;
@@ -645,11 +650,69 @@ export class UI {
         row.appendChild(b);
       }
       det.appendChild(row);
-      const rn = h('button', 'btn', 'Rename'); rn.onclick = () => { const n = prompt('Name your dino', d.name); if (n) { g.dinos.rename(d, n.slice(0, 18)); this.renderDinos(); } };
+      const rn = h('button', 'btn', 'Rename'); rn.onclick = () => { const n = prompt('Name your critter', d.name); if (n) { g.dinos.rename(d, n.slice(0, 18)); this.renderDinos(); } };
       det.appendChild(rn);
-    } else det.innerHTML = '<div class="section-title">YOUR HERD</div><p class="stats">Select a dino to give orders. Tip: use the Dino Whistle to command dinos near you.</p>';
+    } else det.innerHTML = '<div class="section-title">YOUR HERD</div><p class="stats">Select a critter to give orders. Tip: use the Critter Whistle to command critters near you.</p>';
     pane.appendChild(det);
     S.appendChild(pane);
+  }
+
+  // --- the creature dex: every species on the island, portraits once you have met them
+  renderDex() {
+    const S = this.screen, g = this.game, D = g.dinos;
+    if (!D) return;
+    S.innerHTML = '';
+    const pane = h('div', 'pane');
+    const grid = h('div', 'dex-grid');
+    const order = DEX_ORDER.filter((id) => D.species[id]);
+    const known = (id) => D.seen?.has(id) || g.research?.dex?.has(id) || D.tamed().some((d) => d.sp.id === id);
+    this.dexSel = this.dexSel && order.includes(this.dexSel) ? this.dexSel : order.find(known) ?? order[0];
+    const seenN = order.filter(known).length;
+    for (const [i, id] of order.entries()) {
+      const sp = D.species[id], k = known(id);
+      const c = h('div', 'dex-card' + (this.dexSel === id ? ' on' : '') + (k ? '' : ' unknown'));
+      c.innerHTML = `<div class="no">#${String(i + 1).padStart(3, '0')}</div><img alt="">`;
+      this.dexPortrait(sp, c.querySelector('img'));
+      c.title = k ? sp.short : '???';
+      c.onclick = () => { this.dexSel = id; this.renderDex(); g.audio?.play('ui_tick'); };
+      grid.appendChild(c);
+    }
+    const left = h('div', 'dex-left');
+    left.appendChild(h('div', 'section-title', `CRITTERDEX · ${seenN}/${order.length} LOGGED`));
+    left.appendChild(grid);
+    pane.appendChild(left);
+    const det = h('div', 'detail dex-detail');
+    const id = this.dexSel, sp = D.species[id], k = known(id), no = order.indexOf(id) + 1;
+    if (sp) {
+      const head = h('div', 'dex-head' + (k ? '' : ' unknown'));
+      head.innerHTML = `<img alt=""><div><div class="cat">#${String(no).padStart(3, '0')} · ${k ? esc((sp.elementName ?? 'Normal').toUpperCase()) : '???'}</div><h3>${k ? esc(sp.name) : '? ? ?'}</h3><div class="stats"><i>${k ? esc(sp.sci ?? '') : 'Not yet logged'}</i></div></div>`;
+      this.dexPortrait(sp, head.querySelector('img'), true);
+      det.appendChild(head);
+      if (k) {
+        const B = sp.behaviour ?? {};
+        const tags = [B.herd && 'Herd', B.pack && 'Pack', B.predator && 'Predator', B.prey && 'Prey', B.puff && 'Puffs up', B.nocturnal && 'Nocturnal', B.flyer && 'Flyer', B.swimmer && 'Swimmer', B.thief && 'Thief', B.territorial && 'Territorial', B.skittish && 'Skittish', B.gentle && 'Gentle'].filter(Boolean);
+        const tamedN = D.tamed().filter((d) => d.sp.id === id).length;
+        const drops = sp.drops ? sp.drops.map(([it]) => ITEMS[it]?.name ?? it) : ['Raw Meat', 'Scaly Hide', 'Bone', ...(sp.size > 3 ? ['Prime Meat'] : [])];
+        const where = Object.keys(sp.biomes ?? {}).map((b) => BIOME_LABEL[b] ?? b).join(', ');
+        det.appendChild(h('p', '', esc(sp.blurb ?? '')));
+        det.appendChild(h('div', 'dex-tags', tags.map((t) => `<span>${esc(t)}</span>`).join('')));
+        const rows = [
+          ['TEMPER', sp.temper], ['SIZE', `${sp.size.toFixed(1)} m · ${sp.diet}`], ['LOVES', ITEMS[sp.favorite]?.name ?? sp.favorite],
+          ['TAMING', sp.tame?.hint], ['WORK', sp.job ? `${sp.job.name}: ${sp.job.desc}` : 'None'], ['DROPS', drops.join(', ')], ['HABITAT', where || 'Unknown'],
+          ['TAMED', String(tamedN)],
+        ];
+        det.appendChild(h('div', 'dex-rows', rows.map(([a, b]) => `<div><b>${a}</b><span>${esc(b ?? '')}</span></div>`).join('')));
+      } else det.appendChild(h('p', 'stats', 'Get close to one, or point your scanner at it, and the Pocket Prof will log it here.'));
+    }
+    pane.appendChild(det);
+    S.appendChild(pane);
+  }
+  dexPortrait(sp, img, big = false) {
+    const g = this.game;
+    const set = () => { try { img.src = creaturePortrait(g.engine.renderer, sp, 160).url; } catch (e) { console.warn('portrait', e); } };
+    if (speciesReady(sp)) set();
+    else requestSpecies(sp).then(() => { if (img.isConnected) set(); });
+    if (big) img.classList.add('big');
   }
 
   // --- map
@@ -682,7 +745,7 @@ export class UI {
       this.drawMapMarkers();
     }
     legend.innerHTML = `<div class="section-title">LEGEND</div>`;
-    for (const [ic, label] of [['friend', 'You & friends'], ['van', 'The Van'], ['dino', 'Tamed dinos / trail'], ['poi', 'Discovered places'], ['skull', 'Alpha lairs'], ['pin', 'Pins (right-click)']]) {
+    for (const [ic, label] of [['friend', 'You & friends'], ['van', 'The Van'], ['dino', 'Tamed critters / trail'], ['poi', 'Discovered places'], ['skull', 'Alpha lairs'], ['pin', 'Pins (right-click)']]) {
       const row = h('div', 'req'); row.appendChild(iconCanvas(ic, 2)); row.appendChild(h('span', '', label)); legend.appendChild(row);
     }
     legend.appendChild(h('div', 'stats', 'Scroll to zoom. Explore to reveal the map.'));
@@ -823,7 +886,7 @@ export class UI {
   openControls(m) {
     const inp = this.game.input;
     m.innerHTML = '<h2>Controls</h2>';
-    const list = [['Move', 'WASD'], ['Jump / swim up', 'Space'], ['Sprint', 'Shift'], ['Crouch', 'Ctrl / C'], ['Use / swing', 'LMB'], ['Aim / alt', 'RMB'], ['Interact', 'E'], ['Inventory (CHRONO-PAL)', 'Tab'], ['Build menu (hammer)', 'B'], ['Rotate piece', 'R'], ['Map', 'M'], ['Journal', 'J'], ['Hotbar', '1-8 / wheel'], ['Drop', 'Q'], ['Chat', 'Enter'], ['Emotes', 'G'], ['Voice (push to talk)', 'V'], ['Whistle to dinos', 'F'], ['Camera zoom', 'Ctrl + wheel'], ['First / third person', 'P'], ['Horn (in van)', 'H']];
+    const list = [['Move', 'WASD'], ['Jump / swim up', 'Space'], ['Sprint', 'Shift'], ['Crouch', 'Ctrl / C'], ['Use / swing', 'LMB'], ['Aim / alt', 'RMB'], ['Interact', 'E'], ['Inventory (CHRONO-PAL)', 'Tab'], ['Build menu (hammer)', 'B'], ['Rotate piece', 'R'], ['Map', 'M'], ['Journal', 'J'], ['Hotbar', '1-8 / wheel'], ['Drop', 'Q'], ['Chat', 'Enter'], ['Emotes', 'G'], ['Voice (push to talk)', 'V'], ['Whistle to critters', 'F'], ['Camera zoom', 'Ctrl + wheel'], ['First / third person', 'P'], ['Horn (in van)', 'H']];
     for (const [a, k] of list) m.appendChild(h('label', '', `<span>${esc(a)}</span><span class="key">${esc(k)}</span>`));
     void inp;
     const back = h('button', 'btn primary', 'Back'); back.onclick = () => { this.pauseEl.remove(); this.menuOpen = false; this.openPause(); };

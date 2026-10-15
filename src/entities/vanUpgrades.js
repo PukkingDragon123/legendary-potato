@@ -22,15 +22,15 @@ export const DRIVE_NEEDS = ['tire', 'axle', 'engine', 'wiring'];
 // ------------------------------------------------------------------ upgrades
 export const UPGRADES = [
   { id: 'roofdeck', name: 'Roof Deck', cost: { plank: 16, rope: 6, scrap: 4 }, unlock: null, desc: 'Plank platform, rope railings and a ladder. The best seat in the Cretaceous.' },
-  { id: 'horn', name: 'Air Horn of Doom', cost: { scrap: 4, wire: 2, hide: 1 }, unlock: null, desc: 'Twin trumpet horns. Small dinos scatter. Big ones get curious.' },
+  { id: 'horn', name: 'Air Horn of Doom', cost: { scrap: 4, wire: 2, hide: 1 }, unlock: null, desc: 'Twin trumpet horns. Small critters scatter. Big ones get curious.' },
   { id: 'storage', name: 'Cargo Pods', cost: { plank: 10, hide: 4, rope: 4 }, unlock: null, desc: '+12 storage slots in the van.' },
   { id: 'battery2', name: 'Battery Bank II', cost: { battery: 3, wire: 4, scrap: 2 }, unlock: 'electrics', desc: 'Doubles battery capacity.' },
-  { id: 'floodlights', name: 'Raptor Floodlights', cost: { lamp: 2, wire: 4, scrap: 4 }, unlock: 'electrics', desc: 'Roof light bar. Night predators avoid the van.' },
+  { id: 'floodlights', name: 'Night Floodlights', cost: { lamp: 2, wire: 4, scrap: 4 }, unlock: 'electrics', desc: 'Roof light bar. Night predators avoid the van.' },
   { id: 'solar', name: 'Solar Roof', cost: { glass: 4, circuit: 2, wire: 4, scrap: 4 }, unlock: 'solar', desc: 'Charges the batteries during the day.' },
   { id: 'microscope', name: 'Microscope Rig', cost: { glass: 2, circuit: 2, scrap: 3, ingot_copper: 1 }, unlock: 'lab', desc: 'Research runs 50% faster. Enables DNA work.' },
   { id: 'coffee', name: 'Coffee Maker', cost: { coffee_machine: 1 }, unlock: 'comfort', desc: 'Brews Van Coffee from clean water. Morale +1000.' },
   { id: 'generator', name: 'Dung-o-Matic Generator', cost: { scrap: 10, ingot_iron: 4, wire: 6, circuit: 1 }, unlock: 'biofuel', desc: 'Burns Dung-o-Diesel from the tank to charge the batteries.' },
-  { id: 'dish', name: 'Fixed Satellite Dish', cost: { scrap: 6, wire: 6, circuit: 2 }, unlock: 'radio', desc: 'Shows dinos near the van on the map. Gets one (1) radio station.' },
+  { id: 'dish', name: 'Fixed Satellite Dish', cost: { scrap: 6, wire: 6, circuit: 2 }, unlock: 'radio', desc: 'Shows critters near the van on the map. Gets one (1) radio station.' },
   { id: 'armor', name: 'Scrap Armor + Bull Bar', cost: { scrap: 20, ingot_iron: 6, rope: 4 }, unlock: 'mechanics', desc: 'Bolted plates and a spiky bull bar. Ram things. Take less damage.' },
   { id: 'wheels', name: 'Monster Wheels', cost: { hide: 10, tar: 8, ingot_iron: 6 }, unlock: 'mechanics', needs: ['axle', 'tire'], desc: 'Lifted suspension and huge tires. Drives through rivers and over logs.' },
 ];

@@ -68,7 +68,7 @@ export class Game {
     const sx = crash.x - 4, sz = crash.z + 6;
     this.local.teleport(sx, this.sampler.heightAt(sx, sz) + 0.05, sz);
     this.rig.yaw = Math.PI * 0.75;
-    progress(0.75, 'Waking up the dinosaurs');
+    progress(0.75, 'Waking up the critters');
     for (const s of this.opt.systems ?? []) {
       const sys = await s(this);
       if (sys) this.systems.push(sys);

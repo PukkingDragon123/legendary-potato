@@ -63,7 +63,7 @@ export class Weapons {
     g.fx.chips_(d.pos.x, d.pos.y + d.rig.height * 0.5 * d.sizeK, d.pos.z, 3, [0xc84040, 0xffffff], { speed: 1.5, size: 0.04 });
     g.audio?.play(kind === 'club' ? 'bonk' : 'punch', { pos: d.pos, vol: 0.8 });
     g.rig.addTrauma(0.08);
-    if (kind === 'hand' && d.sp.size > 3 && Math.random() < 0.5) g.ui?.toast('Punching a dinosaur. Bold strategy.', 'warn');
+    if (kind === 'hand' && d.sp.size > 3 && Math.random() < 0.5) g.ui?.toast('Punching a critter. Bold strategy.', 'warn');
   }
 
   // ---------------------------------------------------------------- ranged
@@ -175,7 +175,7 @@ export class Weapons {
     const cycle = ['follow', 'stay', 'wander'];
     const next = cycle[(cycle.indexOf(near[0].order) + 1) % cycle.length] ?? 'follow';
     for (const d of near) g.taming?.command(d, next);
-    g.ui?.toast(`*whistle* ${near.length} dino${near.length > 1 ? 's' : ''}: ${next.toUpperCase()}`, '', 'dino');
+    g.ui?.toast(`*whistle* ${near.length} critter${near.length > 1 ? 's' : ''}: ${next.toUpperCase()}`, '', 'dino');
   }
 }
 function segSphere(a, b, c, r) {

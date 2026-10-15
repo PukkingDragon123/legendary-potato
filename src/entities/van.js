@@ -214,7 +214,7 @@ export class Van {
     // computer screens -------------------------------------------------------
     P.screens.forEach((scr, i) => {
       ia({
-        id: 'screen' + i, obj: scr.g, min: [-scr.w / 2, -scr.h / 2, -0.1], max: [scr.w / 2, scr.h / 2, 0.25], label: () => (i === 0 ? 'Main Computer' : i === 1 ? 'DINO-DEX Monitor' : 'Flux Monitor'),
+        id: 'screen' + i, obj: scr.g, min: [-scr.w / 2, -scr.h / 2, -0.1], max: [scr.w / 2, scr.h / 2, 0.25], label: () => (i === 0 ? 'Main Computer' : i === 1 ? 'CRITTER-DEX Monitor' : 'Flux Monitor'),
         info: () => (this.screenOn(i) ? 'CHRONO-OS 0.9' : !S.sw[SW.COMPUTER] ? 'Computer breaker is off' : S.charge <= 0 ? 'No power' : i > 0 && !S.repaired.crt ? 'Broken monitor' : 'Booting...'),
         prompt: () => {
           if (i > 0 && !S.repaired.crt) return hasItem('crt_part') ? { text: 'Hold to fix the monitors', hold: true } : { text: 'Broken monitor', key: '-', warn: 'Needs a CRT Repair Kit' };
@@ -235,7 +235,7 @@ export class Van {
     // radio -----------------------------------------------------------------------
     ia({ id: 'radio', obj: this.body, min: [-0.18, 0.98, -1.88], max: [0.18, 1.14, -1.75], label: () => 'Cassette Radio', info: () => (S.radio >= 0 ? STATIONS[S.radio].name : 'Off'), prompt: () => (!S.sw[SW.RADIO] || S.charge <= 0 ? { text: 'Radio has no power', key: '-', warn: 'Flip the RADIO breaker' } : { text: S.radio < 0 ? 'Turn on Radio' : S.radio < STATIONS.length - 1 ? 'Next Station' : 'Turn off Radio' }), act: () => { if (S.sw[SW.RADIO] && S.charge > 0) this.request('radio', { st: S.radio + 1 >= STATIONS.length ? -1 : S.radio + 1 }); } });
     // bobblehead + dice ---------------------------------------------------------
-    ia({ id: 'bobble', obj: this.body, min: [0.15, 1.16, -2.0], max: [0.25, 1.32, -1.9], label: () => 'Dino Bobblehead', info: () => 'His name is Gerald', prompt: () => ({ text: 'Poke Gerald' }), act: () => { this.bobbleKick(3); g.audio?.play('squeak', { pos: this.localToWorld(_v.set(0.2, 1.25, -1.95)), vol: 0.5 }); }, hit: () => this.bobbleKick(5) });
+    ia({ id: 'bobble', obj: this.body, min: [0.15, 1.16, -2.0], max: [0.25, 1.32, -1.9], label: () => 'Critter Bobblehead', info: () => 'His name is Gerald', prompt: () => ({ text: 'Poke Gerald' }), act: () => { this.bobbleKick(3); g.audio?.play('squeak', { pos: this.localToWorld(_v.set(0.2, 1.25, -1.95)), vol: 0.5 }); }, hit: () => this.bobbleKick(5) });
     // storage ------------------------------------------------------------------
     ia({ id: 'cabinet', obj: this.body, min: [-0.45, 0.58, -0.6], max: [-0.36, 0.98, 1.1], label: () => 'Van Lockers', prompt: () => ({ text: 'Open Lockers' }), act: () => g.ui?.openContainer({ inv: this.storage }, 'Van Lockers', { label: 'Lockers', cols: 4 }) });
     ia({ id: 'fridge', obj: this.body, min: [0.5, 0.58, 1.34], max: [0.94, 1.08, 1.86], label: () => 'Cooler', info: () => 'Food spoils 3x slower', prompt: () => ({ text: 'Open Cooler' }), act: () => g.ui?.openContainer({ inv: this.fridge }, 'Cooler', { label: 'Cooler', cols: 4 }) });
@@ -1096,7 +1096,7 @@ export class Van {
     ctx.font = '11px VT323'; ctx.textBaseline = 'top';
     const line = (txt, y, col = '#8dff9a') => { ctx.fillStyle = col; ctx.fillText(txt, 5, y); };
     if (bt < 3.2) {
-      const lines = ['CHRONO-OS BIOS v0.9', '(C) 1987 DOUG & KEV LABS', '', 'MEM TEST ' + Math.min(640, Math.floor(bt * 400)) + 'K', bt > 1.6 ? 'FLUX CAPACITY.... ??' : '', bt > 2.0 ? 'TEMPORAL DRIVE... FAIL' : '', bt > 2.5 ? 'LOADING DINO.SYS' : ''];
+      const lines = ['CHRONO-OS BIOS v0.9', '(C) 1987 DOUG & KEV LABS', '', 'MEM TEST ' + Math.min(640, Math.floor(bt * 400)) + 'K', bt > 1.6 ? 'FLUX CAPACITY.... ??' : '', bt > 2.0 ? 'TEMPORAL DRIVE... FAIL' : '', bt > 2.5 ? 'LOADING CRITTER.SYS' : ''];
       lines.forEach((l, k) => line(l, 4 + k * 11, l.includes('FAIL') ? '#ff7060' : '#8dff9a'));
       if (Math.floor(bt * 4) % 2) ctx.fillRect(5, 4 + lines.length * 11, 6, 9);
       return;

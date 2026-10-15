@@ -302,7 +302,11 @@ export class Taming {
         J.t = 3;
         J.target = this.findJobTarget(d, range);
         if (J.target) J.phase = 'go';
-        else if (J.id === 'treasure' && Math.random() < 0.08) { J.cargo = [[['amber', 'mineral', 'fossil', 'scrap', 'crystal', 'amber_bug'][Math.floor(Math.random() * 5.2)], 1]]; J.phase = 'deliver'; }
+        else if (J.id === 'wool') {
+          // a fresh fleece every minute or two, delivered to the camp crate
+          J.woolT = (J.woolT ?? 50) - 3;
+          if (J.woolT <= 0) { J.woolT = 70 + Math.random() * 50; J.cargo = [['wool', 1 + Math.floor(Math.random() * 2)]]; J.phase = 'deliver'; d.act('shake', 0.8); }
+        } else if (J.id === 'treasure' && Math.random() < 0.08) { J.cargo = [[['amber', 'mineral', 'fossil', 'scrap', 'crystal', 'amber_bug'][Math.floor(Math.random() * 5.2)], 1]]; J.phase = 'deliver'; }
         break;
       }
       case 'go': {
@@ -412,7 +416,7 @@ export class Taming {
     const g = this.g;
     if (!d.saddle || p.sitting) return;
     const seats = d.sp.ride?.seats ?? 1;
-    if (d.riders.length >= seats) { g.ui?.toast('No room on this dino!', 'warn'); return; }
+    if (d.riders.length >= seats) { g.ui?.toast('No room on this critter!', 'warn'); return; }
     d.riders.push(p);
     p.sitting = { seat: 'dino', dino: d, ride: true, idx: d.riders.length - 1, since: g.time.elapsed };
     d.order = 'follow'; d.job = null;

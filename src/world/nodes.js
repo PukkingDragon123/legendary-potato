@@ -45,7 +45,7 @@ export const NODE_TYPES = {
   driftwood: { name: 'Driftwood', tool: 'hand', hp: 1, drops: [['stick', 2, 4], ['log', 0, 1, 0.5]], regrow: 900, model: 'driftwood', size: [1, 1.4], pickup: true },
   hive: { name: 'Wild Beehive', tool: 'hand', hp: 1, drops: [['honey', 1, 2], ['resin', 0, 1, 0.5]], regrow: 1200, model: 'hive', size: [0.8, 1.1], stings: true },
   sand: { name: 'Sand', tool: 'hand', hp: 1, drops: [['sand', 2, 3]], regrow: 400, model: 'sandpile', size: [0.8, 1.2], pickup: true },
-  dung: { name: 'Dino Dung', tool: 'hand', hp: 1, drops: [['dung', 1, 2]], regrow: 900, model: 'dung', size: [0.7, 1.15], pickup: true },
+  dung: { name: 'Critter Dung', tool: 'hand', hp: 1, drops: [['dung', 1, 2]], regrow: 900, model: 'dung', size: [0.7, 1.15], pickup: true },
 };
 
 // per-biome spawn weights per 32 m cell (expected count)

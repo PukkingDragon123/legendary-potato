@@ -5,7 +5,8 @@
 // nests with eggs, and host-authoritative networking + saving.
 import * as THREE from 'three';
 import { SPECIES, DINO_NAMES, BIOME_KEYS } from './dinoSpecies.js';
-import { buildDino, DinoRig } from './dinoModel.js';
+import { buildDino, DinoRig, sculpted } from './dinoModel.js';
+import { speciesReady, requestSpecies } from './creatureModel.js';
 import { emitAura } from './elements.js';
 import { RNG, hash2i } from '../core/rng.js';
 import { ITEMS } from '../data/items.js';
@@ -49,6 +50,7 @@ export class Dino {
     this.radius = Math.max(0.25, this.rig.br * 1.05);
     this.lastHitBy = null; this.koT = 0;
     this.lod = 0; this.animSkip = 0;
+    this.puff = 0; this.flash = 0; this.hurtT = 0;
     this.applyScale();
     this.root.position.copy(this.pos); this.root.rotation.y = this.yaw;
   }
@@ -74,6 +76,9 @@ export class Dinos {
     this.corpses = [];
     this.nests = [];
     this.species = SPECIES;
+    this.ground = (x, z) => game.sampler.heightAt(x, z);
+    this.seen = new Set(); // species the local player has met (the dex)
+    this.seenT = 0;
     game.dinos = this;
     this.setupNests();
   }
@@ -167,6 +172,8 @@ export class Dinos {
       const c = this.cells.get(key) ?? { until: 0, spawned: 0 };
       this.cells.set(key, c);
       if (!plan) { c.until = now + 1e9; continue; }
+      // sculpted species are meshed on a worker; spawn once the mesh is ready
+      if (sculpted(plan.sp) && !speciesReady(plan.sp)) { requestSpecies(plan.sp); c.until = now + 1.5; continue; }
       // nocturnal packs only show up at dusk
       if (plan.sp.behaviour.nocturnal && !g.time.isNight && Math.random() < 0.6) { c.until = now + 120; continue; }
       const herd = { id: key, leader: null, members: [], sp: plan.sp, home: new THREE.Vector3(plan.x, 0, plan.z), alarm: 0 };
@@ -241,6 +248,13 @@ export class Dinos {
     d.alert = Math.max(0, d.alert - dt * 0.15);
     d.food = Math.max(0, d.food - dt * 0.02);
     if (d.herd?.alarm) d.herd.alarm = Math.max(0, d.herd.alarm - dt);
+    // woolly ones puff up when frightened or hurt and slowly deflate once safe
+    if (B.puff) {
+      const want = d.state !== 'ko' && d.state !== 'dead' && (d.state === 'flee' || d.hurtT > 0 || (d.alert > 0.9 && d.seenPredator)) ? 1 : 0;
+      const was = d.puff;
+      d.puff += (want - d.puff) * Math.min(1, dt * (want > d.puff ? 5 : 0.3));
+      if (was < 0.5 && d.puff >= 0.5) { g.audio?.play('puff', { pos: d.pos, vol: 0.8 }); g.fx.sprite?.('smoke', d.pos.x, d.pos.y + d.rig.height * 0.5, d.pos.z, { life: 0.6, size: d.rig.br * 3, grow: 1.4, color: 0xffffff, alpha: 0.35, drag: 2 }); }
+    }
     if (d.state === 'dead') { d.wantSpeed = 0; return; }
     if (d.hold > 0) { d.hold -= dt; d.wantSpeed = 0; return; } // scripted (alpha dive)
     // torpor + knockouts
@@ -278,11 +292,17 @@ export class Dinos {
           else if (d.seen && (d.food < 85 || B.boss || d.dist2(d.seen.pos) < 100)) {
             if (!['stalk', 'chase', 'attack', 'charge', 'backoff', 'hunt'].includes(d.state)) { d.setState('stalk', 4 + Math.random() * 4); if (B.boss || sp.stats.roar) { d.act('roar', 1.6); g.audio?.play('roar', { pos: d.pos, vol: 1.3, ref: 25 }); g.rig.addTrauma(0.25 * Math.max(0, 1 - d.pos.distanceTo(g.local.pos) / 40)); this.noise(d.pos, 60, 0.7); } else g.audio?.play(sp.call ?? 'growl', { pos: d.pos, vol: 0.9 }); }
             d.target = d.seen;
-          } else if (d.food < 40 && Math.random() < 0.05) {
-            // hunt the nearest smaller wild herbivore
-            let prey = null, pd = 50 * 50;
-            for (const o of this.list.values()) if (o !== d && !o.sp.predator && !o.tamed && o.state !== 'dead' && o.sp.size < sp.size * 1.3) { const dd = d.dist2(o.pos); if (dd < pd) { pd = dd; prey = o; } }
-            if (prey) { d.target = prey; d.setState('stalk', 8); }
+          } else if (d.food < 60 && Math.random() < 0.08 && !['stalk', 'chase', 'feed'].includes(d.state)) {
+            // go hunting: prey species first (everything loves mutton), then any smaller wild herbivore
+            let prey = null, best = 0;
+            for (const o of this.list.values()) {
+              if (o === d || o.sp.predator || o.tamed || o.state === 'dead' || o.sp.size > sp.size * 1.3) continue;
+              const dd = d.dist2(o.pos);
+              if (dd > 70 * 70) continue;
+              const score = (o.sp.behaviour.prey ? 3 : 1) * (o.baby ? 1.5 : 1) / (dd + 40);
+              if (score > best) { best = score; prey = o; }
+            }
+            if (prey) { d.target = prey; d.setState('stalk', 16); for (const m of d.herd?.members ?? []) if (m !== d && m.state === 'wander') { m.target = prey; m.setState('stalk', 16); } }
           }
         } else if (d.seen) {
           const dd = Math.sqrt(d.dist2(d.seen.pos));
@@ -294,6 +314,19 @@ export class Dinos {
           else if (!B.gentle && dd < 6 && d.seen.sprint) this.flee(d, d.seen.pos, 4);
           else if (d.state === 'wander' && Math.random() < 0.2) { d.lookAtP = d.seen; d.setState('watch', 2 + Math.random() * 2); }
         }
+      }
+      // prey keep an eye out for hunters: the herd runs together, puffers puff
+      if (!B.predator && d.state !== 'sleep') {
+        let threat = null, td = ((B.sight ?? 20) * (d.state === 'graze' ? 0.7 : 1)) ** 2;
+        for (const o of this.list.values()) {
+          if (!o.sp.predator || o.tamed || o.hidden || o.state === 'dead' || o.state === 'ko' || o.state === 'sleep' || o.state === 'feed') continue;
+          const dd = d.dist2(o.pos);
+          if (dd > td) continue;
+          const hunting = (o.state === 'stalk' || o.state === 'chase') && (o.target === d || (d.herd && o.target?.herd === d.herd));
+          if (hunting || dd < (o.state === 'stalk' ? 64 : 225)) { td = dd; threat = o; }
+        }
+        d.seenPredator = !!threat;
+        if (threat) { d.alert = 1; if (d.state !== 'flee') this.flee(d, threat.pos, 8); else d.fleeFrom = new THREE.Vector3(threat.pos.x, 0, threat.pos.z); }
       }
       // thirst / grazing ambience
       if (d.state === 'wander' && Math.random() < 0.02) {
@@ -312,7 +345,7 @@ export class Dinos {
         // herd cohesion around the leader, else meander near home
         if (!d.goal || d.dist2(d.goal) < 4 || Math.random() < dt * 0.05) {
           const base = d.herd?.leader && d.herd.leader !== d && d.herd.leader.state !== 'dead' ? d.herd.leader.pos : d.home;
-          const r = d.herd?.leader === d ? 30 : 8 + sp.size;
+          const r = d.herd?.leader === d ? (B.prey ? 14 : 30) : (B.prey ? 2.5 : 8) + sp.size;
           const a = Math.random() * 6.28;
           d.goal = new THREE.Vector3(base.x + Math.cos(a) * r * Math.random(), 0, base.z + Math.sin(a) * r * Math.random());
           if (Math.random() < 0.35) { d.setState('idle', 2 + Math.random() * 5); }
@@ -366,13 +399,15 @@ export class Dinos {
         // pack flanking: offset the approach angle per member
         const off = d.herd ? (d.herd.members.indexOf(d) - (d.herd.members.length - 1) / 2) * 0.6 : 0;
         const ang = Math.atan2(-(tp.x - d.pos.x), -(tp.z - d.pos.z)) + (dd > 8 ? off : 0);
-        yaw = ang; speed = dd > 16 ? st.speed * 1.1 : st.run;
-        if (d.state === 'stalk' && dd < 18) d.setState('chase', 10);
+        const sneaky = T instanceof Dino && !T.seenPredator;
+        yaw = ang; speed = dd > 16 ? st.speed * (sneaky ? 0.75 : 1.1) : st.run;
+        if (d.state === 'stalk' && dd < (sneaky ? 12 : 18)) { d.setState('chase', 10); if (sneaky && sp.call) this.g.audio?.play(sp.call, { pos: d.pos, vol: 0.9 }); }
         if (dd > (B.sight ?? 30) * 2.2 || (B.boss && d.home && d.dist2(d.home) > 140 * 140)) { d.setState('wander'); d.target = null; }
         break;
       }
       case 'chase': {
         const T = d.target;
+        if (T instanceof Dino && T.state === 'dead') { d.meal = T; d.setState('feed', 30); break; }
         if (!T || T.state === 'dead' || (T.downed && !(T instanceof Dino))) { d.setState('wander'); d.target = null; break; }
         toward(T.pos, st.run * (T.sitting?.van ? 0.9 : 1));
         const dd = Math.sqrt(d.dist2(T.pos));
@@ -381,6 +416,20 @@ export class Dinos {
         if (sp.stats.spit && dd < 9 && dd > 4 && !d.action && Math.random() < dt * 0.6) this.melee(d, T, 'spit');
         if (d.stateT <= 0 && dd > 12) d.setState('stalk', 5);
         if (B.boss && d.home && d.dist2(d.home) > 160 * 160) { d.setState('wander'); d.goal = d.home.clone(); d.target = null; }
+        break;
+      }
+      case 'feed': {
+        // walk to the kill and tuck in
+        const M = d.meal;
+        const c = M && this.corpses.find((x) => x.d === M);
+        if (!c) { d.setState('wander'); d.meal = null; break; }
+        const dd = Math.sqrt(d.dist2(M.pos));
+        if (dd > d.radius + M.radius + 0.6) { toward(M.pos, st.speed * 1.2); break; }
+        speed = 0; yaw = Math.atan2(-(M.pos.x - d.pos.x), -(M.pos.z - d.pos.z));
+        if (!d.action) { d.act('eat', 1.6); if (Math.random() < 0.4) this.g.audio?.play('eat_dino', { pos: d.pos, vol: 0.7 }); }
+        d.food = Math.min(100, d.food + dt * 3);
+        c.meat = Math.max(0, c.meat - dt * 0.05); c.picked = (c.picked ?? 0) + dt;
+        if (d.stateT <= 0 || d.food >= 99) { d.setState(this.g.time.isNight ? 'sleep' : 'idle', 20); d.meal = null; d.target = null; }
         break;
       }
       case 'eatcorpse': speed = 0; if (!d.action) d.act('eat', 2); d.food = Math.min(100, d.food + dt * 4); if (d.stateT <= 0 || d.food >= 99) d.setState('wander'); break;
@@ -441,7 +490,7 @@ export class Dinos {
       if (kind === 'spit') {
         g.audio?.play('hiss', { pos: d.pos, vol: 0.9 });
         for (let k = 0; k < 8; k++) g.fx.sprite('drop', d.pos.x, d.pos.y + d.rig.height * 0.8, d.pos.z, { vx: (T.pos.x - d.pos.x) * 0.8 + (Math.random() - 0.5), vy: 2 + Math.random(), vz: (T.pos.z - d.pos.z) * 0.8 + (Math.random() - 0.5), life: 0.9, size: 0.18, color: 0x9ad040, grav: 9 });
-        if (T === g.local && dd < 10) { g.vitals?.damage(sp.stats.dmg * 0.4, { kind: 'spit' }); g.vitals?.add?.('blind', 5); g.ui?.toast('BLEGH! Dino spit in your eyes!', 'warn'); }
+        if (T === g.local && dd < 10) { g.vitals?.damage(sp.stats.dmg * 0.4, { kind: 'spit' }); g.vitals?.add?.('blind', 5); g.ui?.toast('BLEGH! Critter spit in your eyes!', 'warn'); }
         return;
       }
       const reach = d.radius + (T instanceof Dino ? T.radius : 0.5) + 1.4 * d.sizeK;
@@ -462,6 +511,8 @@ export class Dinos {
   damage(d, dmg, torpor, by) {
     const g = this.g;
     if (d.state === 'dead') return;
+    if (d.puff > 0.5) dmg *= 0.5; // a puffed-up fleece is mostly air
+    if (dmg > 0) { d.flash = 1; d.hurtT = 0.3; }
     d.hp -= dmg;
     d.torpor = Math.min(d.maxTorpor * 1.2, d.torpor + torpor);
     d.lastHitBy = by;
@@ -499,11 +550,19 @@ export class Dinos {
     const g = this.g;
     const items = [];
     if (c.dna) { items.push(['dna', 1]); c.dna = 0; }
-    if (c.prime > 0) { items.push(['meat_prime', 1]); c.prime--; }
-    else if (c.meat > 0) { items.push(['meat_raw', Math.min(3, c.meat)]); c.meat -= 3; }
-    if (c.hide > 0 && Math.random() < 0.7) { items.push(['hide', 1]); c.hide--; }
-    if (c.bone > 0 && Math.random() < 0.5) { items.push(['bone', 1]); c.bone--; }
-    if (Math.random() < 0.25) items.push(['feather', 1]);
+    const drops = c.d.sp.drops;
+    if (drops) {
+      // a species with its own drop table (mutton, wool...)
+      c.left ??= drops.map(([id, a, b]) => [id, a + Math.floor(Math.random() * (b - a + 1))]);
+      for (const e of c.left) if (e[1] > 0) { const n = Math.min(e[1], e[0] === 'bone' ? 1 : 2); items.push([e[0], n]); e[1] -= n; }
+      if (c.left.every((e) => e[1] <= 0)) { c.meat = 0; c.prime = 0; }
+    } else {
+      if (c.prime > 0) { items.push(['meat_prime', 1]); c.prime--; }
+      else if (c.meat > 0) { items.push(['meat_raw', Math.min(3, c.meat)]); c.meat -= 3; }
+      if (c.hide > 0 && Math.random() < 0.7) { items.push(['hide', 1]); c.hide--; }
+      if (c.bone > 0 && Math.random() < 0.5) { items.push(['bone', 1]); c.bone--; }
+      if (Math.random() < 0.25) items.push(['feather', 1]);
+    }
     if (by === g.local.id) for (const [id, n] of items) g.give(id, n, { from: c.d.sp.short });
     else g.net?.sendTo?.(by, 'give', { items });
     g.fx.chips_(c.d.pos.x, c.d.pos.y + 0.5, c.d.pos.z, 6, [0xc84040, 0x9a2a2a], { speed: 2, size: 0.05 });
@@ -525,7 +584,7 @@ export class Dinos {
     for (let k = 0; k < 14; k++) {
       const x = (r.next() - 0.5) * g.world.size * 0.8, z = (r.next() - 0.5) * g.world.size * 0.8;
       const b = BIOME_KEYS[g.sampler.biomeAt(x, z)];
-      const sp = { prairie: 'parasaur', nesting: 'trike', badlands: 'proto', jungle: 'compy', highland: 'pachy', river: 'gallimimus', redwood: 'stego', swamp: 'dilo' }[b];
+      const sp = { prairie: r.next() < 0.5 ? 'mutton' : 'parasaur', nesting: 'trike', badlands: 'proto', jungle: 'compy', highland: 'pachy', river: 'gallimimus', redwood: 'stego', swamp: 'dilo' }[b];
       if (!sp || g.sampler.waterAt(x, z) > g.sampler.heightAt(x, z)) continue;
       spots.push([x, z, sp, 1 + r.int(0, 2)]);
     }
@@ -583,12 +642,20 @@ export class Dinos {
     }
     if (d.tangled > 0) { d.tangled -= dt; d.wantSpeed = 0; d.speed *= Math.max(0, 1 - dt * 8); if (Math.random() < dt * 2) d.act('shake', 0.6); }
     d.yaw += Math.max(-turnRate * dt, Math.min(turnRate * dt, dy));
-    const want = d.wantSpeed * (d.speedMul ?? 1);
+    const want = d.wantSpeed * (d.speedMul ?? 1) * (1 - d.puff * 0.3);
     const acc = want > d.speed ? (sp.size > 8 ? 3 : 8) * (d.speedMul ?? 1) : 10;
     d.speed += Math.max(-acc * dt, Math.min(acc * dt, want - d.speed));
     if (d.action && ['eat', 'drink', 'roar', 'call', 'tailwhip'].includes(d.action.name)) d.speed *= Math.max(0, 1 - dt * 6);
     const fx = -Math.sin(d.yaw), fz = -Math.cos(d.yaw);
     d.pos.x += fx * d.speed * dt; d.pos.z += fz * d.speed * dt;
+    // herd mates keep a little personal space
+    if (d.herd && !d.tamed && d.herd.members.length > 1) {
+      for (const m of d.herd.members) {
+        if (m === d || m.state === 'dead') continue;
+        const dx = d.pos.x - m.pos.x, dz = d.pos.z - m.pos.z, dd = dx * dx + dz * dz, R = (d.radius * d.sizeK + m.radius * m.sizeK) * 1.25;
+        if (dd < R * R && dd > 1e-6) { const l = Math.sqrt(dd), k = (R - l) * 0.5 * Math.min(1, dt * 6); d.pos.x += (dx / l) * k; d.pos.z += (dz / l) * k; }
+      }
+    }
     // push out of solid stuff (trees, rocks, buildings, van)
     if (d.speed > 0.05 || d.state === 'charge') {
       const p = { x: d.pos.x, y: d.pos.y, z: d.pos.z };
@@ -650,7 +717,12 @@ export class Dinos {
       const look = d.lookAtP ?? d.seen ?? (d.tamed ? this.g.players.get(d.owner) : null);
       let ly = 0, lp = 0;
       if (look?.pos && d.dist2(look.pos) < 30 * 30) { ly = angleTo(d.yaw, Math.atan2(-(look.pos.x - d.pos.x), -(look.pos.z - d.pos.z))); lp = Math.atan2(look.pos.y + 1 - (d.pos.y + d.rig.height * d.sizeK), Math.sqrt(d.dist2(look.pos))) * 0.6; }
-      d.anim.update(d.animAcc, { speed: d.speed / d.sizeK, yaw: d.yaw, state: d.state === 'dead' ? 'dead' : d.state === 'ko' ? 'ko' : d.state === 'sleep' || d.state === 'sleepT' ? 'sleep' : 'idle', action: d.action ? { name: d.action.name, t: Math.min(1, d.action.t) } : null, look: { yaw: ly, pitch: lp }, alert: d.alert, mood: d.mood, swim: d.swim, fly: d.flying, glide: d.sp.stats.glide, pitch: d.pitch ?? 0 });
+      d.anim.update(d.animAcc, {
+        speed: d.speed / d.sizeK, yaw: d.yaw, state: d.state === 'dead' ? 'dead' : d.state === 'ko' ? 'ko' : d.state === 'sleep' || d.state === 'sleepT' ? 'sleep' : 'idle', ai: d.state,
+        action: d.action ? { name: d.action.name, t: Math.min(1, d.action.t) } : null, look: { yaw: ly, pitch: lp }, alert: d.alert, mood: d.mood, swim: d.swim, fly: d.flying, glide: d.sp.stats.glide, pitch: d.pitch ?? 0,
+        pos: d.pos, scale: d.sizeK, ground: this.ground, puff: d.puff, flash: d.flash, hurt: d.hurtT, lod: dist2 > 42 * 42 ? 1 : 0, tamed: d.tamed, crouch: d.state === 'stalk' && !d.tamed ? 1 : 0,
+        love: d.tame && d.tame.lastFed > this.g.time.elapsed - 2.5 ? 1 : 0,
+      });
       d.animAcc = 0;
     }
     d.root.position.copy(d.pos);
@@ -689,6 +761,7 @@ export class Dinos {
     const g = this.g;
     this.population(dt);
     for (const d of this.list.values()) {
+      d.flash = Math.max(0, d.flash - dt * 5); d.hurtT = Math.max(0, d.hurtT - dt);
       if (g.isHost || !g.net) { this.updateAI(d, dt); this.updateAction(d, dt); if (!d.riders.length) this.move(d, dt); }
       else this.netInterp(d, dt);
       this.animate(d, dt);
@@ -709,6 +782,17 @@ export class Dinos {
         g.fx.stars(me.pos.clone().add(new THREE.Vector3(0, 1.4, 0)), 5);
         if ((this.toldTrample ?? -99) < g.time.elapsed - 20) { this.toldTrample = g.time.elapsed; g.ui?.toast(`TRAMPLED by a ${d.sp.short}! Stampedes go around big rocks and trees, not you.`, 'warn', 'dino', 4000); }
         break;
+      }
+    }
+    // the dex logs every species you get a good look at
+    this.seenT -= dt;
+    if (this.seenT <= 0) {
+      this.seenT = 0.5;
+      for (const d of this.list.values()) {
+        if (d.hidden || this.seen.has(d.sp.id) || d.dist2(me.pos) > 26 * 26) continue;
+        this.seen.add(d.sp.id);
+        g.events.emit('dexNew', { sp: d.sp });
+        g.ui?.toast(`New critter logged: ${d.sp.name}! It is in your DEX now.`, '', 'dino', 4500);
       }
     }
     // danger level for the music: something is hunting YOU
@@ -751,7 +835,7 @@ export class Dinos {
       const pos = new THREE.Vector3(d.pos.x + Math.sin(d.yaw) * back, d.pos.y + Math.max(0.4, d.rig.height * d.sizeK * 0.45), d.pos.z + Math.cos(d.yaw) * back);
       g.drops.spawn('dung', d.sp.size > 6 ? 2 : 1, pos, new THREE.Vector3(Math.sin(d.yaw) * 0.6, 0, Math.cos(d.yaw) * 0.6));
       g.audio?.play('thud', { pos, vol: 0.35, rate: 1.4 });
-      if (!this.toldPoop && d.dist2(g.local.pos) < 30 * 30) { this.toldPoop = true; g.ui?.toast(`The ${d.displayName} just left you a present. Dino Dung: fertiliser AND fuel!`, '', 'dino', 5000); }
+      if (!this.toldPoop && d.dist2(g.local.pos) < 30 * 30) { this.toldPoop = true; g.ui?.toast(`The ${d.displayName} just left you a present. Critter Dung: fertiliser AND fuel!`, '', 'dino', 5000); }
     }
   }
   updateCorpses() { for (const c of this.corpses) if (this.g.time.elapsed - c.at > 900) { this.despawn(c.d); c.gone = true; } this.corpses = this.corpses.filter((c) => !c.gone); }
@@ -762,7 +846,7 @@ export class Dinos {
     for (const d of this.list.values()) {
       let near = false; for (const p of g.players.values()) if (d.dist2(p.pos) < 220 * 220) { near = true; break; }
       if (!near) continue;
-      arr.push([d.id, d.sp.id, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), +d.yaw.toFixed(3), d.state, +d.speed.toFixed(2), d.action?.name ?? '', +(d.hp / d.maxHp).toFixed(2), +(d.torpor / d.maxTorpor).toFixed(2), d.tamed ? 1 : 0, d.name ?? '', d.baby ? +d.growth.toFixed(2) : 1, d.owner ?? '', +(d.tame.progress).toFixed(2), d.sp.alpha ?? '']);
+      arr.push([d.id, d.sp.id, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), +d.yaw.toFixed(3), d.state, +d.speed.toFixed(2), d.action?.name ?? '', +(d.hp / d.maxHp).toFixed(2), +(d.torpor / d.maxTorpor).toFixed(2), d.tamed ? 1 : 0, d.name ?? '', d.baby ? +d.growth.toFixed(2) : 1, d.owner ?? '', +(d.tame.progress).toFixed(2), d.sp.alpha ?? '', +d.puff.toFixed(2)]);
     }
     g.net.broadcast('dinos', arr);
   }
@@ -770,12 +854,13 @@ export class Dinos {
     const seen = new Set();
     const now = performance.now() / 1000;
     for (const a of arr) {
-      const [id, sid, x, y, z, yaw, state, speed, act, hp, tor, tamed, name, growth, owner, tp, alpha] = a;
+      const [id, sid, x, y, z, yaw, state, speed, act, hp, tor, tamed, name, growth, owner, tp, alpha, puff] = a;
       seen.add(id);
       let d = this.list.get(id);
       if (!d) { d = new Dino(this, this.speciesOf(sid, alpha), { id, x, y, z, yaw, baby: growth < 1, growth, tamed: !!tamed, name: name || null, owner: owner || null }); this.list.set(id, d); }
       d.netBuf = d.netBuf || [];
       d.netBuf.push({ at: now, x, y, z, yaw }); if (d.netBuf.length > 10) d.netBuf.shift();
+      d.puff = puff ?? 0;
       d.state = state; d.speed = speed; d.hp = hp * d.maxHp; d.torpor = tor * d.maxTorpor; d.tamed = !!tamed; d.name = name || null; d.owner = owner || null; d.tame.progress = tp;
       if (act && (!d.action || d.action.name !== act)) d.action = { name: act, t: 0, dur: 0.8, done: true };
       if (!act) d.action = null;
@@ -819,9 +904,12 @@ export class Dinos {
 
 export async function install(g) {
   const D = new Dinos(g);
+  // mesh every sculpted species in the background so the first spawn does not hitch
+  for (const sp of Object.values(SPECIES)) if (sculpted(sp)) requestSpecies(sp);
   g.addSystem(D);
   g.interaction.handlers.push((o, d, reach) => D.raycast(o, d, reach + 1.5));
   g.saveables.dinos = { save: () => D.serialize(), load: (d) => D.load(d) };
+  g.saveables.dex = { save: () => [...D.seen], load: (a) => { D.seen = new Set(a ?? []); } };
   // the third-person camera pulls in rather than clipping into big dinos
   g.rig.blockers = (o, dir, max) => {
     let best = null;

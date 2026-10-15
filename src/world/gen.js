@@ -23,7 +23,7 @@ export const BIOME = {
   OCEAN: 0, BEACH: 1, JUNGLE: 2, PRAIRIE: 3, REDWOOD: 4, SWAMP: 5, NESTING: 6,
   HIGHLAND: 7, BADLANDS: 8, MOUNTAIN: 9, SNOW: 10, VOLCANIC: 11, RIVER: 12, CRATER: 13,
 };
-export const BIOME_NAMES = ['Open Sea', 'Sunny Beach', 'Crash Jungle', 'Fern Prairie', 'Redwood Forest', 'Stinky Swamp', 'Rex Nesting Grounds',
+export const BIOME_NAMES = ['Open Sea', 'Sunny Beach', 'Crash Jungle', 'Fern Prairie', 'Redwood Forest', 'Stinky Swamp', 'Magmaw Wastes',
   'Highland Plains', 'Red Badlands', 'Frostbite Peaks', 'Frostbite Peaks', 'Volcano', 'River Valley', 'Meteor Crater'];
 
 // terrain material layers (indices into the terrain texture array)
@@ -601,12 +601,12 @@ function buildPOIs(L, hAt, onLand, rng, mainFall) {
   add('lake', 'Mirror Lake', L.lake.x, L.lake.z, { radius: L.lake.r });
   add('crater', 'Meteor Crater', L.crater.x, L.crater.z, { radius: L.crater.r });
   add('tarpits', 'Tar Pits', L.tarpits.x, L.tarpits.z, { radius: 30 });
-  add('raptorden', 'Raptor Den', 220 + rng.range(-20, 20), -70 + rng.range(-20, 20), { radius: 22 });
+  add('raptorden', 'Voltfang Den', 220 + rng.range(-20, 20), -70 + rng.range(-20, 20), { radius: 22 });
   add('skeleton', 'Big Bones', L.high.badlands[0] + 100, L.high.badlands[1] + 130, { radius: 26 });
   add('petrified', 'Petrified Forest', L.high.badlands[0] - 70, L.high.badlands[1] - 50, { radius: 40 });
-  add('ptera', 'Pteranodon Cliffs', -250 + rng.range(-40, 40), -770, { radius: 40 });
+  add('ptera', 'Gustail Cliffs', -250 + rng.range(-40, 40), -770, { radius: 40 });
   add('caldera', 'Volcano Caldera', L.volcano.x, L.volcano.z, { radius: L.volcano.crater });
-  add('rexnest', 'Rex Nesting Grounds', 540, 600, { radius: 45 });
+  add('rexnest', 'Magmaw Wastes', 540, 600, { radius: 45 });
   add('deadtree', 'The Old Dead Tree', 560, 110, { radius: 18 });
   add('camp', 'Abandoned Camp', -420, 540, { radius: 14 });
   add('crystalcave', 'Crystal Grotto', 250, -640, { radius: 12 });

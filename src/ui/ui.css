@@ -526,3 +526,22 @@ body.diegetic.touch #hotbar { display: none !important; }
   #touch .tc-item { right: calc(250px + env(safe-area-inset-right, 0px)); }
 }
 #touch:not(.t-screen) .tclose { display: none !important; }
+
+/* ---- the creature dex (Pocket Prof screen) */
+#pda.dev .dex-left { width: 252px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+#pda.dev .dex-grid { display: grid; grid-template-columns: repeat(4, 58px); gap: 4px; overflow-y: auto; padding-right: 2px; }
+#pda.dev .dex-card { position: relative; width: 58px; height: 62px; box-shadow: inset 0 0 0 1px var(--ph-dim); cursor: pointer; pointer-events: auto; background: rgba(20, 60, 24, 0.3); }
+#pda.dev .dex-card.on { box-shadow: inset 0 0 0 2px var(--ph-hi), 0 0 8px rgba(140, 255, 120, 0.45); background: rgba(40, 120, 50, 0.3); }
+#pda.dev .dex-card .no { position: absolute; left: 3px; top: 2px; font-family: var(--font-small); font-size: 7px; color: var(--ph-mid); }
+#pda.dev .dex-card img { position: absolute; left: 5px; top: 9px; width: 48px; height: 48px; }
+#pda.dev .dex-card img, #pda.dev .dex-head img { filter: grayscale(1) sepia(1) hue-rotate(58deg) saturate(2.4) brightness(1.08) drop-shadow(0 0 3px rgba(140, 255, 120, 0.45)); }
+#pda.dev .dex-card.unknown img, #pda.dev .dex-detail .unknown img { filter: brightness(0) drop-shadow(0 0 1px #4f9a50) drop-shadow(0 0 1px #4f9a50); }
+#pda.dev .dex-card.unknown .no { color: var(--ph-dim); }
+#pda.dev .dex-detail { overflow-y: auto; }
+#pda.dev .dex-head { display: flex; gap: 10px; align-items: center; }
+#pda.dev .dex-head img { width: 96px; height: 96px; flex: none; box-shadow: inset 0 0 0 1px var(--ph-dim); background: radial-gradient(circle at 50% 60%, rgba(60, 160, 70, 0.25), transparent 70%); }
+#pda.dev .dex-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+#pda.dev .dex-tags span { font-family: var(--font-small); font-size: 8px; letter-spacing: 1px; padding: 3px 5px 2px; box-shadow: inset 0 0 0 1px var(--ph-mid); color: var(--ph-top); }
+#pda.dev .dex-rows { display: flex; flex-direction: column; gap: 3px; }
+#pda.dev .dex-rows div { display: flex; gap: 8px; font-size: 14px; line-height: 16px; color: var(--ph-hi); }
+#pda.dev .dex-rows b { flex: none; width: 62px; font-family: var(--font-small); font-size: 8px; font-weight: normal; letter-spacing: 1px; color: var(--ph-mid); padding-top: 3px; }

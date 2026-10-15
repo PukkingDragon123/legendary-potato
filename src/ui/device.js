@@ -363,11 +363,11 @@ function quadMatrix(w, h, q) {
 
 // what Professor Nubbins says when a chapter starts
 const PROF_LINES = {
-  'Crash Landing': 'First things first: get inside the van, find the scanner in the glovebox and get some power back. The battery is flat as a pancake. A dinosaur pancake.',
+  'Crash Landing': 'First things first: get inside the van, find the scanner in the glovebox and get some power back. The battery is flat as a pancake. A critter pancake.',
   'Stone Age Starter Pack': 'You need tools, a fire and a place to sleep. Punch bushes, chop trees, smash rocks. Very scientific.',
   'Home Sweet Hut': 'Nights here are long and LOUD. Build a proper shelter before something with teeth finds you.',
   'Science, Mostly': 'Use the van computer. Scan EVERYTHING. Plants, rocks, the creatures, their poop. Science is mostly poop.',
-  'Dino Whisperer': 'Make a friend! Study a creature, then knock it out or win it over and feed it what it likes.',
+  'Critter Whisperer': 'Make a friend! Study a creature, then knock it out or win it over and feed it what it likes.',
   'Space Metal': 'There is iron in the meteor crater. Smelt it and we can build real machines.',
   'Get The Van Rolling': 'The van needs repairs and fuel. Yes, the fuel is dung. I do not make the rules. Well, I did make that one.',
   'Power Up': 'Electricity! Comfort! Crazy inventions! Bolt things onto the van.',

@@ -17,6 +17,18 @@ export const SPECIES = {
     temper: 'Skittish thief', blurb: 'A chicken-sized gremlin. Will steal your lunch, then your heart.',
     biomes: { jungle: 1.0, prairie: 0.6, beach: 0.5, redwood: 0.4 }, call: 'chirp',
   },
+  mutton: {
+    name: 'Mutton Chops', short: 'Mutton', size: 1.2, rp: 3, element: 'wind',
+    look: { color: 0xf4eadc, belly: 0xf4eadc, accent: 0xf0a2ac, pcolor: 0xdccfba, dark: 0x3b3337, nose: 0xf0a2ac },
+    stats: { hp: 45, speed: 1.5, run: 5.6, dmg: 2 },
+    behaviour: { herd: [5, 10], skittish: true, prey: true, puff: true, gentle: true, sight: 22 },
+    diet: 'herbivore', foods: ['sunberry', 'redberry', 'blueberry', 'fiddlehead'], favorite: 'sunberry',
+    tame: { method: 'bribe', need: 4, hint: 'Crouch, hold out sunberries and move slowly. If it puffs up, wait for it to deflate.' },
+    job: { id: 'wool', name: 'Wool Grower', desc: 'Grows a fresh fleece. Shear it at camp for wool.' },
+    temper: 'Anxious cloud', blurb: 'A sheep-shaped panic attack with sideburns. Puffs up to twice its size when startled, which fools absolutely no one. Everything wants to eat it.',
+    biomes: { prairie: 1.5, highland: 1.0, beach: 0.3, redwood: 0.3 }, call: 'baa',
+    drops: [['mutton_raw', 2, 3], ['wool', 2, 4], ['bone', 0, 1]],
+  },
   microraptor: {
     name: 'Microraptor', short: 'Microraptor', size: 0.5, rp: 4, element: 'electric',
     look: { kind: 'theropod', body: [0.42, 0.13], hip: 0.26, neck: [0.2, 0.05, 0.8], tail: [0.6, 0.06, 0.05], head: { type: 'thero', len: 0.15, w: 0.09, h: 0.09 }, legs: 'biped', hind: 0.27, arms: 0.2, feathers: true, wings4: true, color: 0x2a2f5a, belly: 0x6a78c0, pattern: 'iridescent', pcolor: 0x40b0e0, accent: 0x50d8ff },
@@ -180,10 +192,55 @@ export const SPECIES = {
     tame: { method: 'knockout', need: 9, research: 'flight', hint: 'Knock it down with a slingshot when it lands to fish, then feed it fish.' },
     job: { id: 'fish', name: 'Fisher', desc: 'Dive-bombs the river and brings fish back to camp.' },
     ride: { saddle: 'flyer', speed: 18, seats: 1, fly: true },
-    temper: 'Fishy show-off', blurb: 'Not technically a dinosaur. Very touchy about it.',
+    temper: 'Fishy show-off', blurb: 'Not technically a critter. Very touchy about it.',
     biomes: { beach: 0.8, highland: 0.6, mountain: 0.8, river: 0.3 }, call: 'squawk',
   },
 };
+// ---------------------------------------------------------------- the redesign
+// The island's creatures are their own species now (see creatureDesigns.js):
+// new names, colours and dex entries on top of the same ids, stats and jobs.
+const REDESIGN = {
+  compy: { name: 'Snatchet', sci: 'Lepus pilferus', temper: 'Sticky-fingered', look: { color: 0x8fd45c, belly: 0xf4f0c8, accent: 0x4f9a3a, pcolor: 0x6ab840 },
+    blurb: 'A pocket-sized leaf bunny with buck teeth and zero shame. Steals your lunch, then looks at you like YOU did something wrong.', tameHint: 'Crouch, hold food and wait. It cannot resist instant noodles.' },
+  microraptor: { name: 'Zappit', sci: 'Petaurus voltaicus', temper: 'Static kleptomaniac', look: { color: 0xf0c040, belly: 0xfff0c8, accent: 0xffe040, pcolor: 0x2a3a6a, glow: 0x8ae8ff },
+    blurb: 'A sugar glider made of static. Glides between trees on its side flaps, crackles when startled and steals anything shiny.' },
+  gallimimus: { name: 'Emberstrut', sci: 'Struthio flagrans', temper: 'Nervous sprinter', look: { color: 0xe0582c, belly: 0xffe4b8, accent: 0xffb040, pcolor: 0x9a2a14, horn: 0xf0b040 },
+    blurb: 'A long-legged fire bird with a candle-flame crest. Runs faster than you can scream, which it also does constantly.' },
+  parasaur: { name: 'Hornpipe', sci: 'Tubicornis placidus', temper: 'Gentle honker', look: { color: 0x4f8fd4, belly: 0xe4f2ff, accent: 0x6ae0ff, pcolor: 0x2a5aa0 },
+    blurb: 'A big soft river beast with a trumpet growing out of its head. It WILL play it at sunrise. Every sunrise.' },
+  proto: { name: 'Grumblet', sci: 'Porcus grumpus', temper: 'Grumpy potato', look: { color: 0xc0885a, belly: 0xf0dcc0, accent: 0xffa030, pcolor: 0x7a5030, horn: 0x8f877a },
+    blurb: 'A pig-shaped boulder with a stone face shield and a permanent frown. Honks at anything that comes near. Especially you.' },
+  pachy: { name: 'Knockle', sci: 'Macropus cranius', temper: 'Headbanger', look: { color: 0x9a7ee8, belly: 0xece6ff, accent: 0xc8eaff, pcolor: 0x6a52b8 },
+    blurb: 'A kangaroo with a crystal geode for a forehead. Solves every problem by headbutting it. Makes new problems the same way.' },
+  trike: { name: 'Thornback', sci: 'Spinadorsum muscosus', temper: 'Mossy tank', look: { color: 0x7a6244, belly: 0xd0c098, accent: 0x6aa83a, pcolor: 0x3a2e22, horn: 0xdcc8a0 },
+    blurb: 'A walking hill with three bramble horns and a garden on its back. Flowers grow on it. It does not care. It will still flatten you.' },
+  stego: { name: 'Prismback', sci: 'Manis crystallina', temper: 'Spiky grump', look: { color: 0x4f5ea8, belly: 0xc0c8ec, accent: 0x8ae8ff, pcolor: 0x2a3470 },
+    blurb: 'A pangolin that grew a cathedral of crystals on its back. Hums when the sun hits it. Do NOT stand behind the tail.' },
+  ankylo: { name: 'Clubbert', sci: 'Testudo clavata', temper: 'Living boulder', look: { color: 0x9a8a62, belly: 0xdcc8a0, accent: 0xffa030, pcolor: 0x6a5a40, horn: 0x847a70 },
+    blurb: 'A turtle that swallowed a quarry. Its shell is a boulder, its tail is a bigger boulder and its mood is the biggest boulder of all.' },
+  brachio: { name: 'Treeneck', sci: 'Silvacollum gigas', temper: 'Serene skyscraper', look: { color: 0xd8ccaa, belly: 0xf4eedc, accent: 0x6aa83a, pcolor: 0xa08a68 },
+    blurb: 'A gentle giant with a forest growing on its back and its head in the clouds. Birds nest on it. So could you.' },
+  raptor: { name: 'Voltfang', sci: 'Lupus fulgur', temper: 'Clever hunter', look: { color: 0x3a4a7c, belly: 0xb8c4e4, accent: 0xffd83a, pcolor: 0x40e0ff },
+    blurb: 'A thunder-wolf with a crackling mane and lightning in its stripes. Hunts in packs at night. Adores mutton.', tameHint: 'Clever pack hunters. Fight them off near a fire, knock one out, feed it prime meat. Or steal a pup...' },
+  dilo: { name: 'Spitfrill', sci: 'Rana venenifrons', temper: 'Show-off spitter', look: { color: 0x6a3a9a, belly: 0xdcc4f0, accent: 0xb8ff3a, pcolor: 0x9aff3a },
+    blurb: 'A frog-faced salamander with a neck frill like a satellite dish. Flares it, wiggles it, then spits poison in your eyes. Rude.' },
+  spino: { name: 'Riptide', sci: 'Lutra squalis', temper: 'River tyrant', look: { color: 0x3a6a8a, belly: 0xd8e8f2, accent: 0x40c8ff, pcolor: 0x1a3a5a },
+    blurb: 'An otter the size of a bus with a shark fin and a smile full of knives. Lurks in deep rivers. Loves fish. Tolerates you.' },
+  rex: { name: 'Magmaw', sci: 'Ursus magmaticus', temper: 'Apex predator', look: { color: 0x2a2220, belly: 0x5a3a2a, accent: 0xff5a14, pcolor: 0xff7a20, horn: 0x1c1618 },
+    blurb: 'A volcano with legs, horns of black glass and a jaw that could fit a van. The ground stays warm where it walks.' },
+  ptera: { name: 'Gustail', sci: 'Bubo ventosus', temper: 'Breezy show-off', look: { color: 0xeaf6f4, belly: 0xffffff, accent: 0x7af0d8, pcolor: 0x40c8b8 },
+    blurb: 'A great white sky-owl with ribbon streamers for a tail. Rides the wind over the cliffs and dive-bombs rivers for fish.' },
+  mutton: { sci: 'Ovis panicus' },
+};
+for (const [id, r] of Object.entries(REDESIGN)) {
+  const sp = SPECIES[id];
+  if (r.name) { sp.name = r.name; sp.short = r.name; }
+  if (r.sci) sp.sci = r.sci;
+  if (r.temper) sp.temper = r.temper;
+  if (r.blurb) sp.blurb = r.blurb;
+  if (r.tameHint) sp.tame.hint = r.tameHint;
+  if (r.look) Object.assign(sp.look, r.look);
+}
 for (const [id, s] of Object.entries(SPECIES)) {
   s.id = id;
   s.predator = !!s.behaviour.predator;
@@ -193,7 +250,7 @@ for (const [id, s] of Object.entries(SPECIES)) {
   s.elementName = s.element ? s.element[0].toUpperCase() + s.element.slice(1) : null;
 }
 
-export const DINO_NAMES = ['Doug Jr.', 'Kevin II', 'Nugget', 'Waffles', 'Sir Chompsalot', 'Pebbles', 'Gerald', 'Mango', 'Toaster', 'Biscuit', 'Captain', 'Noodle', 'Pickles', 'Princess', 'Meatball', 'Spud', 'Taco', 'Dino Dan', 'Fluffy', 'Chewbacca', 'Tiny', 'Gravy', 'Turbo', 'Beans', 'Cronch', 'Marshmallow', 'Professor', 'Disco', 'Wobbles', 'Steve'];
+export const DINO_NAMES = ['Doug Jr.', 'Kevin II', 'Nugget', 'Waffles', 'Sir Chompsalot', 'Pebbles', 'Gerald', 'Mango', 'Toaster', 'Biscuit', 'Captain', 'Noodle', 'Pickles', 'Princess', 'Meatball', 'Spud', 'Taco', 'Critter Dan', 'Fluffy', 'Chewbacca', 'Tiny', 'Gravy', 'Turbo', 'Beans', 'Cronch', 'Marshmallow', 'Professor', 'Disco', 'Wobbles', 'Steve'];
 export const PERSONALITIES = [
   { id: 'loyal', name: 'Loyal', desc: 'Follows closer, works harder.' },
   { id: 'lazy', name: 'Lazy', desc: 'Naps on the job. A lot.' },

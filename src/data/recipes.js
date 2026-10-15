@@ -18,6 +18,7 @@ const r = (id, out, n, inputs, opt = {}) => R.push({ id, out, n, in: inputs, sta
 // ---- by hand
 r('thatch', 'thatch', 1, { fiber: 3 }, { time: 0.8 });
 r('rope', 'rope', 1, { fiber: 4 }, { time: 1 });
+r('rope_wool', 'rope', 2, { wool: 2 }, { time: 1 });
 r('stone_hatchet', 'stone_hatchet', 1, { stick: 2, stone: 3, fiber: 3 }, { cat: 'tools', time: 1.6 });
 r('stone_pick', 'stone_pick', 1, { stick: 2, stone: 4, fiber: 3 }, { cat: 'tools', time: 1.6 });
 r('club', 'club', 1, { stick: 3, fiber: 2 }, { cat: 'tools', time: 1.2 });
@@ -26,6 +27,7 @@ r('torch_cheap', 'torch', 1, { stick: 1, fiber: 4 }, { cat: 'tools', time: 1 });
 r('campfire', 'campfire', 1, { stick: 4, stone: 5 }, { cat: 'camp', time: 1.5 });
 r('hammer', 'hammer', 1, { stick: 2, stone: 2, fiber: 2 }, { cat: 'tools', time: 1.4 });
 r('bedroll', 'bedroll', 1, { fiber: 15, thatch: 4 }, { cat: 'camp', time: 2 });
+r('bedroll_wool', 'bedroll', 1, { wool: 6, fiber: 4 }, { cat: 'camp', time: 2 });
 r('bandage', 'bandage', 1, { fiber: 4, herb: 1 }, { cat: 'medical', time: 1.2 });
 r('bola', 'bola', 1, { rope: 2, stone: 3 }, { cat: 'tools', time: 1.5, unlock: 'tame_basics' });
 r('workbench', 'workbench', 1, { log: 4, stone: 6, rope: 2 }, { cat: 'camp', time: 2.5 });
@@ -76,6 +78,7 @@ r('research_table', 'research_table', 1, { plank: 8, glass: 2, scrap: 4, circuit
 // ---- campfire (cooking)
 const CF = { station: 'campfire', cat: 'food' };
 r('cook_meat', 'meat_cooked', 1, { meat_raw: 1 }, { ...CF, time: 6 });
+r('cook_mutton', 'mutton_cooked', 1, { mutton_raw: 1 }, { ...CF, time: 6 });
 r('cook_prime', 'steak', 1, { meat_prime: 1 }, { ...CF, time: 8 });
 r('cook_fish', 'fish_cooked', 1, { fish_raw: 1 }, { ...CF, time: 5 });
 r('cook_egg', 'egg_cooked', 1, { egg_small: 1 }, { ...CF, time: 4 });

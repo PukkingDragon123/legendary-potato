@@ -229,6 +229,7 @@ export function patchMaterial(mat, opts = {}) {
           reflectedLight.indirectDiffuse += diffuseColor.rgb * uSunColor * ( back * 0.9 + wrap ) * ${t} * ( 1.0 - uNight );
         }`);
     }
+    if (opts.fragment?.lights) fs = fs.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + opts.fragment.lights);
     if (opts.fragment?.post) fs = fs.replace('#include <fog_fragment>', opts.fragment.post + '\n#include <fog_fragment>');
     if (opts.fragment?.emissive) fs = fs.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + opts.fragment.emissive);
     shader.vertexShader = vs;

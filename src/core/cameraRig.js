@@ -61,7 +61,7 @@ export class CameraRig {
         const hit = this.phys.raycast(_p, _d, dist + 0.3, { filter: (s) => s.kind !== 'trigger' && !s.noCam });
         if (hit) allowed = Math.max(0.35, hit.t - 0.3);
       }
-      // big creatures block the camera too (so it never ends up inside a T. rex)
+      // big creatures block the camera too (so it never ends up inside a Magmaw)
       const bt = this.blockers?.(_p, _d, dist + 0.3);
       if (bt !== null && bt !== undefined) allowed = Math.min(allowed, Math.max(0.35, bt - 0.3));
       const k = allowed < this.curDist ? 25 : 4;

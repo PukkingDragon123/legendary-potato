@@ -6,7 +6,7 @@ import { BIOME } from '../world/gen.js';
 
 export const EFFECTS = {
   bleeding: { name: 'Bleeding', icon: 'drop', color: '#d03030', desc: 'Losing health. Use a bandage.' },
-  poison: { name: 'Poisoned', icon: 'skull', color: '#70c040', desc: 'Dilophosaurus spit or bad food.' },
+  poison: { name: 'Poisoned', icon: 'skull', color: '#70c040', desc: 'Spitfrill spit or bad food.' },
   sick: { name: 'Tummy Ache', icon: 'question', color: '#a0b040', desc: 'Should have cooked that.' },
   broken: { name: 'Sprained Leg', icon: 'exclaim', color: '#e0a040', desc: 'Slower until splinted or rested.' },
   trippy: { name: 'Funky', icon: 'star', color: '#e060e0', desc: 'The trees are talking.' },
@@ -17,7 +17,7 @@ export const EFFECTS = {
   caffeinated: { name: 'Caffeinated', icon: 'spark', color: '#c08040', desc: 'Faster stamina regen.' },
   sleepy: { name: 'Sleepy', icon: 'zzz', color: '#9090d0', desc: 'Get some rest.' },
   warm: { name: 'Toasty', icon: 'flame', color: '#ffb060', desc: 'Near a fire.' },
-  blind: { name: 'Spat On', icon: 'drop', color: '#9ad040', desc: 'Dilophosaurus spit. Everything is blurry.' },
+  blind: { name: 'Spat On', icon: 'drop', color: '#9ad040', desc: 'Spitfrill spit. Everything is blurry.' },
   terrified: { name: 'Terrified', icon: 'exclaim', color: '#e05050', desc: 'An alpha roared at you. Legs are jelly.' },
 };
 
@@ -49,7 +49,7 @@ export class Vitals {
     if (this.god || this.dead || amount <= 0) return;
     const p = this.game.local;
     if (p.downed) return;
-    // nothing one-shots you from full health: even a T. rex bite leaves a sliver
+    // nothing one-shots you from full health: even a Magmaw bite leaves a sliver
     if (src.kind === 'dino' && this.hp > 30) amount = Math.min(amount, this.hp - 8, 62);
     this.hp -= amount;
     this.regenDelay = 6;

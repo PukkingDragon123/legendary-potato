@@ -95,7 +95,7 @@ export class Coop {
     const n = Math.min(5, 2 + Math.floor(g.time.day / 3));
     for (let k = 0; k < n; k++) { const d = g.dinos.spawn('raptor', x + k * 1.5, z + (k % 2) * 2, { herd, home: c.clone() }); herd.members.push(d); herd.leader = herd.leader ?? d; d.target = g.local; d.setState('stalk', 30); d.food = 10; }
     g.audio?.play('screech', { pos: new THREE.Vector3(x, g.sampler.heightAt(x, z) + 2, z), vol: 1.2, ref: 40 });
-    g.ui?.toast('You hear screeching in the dark... Raptors are coming! Light fires, grab torches!', 'warn', 'dino', 7000);
+    g.ui?.toast('You hear screeching in the dark... Voltfangs are coming! Light fires, grab torches!', 'warn', 'dino', 7000);
     g.events.emit('nightRaid', { n });
   }
 }

@@ -70,7 +70,7 @@ export class Drops {
     }
     if (!best) return null;
     const d = best;
-    const scan = d.id === 'dung' ? () => ({ key: 'dung:fresh', title: 'Fresh Dino Dung', fact: 'Still warm. Rich in methane. Could power a van, honestly.', cat: 'zoo', rp: 2, insight: 'dung' }) : undefined;
+    const scan = d.id === 'dung' ? () => ({ key: 'dung:fresh', title: 'Fresh Critter Dung', fact: 'Still warm. Rich in methane. Could power a van, honestly.', cat: 'zoo', rp: 2, insight: 'dung' }) : undefined;
     return { dist: bt, kind: 'drop', label: `${ITEMS[d.id].name}${d.n > 1 ? ' ×' + d.n : ''}`, interact: 'Pick up', scan, onInteract: () => { this.game.local.startAction('pickup', 0.35, () => this.pickup(d)); } };
   }
 

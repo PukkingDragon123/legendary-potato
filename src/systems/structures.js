@@ -35,14 +35,14 @@ export const STYPES = {
   solar_panel: { name: 'Solar Panel', power: { gen: 0.6, sun: true } },
   lamp: { name: 'Electric Lamp', power: { draw: 0.08 }, light: { color: 0xfff0d0, intensity: 4, range: 14 }, scare: 14 },
   sprinkler: { name: 'Sprinkler', power: { draw: 0.06 } },
-  dino_wheel: { name: 'Dino Wheel', power: { gen: 2.5, dino: true } },
+  dino_wheel: { name: 'Critter Wheel', power: { gen: 2.5, dino: true } },
   auto_harvester: { name: 'Auto-Harvester', power: { draw: 0.15 } },
   radio_tower: { name: 'Scanner Tower', power: { draw: 0.2 } },
   lightning_rod: { name: 'Lightning Rod', power: { storm: true } },
   capacitor: { name: 'Capacitor Bank', power: { store: 400 } },
   flag: { name: 'Team Flag' },
   coffee_machine: { name: 'Coffee Machine', power: { draw: 0.05 } },
-  dino_bed: { name: 'Dino Nest Bed' },
+  dino_bed: { name: 'Critter Nest Bed' },
   fridge: { name: 'Cooler Box', storage: 16, accept: 'food', spoil: 0.33 },
   table: { name: 'Table' }, chair: { name: 'Chair', seat: true }, rug: { name: 'Rug', flat: true }, planter: { name: 'Planter' }, skull_trophy: { name: 'Skull Trophy' },
   // alpha trophies: predators keep away from a camp that displays one
@@ -342,7 +342,7 @@ export class Structures {
     }
     if (def.collector) { if (D.level >= 1) { prompt = { text: 'Take Clean Water' }; act = () => g.act('st_collect', { id: s.id }); } else prompt = { text: 'Waiting for rain...', key: '-' }; }
     if (def.incubator) {
-      if (!D.egg) { const egg = g.inventory.slots.find((x) => x && ITEMS[x.id]?.egg); if (egg) { prompt = { text: `Place ${ITEMS[egg.id].name}` }; act = () => g.act('st_egg', { id: s.id, egg: egg.id }); } else prompt = { text: 'Empty incubator', key: '-', warn: 'Find a dino egg' }; }
+      if (!D.egg) { const egg = g.inventory.slots.find((x) => x && ITEMS[x.id]?.egg); if (egg) { prompt = { text: `Place ${ITEMS[egg.id].name}` }; act = () => g.act('st_egg', { id: s.id, egg: egg.id }); } else prompt = { text: 'Empty incubator', key: '-', warn: 'Find a critter egg' }; }
       else prompt = { text: `Incubating... ${Math.floor(D.prog * 100)}%`, key: '-' };
     }
     if (def.power && (s.type === 'lamp' || s.type === 'sprinkler' || s.type === 'radio_tower' || s.type === 'auto_harvester')) { prompt = { text: D.on ? 'Switch off' : 'Switch on' }; act = () => g.act('st_toggle', { id: s.id }); }
@@ -365,7 +365,7 @@ export class Structures {
     if (def.fuel) return D.lit && D.fuel > 0 ? `Burning · ${Math.ceil(D.fuel / 60)} min of fuel` : D.fuel > 0 ? 'Not lit' : 'Out of fuel';
     if (def.crop) return D.crop ? `${CROPS[D.crop].name} · ${Math.min(100, Math.floor(D.grow * 100))}% · water ${Math.round(D.water * 100)}%${D.fert ? ' · fertilised' : ''}` : 'Empty';
     if (def.collector) return `Water: ${Math.floor(D.level)} / 5`;
-    if (def.trap) return D.sprung ? (D.caught && this.g.dinos?.list.get(D.caught) ? `Caught: ${this.g.dinos.list.get(D.caught).displayName}! Bonk it or feed it` : 'Sprung') : D.bait ? `Baited with ${ITEMS[D.bait]?.name}` : `Catches dinos up to ${def.trap.max} m · bait it with food`;
+    if (def.trap) return D.sprung ? (D.caught && this.g.dinos?.list.get(D.caught) ? `Caught: ${this.g.dinos.list.get(D.caught).displayName}! Bonk it or feed it` : 'Sprung') : D.bait ? `Baited with ${ITEMS[D.bait]?.name}` : `Catches critters up to ${def.trap.max} m · bait it with food`;
     if (def.power?.store) return `Stored ${Math.round(D.store)} / ${def.power.store}`;
     if (def.power) return this.powered(s) ? 'Powered' : def.power.draw ? 'No power' : (def.power.gen ? 'Generating' : '');
     if (def.storage) { const n = s.inv.slots.filter(Boolean).length; return `${n} / ${def.storage} slots used`; }

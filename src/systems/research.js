@@ -18,20 +18,20 @@ export const INSIGHTS = {
   eggshell: 'Analyse an Eggshell Fragment',
   amber: 'Analyse Amber',
   amber_bug: 'Sequence the DNA in Amber with Mosquito',
-  dung: 'Scan dino dung or analyse a Coprolite',
+  dung: 'Scan critter dung or analyse a Coprolite',
   seeds: 'Find seeds',
-  tamed: 'Tame any dinosaur',
+  tamed: 'Tame any critter',
   predator: 'Scan a predator',
   rex: 'Scan a Tyrannosaurus',
-  ptera: 'Scan a Pteranodon',
-  brachio: 'Scan a Brachiosaurus',
+  ptera: 'Scan a Gustail',
+  brachio: 'Scan a Treeneck',
   storm: 'Witness a thunderstorm',
   fossil: 'Clean a fossil at the research table',
 };
 
 const T = (id, name, cost, opt = {}) => ({ id, name, cost, needs: opt.needs ?? [], insight: opt.insight ?? [], desc: opt.desc ?? '', tier: opt.tier ?? 1, unlocks: opt.unlocks ?? '' });
 export const TECHS = [
-  T('tame_basics', 'Dino Psychology 101', { zoo: 3 }, { desc: 'They are basically big chickens with feelings.', unlocks: 'Bola, Slingshot, Catch Net, Whistle, Trough, Dino Bed' }),
+  T('tame_basics', 'Critter Psychology 101', { zoo: 3 }, { desc: 'They are basically big chickens with feelings.', unlocks: 'Bola, Slingshot, Catch Net, Whistle, Trough, Critter Bed' }),
   T('cooking', 'Fire Cuisine', { bio: 3 }, { desc: 'Applying fire to food. Revolutionary.', unlocks: 'Cooking Pot, Smoker, Cooler, boiling water' }),
   T('pottery', 'Ceramics', { geo: 4 }, { insight: ['clay'], desc: 'Mud + fire = bowls, bricks and pride.', unlocks: 'Clay Kiln, Lantern, Brick building tier' }),
   T('farming', 'Agriculture (Again)', { bio: 6 }, { insight: ['seeds'], desc: 'Invent farming 66 million years early. History is now confused.', unlocks: 'Crop Plot, Rain Catcher' }),
@@ -40,19 +40,19 @@ export const TECHS = [
   T('tranquilizers', 'Sleepy Juice', { bio: 5, zoo: 5 }, { insight: ['snoozeberry'], needs: ['tame_basics'], desc: 'Snoozeberry extract, extremely concentrated. Do not lick.', unlocks: 'Blowgun, Tranquilizer Darts' }),
   T('defense', 'Pointy Sticks', { zoo: 6 }, { insight: ['predator'], desc: 'Predators hate this one weird trick.', unlocks: 'Spike Wall' }),
   T('lab', 'Field Laboratory', { bio: 5, geo: 3, paleo: 3 }, { desc: 'A proper desk for proper science.', unlocks: 'Research Table, Microscope Rig (van)' }),
-  T('eggs', 'Egg-xperiments', { paleo: 4, zoo: 4 }, { insight: ['eggshell'], needs: ['tame_basics'], desc: 'Warm eggs + patience = baby dinosaurs.', unlocks: 'Egg Incubator' }),
-  T('saddles', 'Saddle Up', { zoo: 10 }, { insight: ['tamed'], needs: ['tame_basics'], desc: 'Ride the dinosaur. Live the dream.', unlocks: 'Small Saddle, Big Saddle' }),
+  T('eggs', 'Egg-xperiments', { paleo: 4, zoo: 4 }, { insight: ['eggshell'], needs: ['tame_basics'], desc: 'Warm eggs + patience = baby critters.', unlocks: 'Egg Incubator' }),
+  T('saddles', 'Saddle Up', { zoo: 10 }, { insight: ['tamed'], needs: ['tame_basics'], desc: 'Ride the critter. Live the dream.', unlocks: 'Small Saddle, Big Saddle' }),
   T('metallurgy', 'Space Metal', { geo: 10 }, { insight: ['meteorite'], needs: ['pottery'], desc: 'Smelt the iron that fell from the sky.', unlocks: 'Forge, metal tools, Scrap Metal building tier' }),
-  T('electrics', 'Electrical Engineering', { geo: 6, bio: 2 }, { insight: ['copper'], desc: 'Electrons are just very small dinosaurs.', unlocks: 'Wiring Harness, CRT Kit, batteries, lamps, Battery Bank II' }),
+  T('electrics', 'Electrical Engineering', { geo: 6, bio: 2 }, { insight: ['copper'], desc: 'Electrons are just very small critters.', unlocks: 'Wiring Harness, CRT Kit, batteries, lamps, Battery Bank II' }),
   T('mechanics', 'Van Mechanics', { geo: 12, zoo: 4 }, { needs: ['metallurgy'], desc: 'Pistons from bone. Tires from tar. What could go wrong.', unlocks: 'Engine Parts, Patched Tire, Axle, Armor, Monster Wheels' }),
   T('radio', 'Radio Waves', { geo: 8 }, { needs: ['electrics'], desc: 'Talk to friends across the island.', unlocks: 'Walkie-Talkie, Scanner Tower, Satellite Dish' }),
   T('solar', 'Photovoltaics', { geo: 10 }, { needs: ['electrics'], desc: 'Free power from the big hot ball.', unlocks: 'Solar Panel, Solar Roof (van)' }),
-  T('biofuel', 'Dung-o-Diesel', { bio: 10, zoo: 6 }, { insight: ['dung'], needs: ['electrics'], desc: 'The van runs on dino poo now. Progress.', unlocks: 'Dung-o-Diesel, Dung Generator' }),
+  T('biofuel', 'Dung-o-Diesel', { bio: 10, zoo: 6 }, { insight: ['dung'], needs: ['electrics'], desc: 'The van runs on critter poo now. Progress.', unlocks: 'Dung-o-Diesel, Dung Generator' }),
   T('automation', 'Lazy Engineering', { geo: 14, bio: 6 }, { needs: ['electrics', 'farming'], desc: 'Machines that do chores so you can do naps.', unlocks: 'Sprinkler, Auto-Harvester' }),
-  T('dino_power', 'Hamster Wheel Theory', { zoo: 15, geo: 6 }, { needs: ['electrics', 'tame_basics'], desc: 'One raptor = 2.5 horsepower.', unlocks: 'Dino Wheel' }),
+  T('dino_power', 'Hamster Wheel Theory', { zoo: 15, geo: 6 }, { needs: ['electrics', 'tame_basics'], desc: 'One raptor = 2.5 horsepower.', unlocks: 'Critter Wheel' }),
   T('big_game', 'Big Game Taming', { zoo: 20 }, { insight: ['rex'], needs: ['tranquilizers', 'metallurgy'], desc: 'For when a blowgun is not enough.', unlocks: 'Tranq Rifle, Tranq Shells, Rex Saddle' }),
   T('flight', 'Avian Engineering', { zoo: 18 }, { insight: ['ptera'], needs: ['saddles'], desc: 'Strap a harness to a flying lizard. Scream.', unlocks: 'Flyer Harness' }),
-  T('sauropod', 'Walking Fortress', { zoo: 25, geo: 10 }, { insight: ['brachio'], needs: ['saddles', 'metallurgy'], desc: 'A house. On a dinosaur.', unlocks: 'Platform Saddle' }),
+  T('sauropod', 'Walking Fortress', { zoo: 25, geo: 10 }, { insight: ['brachio'], needs: ['saddles', 'metallurgy'], desc: 'A house. On a critter.', unlocks: 'Platform Saddle' }),
   T('lightning', 'Catch Lightning', { geo: 20 }, { insight: ['storm'], needs: ['electrics'], desc: '1.21 gigawatts, but from the sky.', unlocks: 'Lightning Rod, Capacitor Bank, Power Core' }),
   T('temporal_theory', 'Temporal Theory', { paleo: 10, geo: 10 }, { insight: ['amber'], needs: ['electrics'], desc: 'Time is a flat circle. Or a coil. Probably a coil.', tier: 3, unlocks: 'Temporal Coil' }),
   T('crystal_resonance', 'Crystal Resonance', { geo: 25 }, { insight: ['crystal'], needs: ['temporal_theory'], desc: 'The crystals hum next Tuesday. We can tune that.', tier: 3, unlocks: 'Flux Crystal Matrix' }),
@@ -75,17 +75,17 @@ const TREE_FACTS = {
   dead: ['Dead Tree', 'Deceased. Good firewood though.'],
 };
 const NODE_FACTS = {
-  dung: ['zoo', 'Dino Dung', 'Fresh-ish. Rich in methane. Could power a van, honestly. Also great for crops.', 'dung'],
+  dung: ['zoo', 'Critter Dung', 'Fresh-ish. Rich in methane. Could power a van, honestly. Also great for crops.', 'dung'],
   boulder: ['geo', 'Granite boulder', 'A rock. You scanned a rock. The scanner is unimpressed.'],
   boulder_big: ['geo', 'Glacial erratic', 'A very big rock, dropped here by something very big.'],
   rock_small: ['geo', 'River stones', 'Smooth, throwable, emotionally supportive.'],
   flint: ['geo', 'Flint nodule', 'Sharp when broken. Sparks when struck. Cavemen\'s favourite.'],
-  fiber: ['bio', 'Fiber grass', 'Grass existed with the dinosaurs! Barely. It was the new thing.'],
+  fiber: ['bio', 'Fiber grass', 'Grass existed with the critters! Barely. It was the new thing.'],
   fern: ['bio', 'Ground fern', 'Herbivores love fiddleheads. You can grow them too.'],
-  bush_red: ['bio', 'Redberry bush', 'Tart berries most dinos happily eat.'],
-  bush_blue: ['bio', 'Blueberry bush', 'Sweet and staining. Parasaurs go nuts for these.'],
+  bush_red: ['bio', 'Redberry bush', 'Tart berries most critters happily eat.'],
+  bush_blue: ['bio', 'Blueberry bush', 'Sweet and staining. Hornpipes go nuts for these.'],
   bush_sun: ['bio', 'Sunberry bush', 'Tingly little berries. Gives you a burst of energy.'],
-  bush_snooze: ['bio', 'Snoozeberry bush', 'A powerful natural sedative. Keeps knocked-out dinos asleep. Key ingredient for tranquilizers!', 'snoozeberry'],
+  bush_snooze: ['bio', 'Snoozeberry bush', 'A powerful natural sedative. Keeps knocked-out critters asleep. Key ingredient for tranquilizers!', 'snoozeberry'],
   herb: ['bio', 'Healing herb', 'Bitter leaves full of anti-inflammatory compounds.'],
   mushrooms: ['bio', 'Mushroom cluster', 'The brown ones are fine. The red ones are a journey.'],
   scrap: [null, 'Van debris', 'That is part of your van. You should feel bad.'],
@@ -96,8 +96,8 @@ const NODE_FACTS = {
   obsidian: ['geo', 'Obsidian', 'Volcanic glass. Sharper than a scalpel.'],
   crystal: ['geo', 'Chrono crystals', 'They resonate at 66,000,000 Hz. They are the reason you are here.', 'crystal'],
   clay: ['geo', 'Clay bank', 'Fine sediment. Fire it in a kiln for bricks and pots.', 'clay'],
-  fossil: ['paleo', 'Fossil-bearing rock', 'Bones of things that were already ancient to the dinosaurs.'],
-  tar: ['geo', 'Tar seep', 'Sticky natural asphalt. Waterproofs everything. Traps dinos.'],
+  fossil: ['paleo', 'Fossil-bearing rock', 'Bones of things that were already ancient to the critters.'],
+  tar: ['geo', 'Tar seep', 'Sticky natural asphalt. Waterproofs everything. Traps critters.'],
   salt: ['geo', 'Salt crust', 'Evaporated sea. Preserves meat, seasons regrets.'],
   driftwood: ['bio', 'Driftwood', 'A tree that went on an adventure.'],
   hive: ['bio', 'Wild beehive', 'Prehistoric bees. They are not happy to be scanned.'],
@@ -176,7 +176,7 @@ export class Research {
       case 'dino': { const d = tgt.dino, sp = d.sp; const info = g.dinos?.scanInfo?.(d) ?? { fact: sp.blurb ?? '', insight: null }; return { key: 'dino:' + sp.id, title: sp.name, fact: info.fact, cat: 'zoo', rp: sp.rp ?? 4, insight: info.insight, dino: d }; }
       case 'track': return { key: 'track:' + tgt.species, title: tgt.label ?? 'Footprints', fact: tgt.fact ?? 'Fresh tracks. Something big walked here.', cat: 'paleo', rp: 2, trail: tgt.trail };
       case 'nest': return { key: 'nest:' + tgt.species, title: tgt.label, fact: tgt.fact ?? 'A nest! The parents are probably nearby. Probably watching. Probably hungry.', cat: 'paleo', rp: 3 };
-      case 'dung': return { key: 'dung:' + (tgt.species ?? 'x'), title: 'Dino Dung', fact: 'Fresh. Rich in methane. Could power a van, honestly.', cat: 'zoo', rp: 2, insight: 'dung' };
+      case 'dung': return { key: 'dung:' + (tgt.species ?? 'x'), title: 'Critter Dung', fact: 'Fresh. Rich in methane. Could power a van, honestly.', cat: 'zoo', rp: 2, insight: 'dung' };
       case 'water': return { key: 'water', title: 'Water', fact: 'H2O, 3% tadpole. Boil before drinking.', cat: 'bio', rp: 1 };
       case 'van': return { key: 'van', title: 'The Chrono-Van', fact: 'A 1979 camper van containing one (1) time machine, three (3) CRTs and a disturbing amount of tinfoil.', cat: null, rp: 0 };
       case 'struct': return { key: 'struct:' + tgt.s.type, title: tgt.label, fact: 'You built this. We are proud of you.', cat: null, rp: 0 };
@@ -228,15 +228,15 @@ export class Research {
     const R = {
       plant_sample: ['bio', 4, 'herb', 'Chlorophyll levels: excessive. Photosynthesis: aggressive.'],
       herb: ['bio', 3, 'herb', 'Contains salicin, a natural painkiller. Grandma was right.'],
-      fossil: ['paleo', 5, 'fossil', 'Trilobite. It was already a fossil when the dinosaurs showed up.'],
+      fossil: ['paleo', 5, 'fossil', 'Trilobite. It was already a fossil when the critters showed up.'],
       amber: ['paleo', 4, 'amber', 'Fossilised resin with perfectly preserved... air bubbles. Temporal signatures detected!'],
-      amber_bug: ['paleo', 8, 'amber_bug', 'Mosquito with dino blood inside. Life, uh... finds a way. Timeline data extracted!'],
+      amber_bug: ['paleo', 8, 'amber_bug', 'Mosquito with critter blood inside. Life, uh... finds a way. Timeline data extracted!'],
       eggshell: ['paleo', 4, 'eggshell', 'Calcite structure suggests the parents were EXTREMELY protective.'],
       coprolite: ['zoo', 4, 'dung', 'Fossilised dung. Diet: ferns, regret. Methane potential: enormous.'],
-      dna: ['zoo', 5, null, 'Genome sequenced. 98% dinosaur, 2% cotton bud.'],
+      dna: ['zoo', 5, null, 'Genome sequenced. 98% critter, 2% cotton bud.'],
       mineral: ['geo', 4, null, 'Quartz with chrono-resonant inclusions. Ooooh.'],
       crystal: ['geo', 6, 'crystal', 'It hums when you are not looking at it. Definitely temporal.'],
-      dung: ['zoo', 2, 'dung', 'Fresh dino dung. The lab now smells like a swamp.'],
+      dung: ['zoo', 2, 'dung', 'Fresh critter dung. The lab now smells like a swamp.'],
     }[itemId];
     if (!R) return null;
     const [cat, rp, insight, fact] = R;

@@ -1,14 +1,15 @@
 // Alphas: three legendary dinosaurs with lairs, a boss bar, signature attacks
-// and trophies. OLD GNASHER (T. rex) rules the Rex Nesting Grounds, BIG MOMMA
-// (Spinosaurus) lurks in Mirror Lake and RAZOR leads the Raptor Den. An alpha
+// and trophies. OLD GNASHER (a Magmaw) rules the Magmaw Wastes, BIG MOMMA
+// (a Riptide) lurks in Mirror Lake and RAZOR leads the Voltfang Den. An alpha
 // that is beaten or tamed stays that way (saved), and RAZOR's fall ends the
 // raptor night raids. The host runs the fights; everyone gets the effects.
 import * as THREE from 'three';
 import { SPECIES } from '../entities/dinoSpecies.js';
+import { requestSpecies } from '../entities/creatureModel.js';
 
 export const ALPHAS = {
   gnasher: {
-    sp: 'rex', poi: 'rexnest', name: 'Old Gnasher', title: 'King of the Nesting Grounds',
+    sp: 'rex', poi: 'rexnest', name: 'Old Gnasher', title: 'King of the Magmaw Wastes',
     size: 1.2, hp: 1.8, dmg: 1.2, torpor: 1.25,
     look: { color: 0x1e1a1c, pcolor: 0x3a1010, accent: 0xff3a10, belly: 0x5a2a20, glow: 0xff3010 },
     moves: { roar: 15, stomp: 8, charge: 11 },
@@ -23,10 +24,10 @@ export const ALPHAS = {
     moves: { roar: 18, sweep: 7, dive: 16 },
     loot: [['trophy_momma', 1], ['fish_raw', 10], ['meat_prime', 6], ['hide', 6], ['dna', 2]],
     rp: [['zoo', 35], ['bio', 10]],
-    intro: 'Bubbles. A sail rises out of the lake. Then the rest of her.',
+    intro: 'Bubbles. A fin rises out of the lake. Then the rest of her.',
   },
   razor: {
-    sp: 'raptor', poi: 'raptorden', name: 'Razor', title: 'Alpha of the Raptor Den',
+    sp: 'raptor', poi: 'raptorden', name: 'Razor', title: 'Alpha of the Voltfang Den',
     size: 1.45, hp: 4.5, dmg: 1.6, torpor: 2.4,
     look: { color: 0x1a1a24, pcolor: 0x6a50d0, accent: 0xb080ff, belly: 0xb8b0c8, glow: 0xb080ff },
     moves: { howl: 22, pounce: 6 },
@@ -65,6 +66,8 @@ export class Bosses {
     this.ensureT = 1;
     this.met = new Set();
     this.barFor = null;
+    // sculpt the alphas in the background before anyone meets one
+    for (const id of Object.keys(ALPHAS)) requestSpecies(alphaSpecies(id));
     this.buildBar();
   }
   species(id) { return alphaSpecies(id); }
