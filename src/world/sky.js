@@ -189,8 +189,16 @@ export class Sky {
     fog.color.copy(u.uHorizon.value).lerp(u.uZenith.value, 0.15);
     fog.density = lerpKey(e, 'fog') * (1 + cover * 0.4 + weather.fog * 2.5 + storm * 0.8);
     G.uFogSunColor.value.copy(u.uSunColor.value).lerp(fog.color, 0.35).multiplyScalar(day(night));
-    G.uFogHeightDensity.value = 0.0035 + weather.fog * 0.03 + (1 - Math.abs(e)) * 0.002;
+    // low valley mist pools at dawn and burns off as the sun climbs
+    const dawn = THREE.MathUtils.smoothstep(e, -0.12, 0.0) * (1 - THREE.MathUtils.smoothstep(e, 0.08, 0.3)) * (t < 0.5 ? 1 : 0.25);
+    G.uFogHeightDensity.value = 0.0035 + weather.fog * 0.03 + (1 - Math.abs(e)) * 0.002 + dawn * 0.018;
     G.uNight.value = night;
+    // cloud shadows drift with the wind; stronger when it is cloudier, gone at night
+    const cs = G.uCloudSh.value;
+    cs.x -= (G.uWind.value.x * 6 + 2.5) * dt; cs.y -= (G.uWind.value.z * 6 + 1) * dt;
+    if (Math.abs(cs.x) > 9e4) cs.x %= 9e4; if (Math.abs(cs.y) > 9e4) cs.y %= 9e4; // keep shader precision
+    cs.z = THREE.MathUtils.clamp(0.22 + cover * 0.55, 0, 0.7) * (1 - night) * (1 - storm * 0.7) * horizonFade;
+    cs.w = THREE.MathUtils.lerp(0.62, 0.36, cover);
     return this.state;
   }
 }

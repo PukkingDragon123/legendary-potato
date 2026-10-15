@@ -22,8 +22,22 @@ float vnoise( vec2 p ) {
 }
 `;
 
+// Worn, bare patches where the soil shows through the plants, and steep
+// banks where it erodes. Shared with the ground cover so no grass grows on them.
+export const GLSL_BARE = /* glsl */ `
+float bareGround( vec2 xz, float slope ) {
+  float worn = vnoise( xz * 0.055 + 11.0 ) * 0.55 + vnoise( xz * 0.19 + 4.0 ) * 0.3 + vnoise( xz * 0.7 + 1.7 ) * 0.15;
+  return clamp( smoothstep( 0.6, 0.7, worn ) + smoothstep( 0.28, 0.55, slope ) * 0.85, 0.0, 1.0 );
+}
+`;
+// ground types that are plant cover (grass, forest floor, moss, dry grass, needles)
+export const VEGETATED = [1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0];
+// ground types that turn to mud along the water (beaches, rock and snow stay as they are)
+export const MUDDY_BANK = [1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0.6, 1, 1, 0, 0, 1, 0, 0];
+
 export class Terrain {
-  constructor(engine, world, sampler) {
+  // texData: ground textures already painted in a worker (optional)
+  constructor(engine, world, sampler, texData = null) {
     this.engine = engine;
     this.world = world;
     this.s = sampler;
@@ -49,15 +63,20 @@ export class Terrain {
     this.waterTex.magFilter = this.waterTex.minFilter = THREE.NearestFilter;
     this.waterTex.needsUpdate = true;
 
-    const tex = buildTerrainTextures();
+    const tex = buildTerrainTextures(texData);
     this.textures = tex;
     tex.albedo.anisotropy = engine.maxAniso;
     tex.normal.anisotropy = engine.maxAniso;
 
+    tex.detail.anisotropy = engine.maxAniso;
     this.uniforms = {
       tSplat: { value: this.splatTex },
       tAlbedo: { value: tex.albedo },
       tNormalArr: { value: tex.normal },
+      tDetail: { value: tex.detail },
+      uDetailK: { value: tex.detailK },
+      uVeg: { value: VEGETATED },
+      uMudOK: { value: MUDDY_BANK },
       uRough: { value: tex.rough },
       uHalf: { value: world.half },
       uSize: { value: world.size },
@@ -69,6 +88,7 @@ export class Terrain {
 
   makeMaterial() {
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0 });
+    const detail = this.engine.quality.groundDetail !== false;
     patchMaterial(mat, {
       wet: true,
       uniforms: this.uniforms,
@@ -78,6 +98,7 @@ export class Terrain {
       },
       fragment: {
         head: /* glsl */ `
+          ${detail ? '#define GROUND_DETAIL' : ''}
           precision highp sampler2DArray;
           varying vec3 vTWorld;
           varying vec3 vTNrm;
@@ -85,17 +106,23 @@ export class Terrain {
           uniform sampler2D tWaterLvl;
           uniform sampler2DArray tAlbedo;
           uniform sampler2DArray tNormalArr;
+          uniform sampler2D tDetail;
+          uniform vec2 uDetailK[18];
+          uniform float uVeg[18];
+          uniform float uMudOK[18];
           uniform float uRough[18];
           uniform float uHalf;
           uniform float uSize;
           uniform float uDitherDist;
           ${GLSL_HASH}
+          ${GLSL_BARE}
           float tPick; float tRoughOut; vec3 tNrmWorld;
           vec3 tAlb;
           vec4 splatAt( vec2 xz ) {
             vec2 uv = ( xz + uHalf ) / uSize;
             return texture2D( tSplat, uv );
           }
+          float waterAt( vec2 xz ) { return texture2D( tWaterLvl, ( xz + uHalf ) / uSize ).r; }
           // projection uv (4 m tiles) for a world position + normal; returns layer-space uv and axis
           vec2 projUV( vec3 p, vec3 n, out int axis ) {
             vec3 an = abs( n );
@@ -103,12 +130,26 @@ export class Terrain {
             if ( an.x > an.z ) { axis = 0; return vec2( p.z * sign( n.x ), -p.y ) * 0.25; }
             axis = 2; return vec2( -p.x * sign( n.z ), -p.y ) * 0.25;
           }
+          // one ground type: colour+roughness, with a rotated second lookup mixed in
+          // patches so the 4 m tile never repeats visibly
+          vec4 albedoAT( vec2 uv, vec2 uv2, float id, float mt ) {
+            vec4 a = texture( tAlbedo, vec3( uv, id ) );
+            #ifdef GROUND_DETAIL
+              vec4 b = texture( tAlbedo, vec3( uv2, id ) );
+              a = mix( a, b, mt );
+            #endif
+            return a;
+          }
           void terrainSample() {
             vec3 wp = vTWorld;
             vec3 wn = normalize( vTNrm );
             float dist = distance( wp, cameraPosition );
             int axis;
             vec2 uv = projUV( wp, wn, axis );
+            vec2 uv2 = mat2( 0.8, -0.6, 0.6, 0.8 ) * uv * 0.73 + vec2( 0.37, 0.61 );
+            // (explicit gradients for the lookups that sit inside branches)
+            vec2 gx = dFdx( uv ), gy = dFdy( uv );
+            float mt = smoothstep( 0.42, 0.58, vnoise( wp.xz * 0.045 + 3.7 ) * 0.75 + vnoise( wp.xz * 0.2 ) * 0.25 );
             // organic jitter of the splat lookup, fades with distance
             float near = 1.0 - smoothstep( uDitherDist * 0.6, uDitherDist, dist );
             vec2 jit = ( vec2( vnoise( wp.xz * 0.9 ), vnoise( wp.xz * 0.9 + 31.7 ) ) - 0.5 ) * 2.6;
@@ -123,18 +164,68 @@ export class Terrain {
             }
             float bl = sp.b;
             float sel = vnoise( wp.xz * 0.75 + 5.3 ) * 0.78 + vnoise( wp.xz * 4.3 + 3.0 ) * 0.22;
-            vec3 c1 = texture( tAlbedo, vec3( uv, id1 ) ).rgb;
-            vec3 c2 = texture( tAlbedo, vec3( uv, id2 ) ).rgb;
-            // ragged but soft borders between ground types (sharper up close)
+            vec4 c1 = albedoAT( uv, uv2, id1, mt ), c2 = albedoAT( uv, uv2, id2, mt );
+            vec4 n1 = texture( tNormalArr, vec3( uv, id1 ) ), n2 = texture( tNormalArr, vec3( uv, id2 ) );
+            // height blend: the higher relief wins at the border (stones poke through
+            // grass, soil fills the hollows), ragged and soft further away
             float pickB = mix( bl, smoothstep( sel - 0.12, sel + 0.12, bl ), near );
-            tAlb = mix( c1, c2, pickB );
-            tPick = pickB > 0.5 ? id2 : id1;
-            tRoughOut = mix( uRough[ int( id1 ) ], uRough[ int( id2 ) ], pickB );
-            // normal map in the same projection
-            vec3 nm1 = texture( tNormalArr, vec3( uv, id1 ) ).xyz * 2.0 - 1.0;
-            vec3 nm2 = texture( tNormalArr, vec3( uv, id2 ) ).xyz * 2.0 - 1.0;
-            vec3 nm = normalize( mix( nm1, nm2, pickB ) );
-            nm.xy *= 0.9;
+            float hb = clamp( ( n2.a - n1.a ) * 0.8 + ( pickB * 2.0 - 1.0 ) * 1.4 + 0.5, 0.0, 1.0 );
+            hb = mix( pickB, smoothstep( 0.3, 0.7, hb ), near );
+            vec4 cc = mix( c1, c2, hb );
+            vec4 nn = mix( n1, n2, hb );
+            float vegW = mix( uVeg[ int( id1 ) ], uVeg[ int( id2 ) ], hb );
+            vec2 dK = mix( uDetailK[ int( id1 ) ], uDetailK[ int( id2 ) ], hb );
+            float rgh = mix( uRough[ int( id1 ) ], uRough[ int( id2 ) ], hb );
+            tPick = hb > 0.5 ? id2 : id1;
+            // bare soil through the plant cover, and mud along the water
+            float wl = waterAt( wp.xz );
+            float wlN = wl;
+            #ifdef GROUND_DETAIL
+              wlN = max( max( waterAt( wp.xz + vec2( 3.0, 0.0 ) ), waterAt( wp.xz - vec2( 3.0, 0.0 ) ) ), max( waterAt( wp.xz + vec2( 0.0, 3.0 ) ), waterAt( wp.xz - vec2( 0.0, 3.0 ) ) ) );
+              wlN = max( wlN, wl );
+            #endif
+            float bank = wlN > -999.0 ? 1.0 - smoothstep( 0.25, 0.95, wp.y - wlN ) : 0.0;
+            bank *= mix( uMudOK[ int( id1 ) ], uMudOK[ int( id2 ) ], hb );
+            float ov = max( bareGround( wp.xz, 1.0 - wn.y ) * vegW, bank * 0.95 );
+            // far away, big rock faces get a second, much larger lookup so the
+            // tile's strata and joints stop repeating across a whole mountain
+            float farK = smoothstep( 60.0, 220.0, dist );
+            if ( axis != 1 && farK > 0.0 ) {
+              vec2 uvF = uv * 0.21 + vec2( 0.13, 0.71 );
+              vec4 cF = mix( textureGrad( tAlbedo, vec3( uvF, id1 ), gx * 0.21, gy * 0.21 ), textureGrad( tAlbedo, vec3( uvF, id2 ), gx * 0.21, gy * 0.21 ), hb );
+              cc = mix( cc, cF, farK * 0.6 );
+            }
+            if ( axis == 1 && ov > 0.002 ) {
+              float idO = bank > 0.35 ? 5.0 : 2.0;
+              vec4 c3 = textureGrad( tAlbedo, vec3( uv, idO ), gx, gy );
+              #ifdef GROUND_DETAIL
+                c3 = mix( c3, textureGrad( tAlbedo, vec3( uv2, idO ), gx * 0.73, gy * 0.73 ), mt );
+              #endif
+              vec4 n3 = textureGrad( tNormalArr, vec3( uv, idO ), gx, gy );
+              float ob = clamp( ( n3.a - nn.a ) * 0.8 + ( ov * 2.0 - 1.0 ) * 1.4 + 0.5, 0.0, 1.0 );
+              ob = smoothstep( 0.3, 0.7, ob );
+              cc = mix( cc, c3, ob ); nn = mix( nn, n3, ob );
+              dK = mix( dK, uDetailK[ int( idO ) ], ob );
+              rgh = mix( rgh, uRough[ int( idO ) ], ob );
+              vegW *= 1.0 - ob;
+              if ( ob > 0.5 ) tPick = idO;
+            }
+            tAlb = cc.rgb;
+            tRoughOut = cc.a * rgh;
+            // relief: hollows a little darker
+            tAlb *= mix( 0.8, 1.04, smoothstep( 0.05, 0.6, nn.a ) );
+            vec3 nm = nn.xyz * 2.0 - 1.0;
+            #ifdef GROUND_DETAIL
+              // close-up grit and fibres from the shared 1 m tile
+              float dFade = 1.0 - smoothstep( 10.0, 32.0, dist );
+              if ( dFade > 0.0 ) {
+                vec4 dt = textureGrad( tDetail, uv * 4.0, gx * 4.0, gy * 4.0 );
+                nm.xy += ( ( dt.rg * 2.0 - 1.0 ) * dK.x + ( dt.ba * 2.0 - 1.0 ) * dK.y ) * dFade * 0.9;
+              }
+            #endif
+            // far ground keeps its colour but drops most of its fine relief (no shimmer)
+            nm.xy *= 1.0 - smoothstep( 120.0, 420.0, dist ) * 0.7;
+            nm = normalize( nm );
             vec3 T, B;
             if ( axis == 1 ) { T = vec3( 1.0, 0.0, 0.0 ); B = vec3( 0.0, 0.0, 1.0 ); }
             else if ( axis == 0 ) { T = vec3( 0.0, 0.0, sign( wn.x ) ); B = vec3( 0.0, -1.0, 0.0 ); }
@@ -143,25 +234,27 @@ export class Terrain {
             B = normalize( B - wn * dot( wn, B ) - T * dot( T, B ) );
             tNrmWorld = normalize( T * nm.x + B * nm.y + wn * nm.z );
             // macro variation so tiles never look repetitive
-            float m1 = vnoise( wp.xz * 0.018 ), m2 = vnoise( wp.xz * 0.07 + 17.0 );
+            float m1 = vnoise( wp.xz * 0.018 ), m2 = vnoise( wp.xz * 0.07 + 17.0 ), m3 = vnoise( wp.xz * 0.011 + 7.0 );
             tAlb *= 0.9 + 0.17 * m1 + 0.06 * ( m2 - 0.5 );
             tAlb = mix( tAlb, tAlb * vec3( 1.06, 1.0, 0.86 ), smoothstep( 0.55, 0.9, m2 ) * 0.5 );
+            // meadows drift between sun-yellowed and deep cool green
+            tAlb = mix( tAlb, tAlb * vec3( 1.14, 1.04, 0.72 ), smoothstep( 0.58, 0.85, m3 ) * vegW * 0.55 );
+            tAlb = mix( tAlb, tAlb * vec3( 0.84, 0.96, 0.92 ), smoothstep( 0.42, 0.15, m3 ) * vegW * 0.45 );
             // wet margin at water edges + caustics under water
-            float wl = texture2D( tWaterLvl, ( wp.xz + uHalf ) / uSize ).r;
             float depth = wl - wp.y;
-            if ( wl > -999.0 ) {
-              float wet = 1.0 - smoothstep( -0.05, 0.55, -depth );
-              tAlb *= 1.0 - 0.33 * wet;
-              tRoughOut = mix( tRoughOut, 0.3, wet );
-              if ( depth > 0.0 ) {
-                vec2 q = floor( wp.xz * 12.0 ) / 12.0;
-                float t = uTime * 0.8;
-                float c = sin( q.x * 2.1 + sin( q.y * 1.7 + t ) * 1.3 + t ) + sin( q.y * 2.3 + sin( q.x * 1.9 - t * 1.1 ) * 1.2 - t * 0.7 );
-                c = pow( clamp( 1.0 - abs( c ) * 0.9, 0.0, 1.0 ), 6.0 );
-                float fade = exp( - depth * 0.35 ) * smoothstep( 0.0, 0.25, depth );
-                tAlb += vec3( 0.55, 0.75, 0.7 ) * c * fade * 0.9;
-                tAlb *= mix( vec3( 1.0 ), vec3( 0.55, 0.78, 0.8 ), smoothstep( 0.0, 3.0, depth ) );
-              }
+            if ( wlN > -999.0 ) {
+              float wet = max( 1.0 - smoothstep( -0.05, 0.55, -depth ), bank * 0.45 );
+              tAlb *= 1.0 - 0.3 * wet;
+              tRoughOut = mix( tRoughOut, max( tRoughOut * 0.55, 0.18 ), wet );
+            }
+            if ( wl > -999.0 && depth > 0.0 ) {
+              vec2 q = floor( wp.xz * 12.0 ) / 12.0;
+              float t = uTime * 0.8;
+              float c = sin( q.x * 2.1 + sin( q.y * 1.7 + t ) * 1.3 + t ) + sin( q.y * 2.3 + sin( q.x * 1.9 - t * 1.1 ) * 1.2 - t * 0.7 );
+              c = pow( clamp( 1.0 - abs( c ) * 0.9, 0.0, 1.0 ), 6.0 );
+              float fade = exp( - depth * 0.35 ) * smoothstep( 0.0, 0.25, depth );
+              tAlb += vec3( 0.55, 0.75, 0.7 ) * c * fade * 0.9;
+              tAlb *= mix( vec3( 1.0 ), vec3( 0.55, 0.78, 0.8 ), smoothstep( 0.0, 3.0, depth ) );
             }
           }
         `,
@@ -173,7 +266,7 @@ export class Terrain {
     mat.onBeforeCompile = (shader, r) => {
       prev(shader, r);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = tRoughOut;')
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp( tRoughOut, 0.1, 1.0 );')
         .replace('#include <normal_fragment_maps>', 'normal = normalize( ( viewMatrix * vec4( tNrmWorld, 0.0 ) ).xyz );');
     };
     return mat;

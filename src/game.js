@@ -37,7 +37,7 @@ export class Game {
   async init(progress = () => {}) {
     const e = this.engine;
     progress(0.05, 'Laying down the dirt');
-    this.terrain = new Terrain(e, this.world, this.sampler);
+    this.terrain = new Terrain(e, this.world, this.sampler, this.opt.terrainTex ?? null);
     this.terrain.update(e.camera.position, true);
     progress(0.2, 'Filling rivers');
     this.water = new Water(e, this.world, this.sampler, this.terrain);

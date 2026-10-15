@@ -1,440 +1,516 @@
-// Hand-painted (procedurally) pixel-art ground materials. Each is a 128x128
-// tile covering 4 m (32 px per metre), lit from the top-left like classic
-// pixel art, and seamless.
+// Painted ground materials. Each is a 256x256 tile covering 4 m (64 px per
+// metre) with colour + roughness (alpha) and a normal map + height (alpha)
+// built from the painted relief: clods, stones, leaf litter, needles, cracks,
+// puddles. A shared 1 m detail tile adds grit up close.
 import * as THREE from 'three';
-import { PixelPainter, ramp, makeArrayTexture, mixRgb, bayer } from './pixel.js';
-import { tileFbm, tileNoise } from '../core/rng.js';
+import { GroundPainter, normalFromHeight, hex, mixc, mulc, sst } from './groundPainter.js';
 import { MAT_NAMES } from '../world/gen.js';
 
-const S = 128;
+const S = 256;
+const STONES = [0x8c867d, 0x9e9486, 0x6f6a63, 0xa48b6c, 0x857059, 0x5d5853, 0x8f6d5d, 0xb0a596].map(hex);
+const STRAW = [0xb39a5c, 0x9c8550, 0x7e6a42, 0xc2ab6c].map(hex);
+const pick = (r, a) => a[Math.floor(r.next() * a.length)];
+const rnd = (r, a, b) => a + r.next() * (b - a);
 
-function grassBlades(p, pal, count, opt = {}) {
-  const { minLen = 2, maxLen = 5, lean = 0.5, tipBoost = 1 } = opt;
-  p.scatter(count, (x, y, i, r) => {
-    const len = Math.floor(minLen + r.next() * (maxLen - minLen + 1));
-    const dir = (r.next() - 0.5) * lean;
-    const shade = Math.floor(r.next() * (pal.length - 1));
-    for (let k = 0; k < len; k++) {
-      const c = k === len - 1 ? pal[Math.min(pal.length - 1, shade + 1 + tipBoost)] : pal[Math.min(pal.length - 1, shade + (k > len / 2 ? 1 : 0))];
-      p.set(x + dir * k, y - k, c);
-    }
-    p.set(x, y + 1, pal[0]);
-  });
-}
-
-function leaf(p, x, y, ang, len, pal, rib) {
-  const ca = Math.cos(ang), sa = Math.sin(ang);
-  for (let t = -len; t <= len; t++) {
-    const w = Math.round((1 - Math.abs(t) / (len + 0.5)) * len * 0.45);
-    for (let s = -w; s <= w; s++) {
-      const px = x + ca * t - sa * s, py = y + sa * t + ca * s;
-      const lit = s < 0 ? 2 : s === 0 ? 1 : 0;
-      p.set(px, py, pal[Math.min(pal.length - 1, lit + (t < 0 ? 1 : 0))]);
-    }
-    if (rib) p.set(x + ca * t, y + sa * t, rib);
+function stones(p, n, rMin, rMax, o = {}) {
+  const r = p.rng, S = p.S;
+  for (let k = 0; k < n; k++) {
+    p.blob(r.next() * S, r.next() * S, rnd(r, rMin, rMax), rnd(r, 0.55, 0.95), r.next() * 6.28, {
+      col: mulc(pick(r, o.cols ?? STONES), rnd(r, 0.85, 1.1)), h: rnd(r, o.h0 ?? 0.12, o.h1 ?? 0.24), ao: o.ao ?? 0.35, rough: o.rough ?? 0.7, shine: 0.28, lumpy: o.lumpy ?? 0.14,
+    });
   }
 }
-
-function pebbles(p, count, pals, opt = {}) {
-  const { minR = 1.2, maxR = 3.2, shadow = null } = opt;
-  p.scatter(count, (x, y, i, r) => {
-    const rx = minR + r.next() * (maxR - minR);
-    const ry = rx * (0.6 + r.next() * 0.35);
-    const pal = pals[Math.floor(r.next() * pals.length)];
-    if (shadow) p.disc(x + 1, y + 1.2, rx, shadow, { ry });
-    p.blob(x, y, rx, ry, pal);
-  });
+function twigs(p, n, o = {}) {
+  const r = p.rng, S = p.S;
+  for (let k = 0; k < n; k++) p.stroke(r.next() * S, r.next() * S, rnd(r, o.l0 ?? 10, o.l1 ?? 24), r.next() * 6.28, { c0: hex(o.c0 ?? 0x4e3a28), c1: hex(o.c1 ?? 0x705238), w0: o.w ?? 1.6, w1: (o.w ?? 1.6) * 0.65, h: 0.14, bend: rnd(r, -0.6, 0.6), ao: 0.35, rough: 0.85 });
 }
-
-// soft low-frequency base: 3 close shades, crisp borders with a thin dithered seam
-function softBase(p, pal, scale, seed, opt = {}) {
-  const { t1 = 0.42, t2 = 0.6, octaves = 3 } = opt;
-  for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
-    const n = tileFbm((x / p.w) * scale, (y / p.h) * scale, scale, octaves, seed);
-    const d = (bayer(x, y) - 0.5) * 0.04;
-    p.set(x, y, n + d < t1 ? pal[0] : n + d < t2 ? pal[1] : pal[2]);
+function blades(p, n, cols, o = {}) {
+  const r = p.rng, S = p.S;
+  for (let k = 0; k < n; k++) {
+    const c = pick(r, cols);
+    p.stroke(r.next() * S, r.next() * S, rnd(r, o.l0 ?? 3, o.l1 ?? 8), r.next() * 6.28, { c0: mulc(c, o.root ?? 0.7), c1: c, w0: o.w0 ?? 1.2, w1: o.w1 ?? 0.35, h: o.h ?? 0.07, bend: rnd(r, -0.7, 0.7), ao: o.ao ?? 0.12, hTaper: true });
   }
 }
-function tuft(p, x, y, pal, h) {
-  // three blades fanning out, dark root, light tips (lit from top-left)
-  const blades = [[-1, h - 1], [0, h], [1, h - 1]];
-  for (const [dir, len] of blades) {
-    for (let k = 0; k < len; k++) {
-      const px = x + Math.round(dir * k * 0.5), py = y - k;
-      p.set(px, py, k === len - 1 ? pal[3] : k === 0 ? pal[0] : dir < 0 ? pal[2] : pal[1]);
-    }
-  }
-}
-const near = (c, f) => { const [r, g, b] = Array.isArray(c) ? c : [(c >> 16) & 255, (c >> 8) & 255, c & 255]; return [Math.min(255, r * f), Math.min(255, g * f), Math.min(255, b * f)]; };
-function speckle(p, n, cols) { p.scatter(n, (x, y, i, r) => p.set(x, y, r.pick(cols))); }
-function crackNet(p, n, dark, light, opt = {}) {
-  p.scatter(n, (x, y, i, r) => {
-    let a = opt.angle !== undefined ? opt.angle + (r.next() - 0.5) * (opt.spread ?? 0.6) : r.next() * Math.PI * 2;
-    const len = (opt.min ?? 8) + r.next() * ((opt.max ?? 20) - (opt.min ?? 8));
-    let cx = x, cy = y;
-    for (let k = 0; k < len; k++) {
-      p.set(cx, cy, dark);
-      if (light) p.set(cx - Math.round(Math.sin(a)), cy + Math.round(Math.cos(a)) * -1, light);
-      a += (r.next() - 0.5) * (opt.wiggle ?? 0.7);
-      cx += Math.cos(a); cy += Math.sin(a);
-      if (opt.branch && r.next() < opt.branch) {
-        let b = a + (r.next() < 0.5 ? 1 : -1) * 1.1, bx = cx, by = cy;
-        for (let m = 0; m < len * 0.35; m++) { p.set(bx, by, dark); b += (r.next() - 0.5) * 0.6; bx += Math.cos(b); by += Math.sin(b); }
-      }
-    }
-  });
-}
-function voronoi(p, count, seed, fn) {
-  const pts = [];
-  for (let i = 0; i < count; i++) pts.push([p.rng.next() * p.w, p.rng.next() * p.h, p.rng.next()]);
-  for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
-    let d1 = 1e9, d2 = 1e9, best = 0, bx = 0, by = 0;
-    for (let k = 0; k < pts.length; k++) for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
-      const dx = x - (pts[k][0] + ox * p.w), dy = y - (pts[k][1] + oy * p.h);
-      const d = dx * dx + dy * dy;
-      if (d < d1) { d2 = d1; d1 = d; best = k; bx = dx; by = dy; } else if (d < d2) d2 = d;
-    }
-    fn(x, y, Math.sqrt(d2) - Math.sqrt(d1), pts[best][2], bx, by);
+function leaves(p, n, cols, o = {}) {
+  const r = p.rng, S = p.S;
+  for (let k = 0; k < n; k++) {
+    const len = rnd(r, o.l0 ?? 3.5, o.l1 ?? 8);
+    const c = mulc(pick(r, cols), rnd(r, 0.85, 1.12));
+    p.leaf(r.next() * S, r.next() * S, len, len * rnd(r, 0.32, 0.55), r.next() * 6.28, { col: c, rib: mulc(c, 0.72), h: 0.06, ao: o.ao ?? 0.2 });
   }
 }
 
 const painters = {
-  grass(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x5c8f36, 6, { light: 0.21 });
-    softBase(p, [near(pal[2], 0.9), pal[2], near(pal[2], 1.04)], 3, seed);
-    // dense tufts, darker under-layer first then lighter tufts on top
-    p.scatter(520, (x, y, i, r) => tuft(p, x, y, [pal[0], pal[1], pal[2], pal[3]], 2 + r.int(0, 1)));
-    p.scatter(380, (x, y, i, r) => tuft(p, x, y, [pal[1], pal[2], pal[3], pal[4]], 2 + r.int(0, 2)));
-    p.scatter(60, (x, y, i, r) => tuft(p, x, y, [pal[2], pal[3], pal[4], pal[5]], 3));
-    // tiny clover + daisies
-    p.scatter(8, (x, y, i, r) => { for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [-1, 0]]) p.set(x + dx, y + dy, pal[1]); p.set(x, y, pal[3]); });
-    p.scatter(6, (x, y, i, r) => { const c = r.next() < 0.5 ? 0xf4f1d6 : 0xf3cf45; p.set(x, y, c); p.set(x + 1, y, c); p.set(x, y - 1, c); p.set(x + 1, y + 1, 0x2f5a20); });
-    return p;
-  },
-  jungle(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const soil = ramp(0x553b27, 5, { light: 0.16 });
-    softBase(p, [near(soil[2], 0.9), soil[2], near(soil[2], 1.06)], 4, seed);
-    speckle(p, 300, [soil[0], soil[3]]);
-    const greens = ramp(0x557f2c, 4), yel = ramp(0xa2822f, 4), reds = ramp(0x83402a, 4), dead = ramp(0x75603b, 4), dark = ramp(0x3e3022, 4);
-    // big leaf litter (5-9 px leaves with midribs)
-    p.scatter(70, (x, y, i, r) => {
-      const pal = r.pick([dead, dead, yel, reds, dark, greens]);
-      leaf(p, x, y, r.next() * Math.PI, 3 + r.int(0, 2), pal, pal[0]);
-    });
-    p.scatter(50, (x, y, i, r) => { const pal = r.pick([dead, yel, dark]); leaf(p, x, y, r.next() * Math.PI, 2, pal, null); });
-    // twigs
-    p.scatter(12, (x, y, i, r) => { const a = r.next() * Math.PI; const l = 6 + r.next() * 9; p.line(x, y + 1, x + Math.cos(a) * l, y + Math.sin(a) * l + 1, 0x2a1d12); p.line(x, y, x + Math.cos(a) * l, y + Math.sin(a) * l, 0x7a5a38); });
-    // small moss cushions + seedlings
-    const moss = ramp(0x4f8a2a, 4);
-    p.scatter(14, (x, y, i, r) => { for (let k = 0; k < 7; k++) { const rr = 1 + r.next(); p.blob(x + r.int(-3, 3), y + r.int(-2, 2), rr, rr * 0.8, moss); } });
-    p.scatter(30, (x, y, i, r) => tuft(p, x, y, [greens[0], greens[1], greens[2], greens[3]], 2));
-    p.scatter(4, (x, y) => { p.set(x, y, 0xb8302a); p.set(x + 1, y, 0xe0503a); p.set(x, y + 1, 0x6e1a16); });
-    return p;
-  },
-  dirt(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x8c6745, 5, { light: 0.16 });
-    softBase(p, [near(pal[2], 0.93), pal[2], near(pal[2], 1.06)], 3, seed, { t1: 0.4, t2: 0.62 });
-    speckle(p, 420, [pal[1], pal[3], pal[4]]);
-    pebbles(p, 70, [ramp(0x8d857a, 4), ramp(0xa38262, 4), ramp(0x75695c, 4)], { minR: 0.9, maxR: 2.2, shadow: pal[0] });
-    crackNet(p, 6, pal[0], pal[4], { min: 5, max: 11, wiggle: 0.8 });
-    return p;
-  },
-  rock(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x84817b, 6, { light: 0.24, hueShift: 0.1 });
-    softBase(p, [pal[2], pal[3], pal[2]], 2, seed, { t1: 0.38, t2: 0.62 });
-    // chiseled facets: only some Voronoi edges become ridges (light) or cracks (dark)
-    voronoi(p, 14, seed, (x, y, edge, rnd, bx, by) => {
-      const t = tileFbm(x / S * 6, y / S * 6, 6, 2, seed + 7);
-      if (edge < 1.0 && rnd > 0.25) p.set(x, y, pal[0]);
-      else if (edge < 2.0 && rnd > 0.25 && (bx + by) < 0) p.set(x, y, pal[4]);
-      else if (rnd < 0.3 && t > 0.6) p.set(x, y, pal[3]);
-      else if (t < 0.3) p.set(x, y, pal[1]);
-    });
-    crackNet(p, 9, pal[0], pal[4], { min: 10, max: 26, wiggle: 0.6, branch: 0.08 });
-    speckle(p, 260, [pal[1], pal[4], pal[5]]);
-    const lich = [ramp(0xb9b56c, 3), ramp(0xd59443, 3), ramp(0x9db36f, 3)];
-    p.scatter(9, (x, y, i, r) => { const c = r.pick(lich); for (let k = 0; k < 7; k++) p.blob(x + r.int(-3, 3), y + r.int(-2, 2), 1.2, 1, c); });
-    return p;
-  },
-  sand(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0xdcc591, 5, { light: 0.12, hueShift: 0.1 });
-    softBase(p, [near(pal[2], 0.97), pal[2], near(pal[2], 1.03)], 3, seed);
-    // subtle wind ripples: thin dashed shadow lines with a lit edge above
-    for (let k = 0; k < 11; k++) {
-      const y0 = (k / 11) * S + p.rng.next() * 4;
-      for (let x = 0; x < S; x++) {
-        const y = y0 + Math.sin((x / S) * Math.PI * 2 * 2 + k) * 2.5 + tileFbm(x / S * 4, k, 4, 2, seed) * 3;
-        if (tileNoise(x / 6, k * 3, Math.ceil(S / 6), seed) > 0.42) { p.set(x, y, pal[1]); p.set(x, y - 1, pal[4]); }
-      }
-    }
-    speckle(p, 700, [pal[1], pal[4], pal[0]]);
-    p.scatter(9, (x, y, i, r) => { const c = r.pick([0xf6efe4, 0xeab9a2, 0xd8cbb6]); p.set(x, y, c); p.set(x + 1, y, c); p.set(x + 1, y + 1, pal[0]); });
-    return p;
-  },
-  mud(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x4c3b29, 5, { light: 0.16 });
-    softBase(p, [near(pal[2], 0.92), pal[2], near(pal[2], 1.05)], 3, seed);
-    speckle(p, 300, [pal[0], pal[3]]);
-    // wet puddles with sky glint
-    p.scatter(12, (x, y, i, r) => {
-      const rx = 3 + r.next() * 6;
-      p.disc(x, y, rx, 0x2c2218, { ry: rx * 0.5 });
-      p.line(x - rx * 0.55, y - rx * 0.22, x + rx * 0.1, y - rx * 0.28, 0x8f8a86);
-      p.set(x + rx * 0.3, y, 0x5a4a38);
-    });
-    // footprint-ish dimples
-    p.scatter(20, (x, y) => { p.set(x, y, pal[0]); p.set(x + 1, y, pal[0]); p.set(x, y - 1, pal[3]); });
-    return p;
-  },
-  snow(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = [[184, 202, 228], [210, 222, 240], [232, 239, 248], [246, 249, 253], [255, 255, 255]];
-    softBase(p, [pal[2], pal[3], pal[3]], 3, seed);
-    for (let k = 0; k < 9; k++) {
-      const y0 = (k / 9) * S;
-      for (let x = 0; x < S; x++) { const y = y0 + Math.sin(x / S * Math.PI * 4 + k * 2) * 3; if (tileNoise(x / 8, k, 16, seed) > 0.5) { p.set(x, y, pal[1]); p.set(x, y - 1, pal[4]); } }
-    }
-    speckle(p, 120, [pal[4], pal[1]]);
-    return p;
-  },
-  ash(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x48423f, 5, { light: 0.14, hueShift: 0.15 });
-    softBase(p, [pal[1], pal[2], pal[1]], 3, seed);
-    speckle(p, 500, [pal[0], pal[3], pal[4]]);
-    pebbles(p, 34, [ramp(0x2c292b, 4), ramp(0x5c4c46, 4)], { minR: 0.9, maxR: 2.2, shadow: pal[0] });
-    return p;
-  },
-  sandstone(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const cols = [0xb9583b, 0xd27d4b, 0xe6a86d, 0xc76c45, 0xab4c36, 0xdd9c64, 0xf0c48c, 0xc0623f];
-    // horizontal strata of varying thickness
-    const bounds = [];
-    let yy = 0;
-    while (yy < S) { const t = 4 + Math.floor(p.rng.next() * 10); bounds.push([yy, Math.min(S, yy + t), cols[bounds.length % cols.length]]); yy += t; }
-    for (let x = 0; x < S; x++) {
-      const wav = Math.round(Math.sin((x / S) * Math.PI * 2) * 1.5 + (tileFbm(x / S * 4, 0.5, 4, 2, seed) - 0.5) * 3);
-      for (let y = 0; y < S; y++) {
-        const yw = (y + wav + S) % S;
-        let band = bounds[0];
-        for (const b of bounds) if (yw >= b[0] && yw < b[1]) band = b;
-        const pal = ramp(band[2], 4, { light: 0.12 });
-        const streak = tileNoise(x / 7, y / 1.5, Math.ceil(S / 7), seed + 3);
-        let c = streak > 0.68 ? pal[3] : streak < 0.3 ? pal[1] : pal[2];
-        if (yw === band[0]) c = pal[3]; // lit top edge of each layer
-        if (yw === band[1] - 1) c = pal[0]; // shadowed underside
-        p.set(x, y, c);
-      }
-    }
-    // vertical joints + erosion pockets
-    crackNet(p, 10, 0x6a2c1e, null, { angle: Math.PI / 2, spread: 0.3, min: 4, max: 12, wiggle: 0.3 });
-    p.scatter(14, (x, y, i, r) => { const rr = 1 + r.next() * 1.5; p.disc(x, y, rr, 0x7a3423, { ry: rr * 0.7 }); p.set(x - 1, y - 1, 0xf3c38c); });
-    return p;
-  },
-  moss(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x4f8f2c, 6, { light: 0.22 });
-    softBase(p, [pal[0], pal[1], pal[1]], 4, seed);
-    p.scatter(330, (x, y, i, r) => { const rr = 1.2 + r.next() * 1.8; p.blob(x, y, rr, rr * 0.8, pal.slice(1, 5)); });
-    p.scatter(20, (x, y) => { p.set(x, y, 0xcfe07a); p.set(x, y - 1, 0x7aa83b); });
-    return p;
-  },
-  gravel(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const base = ramp(0x6c6357, 4);
-    softBase(p, [base[1], base[1], base[2]], 4, seed);
-    pebbles(p, 380, [ramp(0x908b84, 4), ramp(0x9c8870, 4), ramp(0x737679, 4), ramp(0xb3a58e, 4)], { minR: 1.5, maxR: 3.6, shadow: 0x3d3934 });
-    return p;
-  },
-  drygrass(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0xa79a4f, 6, { light: 0.2 });
-    softBase(p, [pal[1], pal[2], pal[1]], 3, seed);
-    p.scatter(500, (x, y, i, r) => tuft(p, x, y, [pal[0], pal[1], pal[2], pal[3]], 2 + r.int(0, 2)));
-    p.scatter(300, (x, y, i, r) => tuft(p, x, y, [pal[1], pal[3], pal[4], pal[5]], 3 + r.int(0, 1)));
-    speckle(p, 40, [0x6b5a2e]);
-    return p;
-  },
-  needles(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x6b4329, 5, { light: 0.15 });
-    softBase(p, [pal[1], pal[2], pal[1]], 3, seed);
-    const nc = [0x9c5b2f, 0xba763e, 0x7e4b27, 0xcb8f51, 0x5c3820];
-    p.scatter(560, (x, y, i, r) => { const a = r.next() * Math.PI; const l = 3 + r.next() * 3; p.line(x, y, x + Math.cos(a) * l, y + Math.sin(a) * l, r.pick(nc)); });
-    p.scatter(5, (x, y, i, r) => { p.blob(x, y, 2.6, 3.4, ramp(0x7a5230, 4), { outline: 0x3a2414 }); });
-    return p;
-  },
-  redsand(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0xc87747, 5, { light: 0.14 });
-    softBase(p, [near(pal[2], 0.96), pal[2], near(pal[2], 1.04)], 3, seed);
-    for (let k = 0; k < 10; k++) {
-      const y0 = (k / 10) * S + p.rng.next() * 4;
-      for (let x = 0; x < S; x++) {
-        const y = y0 + Math.sin((x / S) * Math.PI * 2 * 2 + k * 1.7) * 3 + tileFbm(x / S * 4, k, 4, 2, seed) * 3;
-        if (tileNoise(x / 5, k * 3, Math.ceil(S / 5), seed) > 0.45) { p.set(x, y, pal[1]); p.set(x, y - 1, pal[4]); }
-      }
-    }
-    speckle(p, 600, [pal[1], pal[4], pal[0]]);
-    pebbles(p, 14, [ramp(0x9e4d32, 4), ramp(0xd99a6a, 4)], { minR: 0.9, maxR: 1.8, shadow: pal[0] });
-    return p;
-  },
-  basalt(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x4c4746, 6, { light: 0.2, hueShift: 0.2 });
-    voronoi(p, 18, seed, (x, y, edge, rnd, bx, by) => {
-      const shade = 1 + Math.floor(rnd * 3);
-      let c = pal[shade];
-      if (edge < 1.3) c = pal[0];
-      else if (edge < 2.4 && bx + by < 0) c = pal[Math.min(5, shade + 2)];
-      else if (tileNoise(x / 3, y / 3, Math.ceil(S / 3), seed) > 0.8) c = pal[shade + 1];
-      p.set(x, y, c);
-    });
-    speckle(p, 160, [pal[4], pal[1]]);
-    p.scatter(10, (x, y) => { p.set(x, y, 0x93422a); p.set(x + 1, y, 0x5a2a20); });
-    return p;
-  },
-  clay(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0xa38d74, 5, { light: 0.14 });
-    softBase(p, [pal[2], pal[3], pal[2]], 3, seed);
-    voronoi(p, 26, seed, (x, y, edge, rnd, bx, by) => {
-      if (edge < 1.1) p.set(x, y, pal[0]);
-      else if (edge < 2.1 && bx + by < 0) p.set(x, y, pal[4]);
-    });
-    speckle(p, 220, [pal[1], pal[4]]);
-    p.scatter(22, (x, y) => { p.set(x, y, 0x5b5f66); p.set(x - 1, y - 1, 0xc9ced6); });
-    return p;
-  },
-  // side-projection cliff: wavy bedding planes, sparse slanted joints,
-  // weathered patches, water stains and moss on the ledges (tiles in x and y)
-  cliff(seed) {
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x837f78, 6, { light: 0.24, hueShift: 0.1 });
+  // short meadow turf seen from above: blades in every direction over dark soil
+  grass(p) {
     const r = p.rng;
+    const f2 = p.fbm(2, 4, 1), f6 = p.fbm(6, 4, 2), f20 = p.fbm(20, 3, 3), f48 = p.fbm(48, 2, 4);
+    const soil = hex(0x4a3a26), dark = hex(0x2b4419), mid = hex(0x426a26), lite = hex(0x6c9636), yel = hex(0x93a23e);
+    p.base((x, y, i) => {
+      let c = mixc(dark, mid, sst(0.3, 0.72, f6[i]));
+      c = mixc(c, soil, sst(0.66, 0.8, f20[i]) * 0.55);
+      c = mulc(c, 0.9 + (f48[i] - 0.5) * 0.2);
+      return { c, h: 0.25 + f6[i] * 0.1 + f48[i] * 0.04, r: 0.88 };
+    });
+    // the tint of the blades drifts in patches: lush, yellowed, bluish
+    const S = p.S;
+    for (let k = 0; k < 2600; k++) {
+      const x = r.next() * S, y = r.next() * S, i = p.at(x, y);
+      const patch = f2[i];
+      const c = mixc(mixc(mid, lite, r.next()), yel, sst(0.62, 0.8, patch) * r.next());
+      p.stroke(x, y, rnd(r, 3, 8), r.next() * 6.28, { c0: mulc(c, 0.62), c1: mulc(c, rnd(r, 0.92, 1.15)), w0: 1.3, w1: 0.35, h: 0.07, bend: rnd(r, -0.8, 0.8), ao: 0.1, hTaper: true });
+    }
+    // clover and tiny flowers
+    for (let k = 0; k < 26; k++) {
+      const x = r.next() * S, y = r.next() * S;
+      for (let q = 0; q < 3; q++) { const a = q * 2.09 + r.next(); p.blob(x + Math.cos(a) * 1.6, y + Math.sin(a) * 1.6, 1.4, 0.9, a, { col: hex(0x5e9a34), h: 0.08, ao: 0.15, lumpy: 0 }); }
+    }
+    for (let k = 0; k < 12; k++) p.blob(r.next() * S, r.next() * S, 1.1, 1, 0, { col: hex(r.next() < 0.6 ? 0xf2efe0 : 0xf2cf4a), h: 0.1, ao: 0.1, lumpy: 0 });
+    return p;
+  },
+  // forest floor: dark humus buried in leaf litter, twigs, roots and moss
+  jungle(p) {
+    const r = p.rng, S = p.S;
+    const f3 = p.fbm(3, 4, 1), f12 = p.fbm(12, 4, 2), f40 = p.fbm(40, 2, 3);
+    const A = hex(0x46331f), B = hex(0x5a412a), C = hex(0x35271a);
+    p.base((x, y, i) => {
+      let c = mixc(A, B, sst(0.3, 0.7, f3[i]));
+      c = mixc(c, C, sst(0.6, 0.8, f12[i]) * 0.6);
+      return { c: mulc(c, 0.9 + (f40[i] - 0.5) * 0.25), h: 0.22 + f12[i] * 0.1 + f40[i] * 0.05, r: 0.9 };
+    });
+    // roots snaking across
+    for (let k = 0; k < 3; k++) p.stroke(r.next() * S, r.next() * S, rnd(r, 50, 90), r.next() * 6.28, { c0: hex(0x553d2a), c1: hex(0x6a4c33), w0: 3, w1: 1.4, h: 0.3, bend: rnd(r, -2, 2), ao: 0.45, rough: 0.8 });
+    const litter = [0x6e4e2e, 0x8c6c34, 0x6e3a22, 0x4e5e2a, 0x3d2c1a, 0x9a7e3a, 0x5e4228, 0x7a5228].map(hex);
+    leaves(p, 300, litter, { l0: 4, l1: 9 });
+    twigs(p, 16);
+    leaves(p, 160, litter, { l0: 3, l1: 6.5 });
+    // moss cushions and seedlings
+    for (let k = 0; k < 12; k++) {
+      const x = r.next() * S, y = r.next() * S;
+      for (let q = 0; q < 8; q++) p.blob(x + rnd(r, -5, 5), y + rnd(r, -4, 4), rnd(r, 1.4, 3), 0.8, r.next() * 6, { col: mulc(hex(0x4c7a2a), rnd(r, 0.8, 1.2)), h: 0.12, ao: 0.25, lumpy: 0.25 });
+    }
+    for (let k = 0; k < 10; k++) {
+      const x = r.next() * S, y = r.next() * S;
+      for (let q = 0; q < 3; q++) p.leaf(x + rnd(r, -1, 1), y + rnd(r, -1, 1), 2.6, 1.3, q * 2.1 + r.next(), { col: hex(0x6aa03a), h: 0.08, ao: 0.15 });
+    }
+    return p;
+  },
+  // bare earth: clods, grit, stones, cracks, damp patches, straw and twigs
+  dirt(p) {
+    const r = p.rng, S = p.S;
+    const f3 = p.fbm(3, 5, 1), f8 = p.fbm(8, 4, 2), f24 = p.fbm(24, 3, 3), f64 = p.fbm(64, 2, 4), damp = p.fbm(2, 4, 5);
+    const A = hex(0x6f5137), B = hex(0x553c2b), C = hex(0x83603f), G = hex(0x7d7262), D = hex(0x3a291e);
+    const dust = p.fbm(3, 4, 6);
+    p.base((x, y, i) => {
+      let c = mixc(A, C, sst(0.35, 0.7, f3[i]));
+      c = mixc(c, G, sst(0.5, 0.75, dust[i]) * 0.65);
+      c = mixc(c, B, sst(0.6, 0.85, f24[i]) * 0.6);
+      c = mulc(c, 0.86 + 0.28 * f24[i] + (f64[i] - 0.5) * 0.2);
+      const wet = sst(0.58, 0.72, damp[i]);
+      c = mixc(c, D, wet * 0.5);
+      return { c, h: 0.3 + f8[i] * 0.14 + f24[i] * 0.08 + f64[i] * 0.05, r: 0.95 - wet * 0.25 };
+    });
+    for (let k = 0; k < 160; k++) {
+      const x = r.next() * S, y = r.next() * S;
+      p.blob(x, y, rnd(r, 2.5, 8), rnd(r, 0.6, 0.95), r.next() * 6.28, { col: mulc(p.getCol(p.at(x, y)), rnd(r, 0.92, 1.18)), h: rnd(r, 0.1, 0.24), ao: 0.3, lumpy: 0.32, shine: 0.16, vary: 0.14 });
+    }
+    for (let k = 0; k < 10; k++) p.crack(r.next() * S, r.next() * S, rnd(r, 18, 56), r.next() * 6.28, { w: 0.8, depth: 0.14, col: D, wiggle: 0.32, branch: 0.05, lip: 0.08 });
+    stones(p, 320, 0.8, 2.6);
+    stones(p, 18, 3.5, 7.5, { h0: 0.28, h1: 0.4, ao: 0.42 });
+    for (let k = 0; k < 70; k++) { const c = pick(r, STRAW); p.stroke(r.next() * S, r.next() * S, rnd(r, 4, 11), r.next() * 6.28, { c0: mulc(c, 0.78), c1: c, w0: 0.9, w1: 0.5, h: 0.06, bend: rnd(r, -0.5, 0.5), ao: 0.25 }); }
+    twigs(p, 8);
+    // trodden dimples
+    for (let k = 0; k < 10; k++) p.puddle(r.next() * S, r.next() * S, rnd(r, 2, 4), { col: mulc(A, 0.7), level: 0.22, rough: 0.8 });
+    return p;
+  },
+  // weathered bedrock seen from above: big slabs, joints only partly open,
+  // soil and grit lodged in them, pits, lichen
+  rock(p) {
+    const r = p.rng, S = p.S;
+    const W = p.worley(3, 1, 1.6), W2 = p.worley(9, 2, 1.2), f4 = p.fbm(4, 4, 2), f16 = p.fbm(16, 3, 3), f60 = p.fbm(60, 2, 4), open = p.fbm(5, 3, 5);
+    const greys = [0x8a8680, 0x96907f, 0x7c7d80, 0x8e8577].map(hex);
+    const soil = hex(0x4c3a2a);
+    p.base((x, y, i) => {
+      const e = W.f2[i] - W.f1[i], e2 = W2.f2[i] - W2.f1[i];
+      const g = Math.floor(W.id[i] * 3.999);
+      let c = mixc(greys[g], greys[(g + 1) % 4], f4[i] * 0.7);
+      c = mulc(c, 0.82 + 0.3 * f16[i] + (f60[i] - 0.5) * 0.16);
+      const gap = (1 - sst(0.015, 0.06, e)) * sst(0.4, 0.55, open[i]);
+      const hair = (1 - sst(0.0, 0.02, e2)) * sst(0.55, 0.7, f16[i]);
+      c = mixc(c, soil, gap * 0.9);
+      c = mulc(c, 1 - hair * 0.35);
+      const edge = sst(0.04, 0.25, e);
+      return { c, h: 0.25 + (0.18 + edge * 0.18) * (1 - gap) + f16[i] * 0.12 + f60[i] * 0.03 - hair * 0.05, r: 0.82 + gap * 0.12 };
+    });
+    for (let k = 0; k < 30; k++) p.puddle(r.next() * S, r.next() * S, rnd(r, 0.8, 2), { col: hex(0x5a5650), level: 0.3, rough: 0.9 });
+    const lich = [0xbdb67a, 0xcf8f48, 0xd9d7c9, 0x9aad6a].map(hex);
+    for (let k = 0; k < 10; k++) {
+      const x = r.next() * S, y = r.next() * S, c = pick(r, lich);
+      for (let q = 0; q < 6; q++) p.blob(x + rnd(r, -4, 4), y + rnd(r, -3, 3), rnd(r, 1.2, 2.6), 0.85, 0, { col: c, h: 0.02, ao: 0, alpha: 0.6, lumpy: 0.35 });
+    }
+    stones(p, 70, 0.8, 2.4);
+    return p;
+  },
+  sand(p) {
+    const r = p.rng, S = p.S;
+    const f3 = p.fbm(3, 4, 1), f10 = p.fbm(10, 3, 2), f80 = p.fbm(80, 2, 3), wetN = p.fbm(2, 4, 4);
+    const A = hex(0xd9c38f), B = hex(0xc9ad78), Wt = hex(0xa88e62);
+    p.base((x, y, i) => {
+      const warp = (f10[i] - 0.5) * 18;
+      const ripA = Math.sin(((y + warp) / S) * Math.PI * 2 * 11 + f3[i] * 3);
+      // asymmetric ripples: long gentle backs, short steep fronts
+      const rip = ripA > 0 ? ripA * 0.6 : ripA;
+      let c = mixc(A, B, sst(0.35, 0.7, f3[i]));
+      c = mulc(c, 0.95 + (f80[i] - 0.5) * 0.14 - rip * 0.05);
+      const wet = sst(0.6, 0.75, wetN[i]);
+      c = mixc(c, Wt, wet * 0.6);
+      return { c, h: 0.3 + rip * 0.05 + f10[i] * 0.06 + f80[i] * 0.02, r: 0.92 - wet * 0.3 };
+    });
+    // seaweed scraps and driftwood splinters
+    for (let k = 0; k < 4; k++) p.stroke(r.next() * S, r.next() * S, rnd(r, 5, 10), r.next() * 6.28, { c0: hex(0x4a5a2e), c1: hex(0x66733a), w0: 1.2, w1: 0.6, h: 0.05, bend: rnd(r, -1.5, 1.5), ao: 0.12, rough: 0.4 });
+    twigs(p, 4, { c0: 0x8a7a64, c1: 0xa89a82, l0: 8, l1: 18 });
+    for (let k = 0; k < 22; k++) p.blob(r.next() * S, r.next() * S, rnd(r, 0.8, 1.7), 0.7, r.next() * 6, { col: hex(r.next() < 0.5 ? 0xf3ece0 : 0xe8c4ae), h: 0.05, ao: 0.15, rough: 0.5, lumpy: 0.3 });
+    stones(p, 30, 0.8, 1.8, { h0: 0.05, h1: 0.1, ao: 0.2 });
+    return p;
+  },
+  // wet trampled mud: dried crust at the edges, ruts with raised lips, glassy
+  // puddles, three-toed critter prints, sunk pebbles, dead leaves
+  mud(p) {
+    const r = p.rng, S = p.S;
+    const f3 = p.fbm(3, 4, 1), f10 = p.fbm(10, 4, 2), f40 = p.fbm(40, 2, 3), dry = p.fbm(2, 4, 4);
+    const A = hex(0x3e2d20), B = hex(0x50392a), C = hex(0x2c2118), Dr = hex(0x6a5440);
+    p.base((x, y, i) => {
+      let c = mixc(A, B, sst(0.3, 0.7, f3[i]));
+      c = mixc(c, C, sst(0.6, 0.8, f10[i]) * 0.5);
+      const crust = sst(0.6, 0.72, dry[i]);
+      c = mixc(c, Dr, crust * 0.65);
+      return { c: mulc(c, 0.92 + (f40[i] - 0.5) * 0.16), h: 0.3 + f10[i] * 0.16 + f40[i] * 0.04 + crust * 0.05, r: 0.35 + f10[i] * 0.15 + crust * 0.45 };
+    });
+    for (let k = 0; k < 8; k++) p.puddle(r.next() * S, r.next() * S, rnd(r, 5, 15), { col: hex(0x2a2a2c), level: 0.2, rough: 0.03 });
+    // critter tracks: a pad and three toes pressed in
+    for (let k = 0; k < 4; k++) {
+      let x = r.next() * S, y = r.next() * S;
+      const a = r.next() * 6.28;
+      for (let st = 0; st < 5; st++) {
+        const side = st % 2 ? 1 : -1;
+        const px = x + Math.cos(a + 1.57) * 4 * side, py = y + Math.sin(a + 1.57) * 4 * side;
+        p.puddle(px, py, 2.8, { col: mulc(C, 0.85), level: 0.18, rough: 0.12 });
+        for (const t of [-0.55, 0, 0.55]) p.puddle(px + Math.cos(a + t) * 5.2, py + Math.sin(a + t) * 5.2, 1.4, { col: mulc(C, 0.85), level: 0.18, rough: 0.12 });
+        x += Math.cos(a) * 14; y += Math.sin(a) * 14;
+      }
+    }
+    stones(p, 90, 0.8, 2.2, { h0: 0.05, h1: 0.12, ao: 0.25, rough: 0.3 });
+    leaves(p, 14, [0x4a3420, 0x5a4026, 0x3a2a1a].map(hex), { l0: 3.5, l1: 7 });
+    twigs(p, 4, { c0: 0x3a2a1e, c1: 0x4e3a28 });
+    return p;
+  },
+  snow(p) {
+    const r = p.rng, S = p.S;
+    const f3 = p.fbm(3, 4, 1), f9 = p.fbm(9, 4, 2), f50 = p.fbm(50, 2, 3);
+    const A = hex(0xeef3fa), B = hex(0xd6e0ee), Bl = hex(0xbccbe2);
+    p.base((x, y, i) => {
+      const rip = Math.sin(((y + (f9[i] - 0.5) * 30) / S) * Math.PI * 2 * 6);
+      let c = mixc(A, B, sst(0.4, 0.75, f3[i]) * 0.7 + rip * 0.08);
+      c = mixc(c, Bl, sst(0.68, 0.85, f9[i]) * 0.4);
+      return { c: mulc(c, 0.97 + (f50[i] - 0.5) * 0.06), h: 0.3 + f9[i] * 0.2 + rip * 0.03, r: 0.62 };
+    });
+    // glints
+    for (let k = 0; k < 500; k++) { const i = p.at(r.next() * S, r.next() * S); p.blend(i, [1, 1, 1], 0.8); p.rough[i] = 0.2; }
+    return p;
+  },
+  ash(p) {
+    const f3 = p.fbm(3, 4, 1), f12 = p.fbm(12, 3, 2), f70 = p.fbm(70, 2, 3);
+    const A = hex(0x4a4644), B = hex(0x3a3634), C = hex(0x5a5450);
+    p.base((x, y, i) => {
+      let c = mixc(A, B, sst(0.35, 0.7, f3[i]));
+      c = mixc(c, C, sst(0.62, 0.82, f12[i]) * 0.5);
+      return { c: mulc(c, 0.92 + (f70[i] - 0.5) * 0.2), h: 0.3 + f12[i] * 0.12 + f70[i] * 0.04, r: 0.96 };
+    });
+    stones(p, 300, 0.8, 3, { cols: [0x252224, 0x2e2a2b, 0x5a3a30, 0x3a3436].map(hex), h0: 0.1, h1: 0.22, rough: 0.85, lumpy: 0.3 });
+    stones(p, 24, 3, 6, { cols: [0x1e1b1d, 0x2a2527, 0x4a2e28].map(hex), h0: 0.25, h1: 0.4, rough: 0.8, lumpy: 0.45 });
+    return p;
+  },
+  // layered red rock (also the badland cliff faces)
+  sandstone(p) {
+    const r = p.rng;
+    const cols = [0xb9583b, 0xd27d4b, 0xe6a86d, 0xc76c45, 0xab4c36, 0xdd9c64, 0xf0c48c, 0xc0623f].map(hex);
+    const bands = [];
+    for (let y = 0; y < S;) { const t = 5 + Math.floor(r.next() * 14); bands.push([y, Math.min(S, y + t), cols[bands.length % cols.length], r.next()]); y += t; }
+    const f4 = p.fbm(4, 3, 1), f20 = p.fbm(20, 3, 2), f80 = p.fbm(80, 2, 3);
+    p.base((x, y, i) => {
+      const yw = (((y + Math.sin((x / S) * Math.PI * 2) * 2 + (f4[i] - 0.5) * 6) % S) + S) % S;
+      let b = bands[0];
+      for (const bb of bands) if (yw >= bb[0] && yw < bb[1]) b = bb;
+      const tIn = (yw - b[0]) / Math.max(1, b[1] - b[0]);
+      let c = mulc(b[2], 0.88 + 0.2 * f20[i] + (f80[i] - 0.5) * 0.12);
+      if (tIn < 0.12) c = mulc(c, 1.1); else if (tIn > 0.86) c = mulc(c, 0.72);
+      return { c, h: 0.3 + (1 - tIn) * 0.18 * (0.5 + b[3]) + f20[i] * 0.1 + f80[i] * 0.03, r: 0.88 };
+    });
+    for (let k = 0; k < 9; k++) p.crack(r.next() * S, r.next() * S, rnd(r, 8, 22), Math.PI / 2 + rnd(r, -0.3, 0.3), { w: 0.8, depth: 0.15, col: hex(0x6a2c1e), wiggle: 0.25 });
+    for (let k = 0; k < 16; k++) { const x = r.next() * S, y = r.next() * S; p.puddle(x, y, rnd(r, 1.5, 3), { col: hex(0x7a3423), level: 0.2, rough: 0.9 }); }
+    return p;
+  },
+  // cushion moss: clumps of every size, soft dark hollows, bright sunlit tips
+  moss(p) {
+    const r = p.rng, S = p.S;
+    const W = p.worley(9, 1, 1.4), W2 = p.worley(23, 2, 1.0), f5 = p.fbm(5, 4, 2), f60 = p.fbm(60, 2, 3);
+    const D = hex(0x2a3e1c), M = hex(0x4c7a2a), L = hex(0x7ea83e), Y = hex(0xa6b244);
+    p.base((x, y, i) => {
+      const d1 = Math.max(0, 1 - W.f1[i] * 0.95), d2 = Math.max(0, 1 - W2.f1[i] * 1.05);
+      const dome = Math.min(1, d1 * 0.6 + d2 * 0.55 + f5[i] * 0.2);
+      let c = mixc(D, M, sst(0.15, 0.55, dome));
+      c = mixc(c, L, sst(0.5, 0.9, dome) * (0.4 + 0.6 * f5[i]));
+      c = mixc(c, Y, sst(0.62, 0.8, f5[i]) * sst(0.6, 0.95, dome) * 0.45);
+      return { c: mulc(c, 0.92 + (f60[i] - 0.5) * 0.2 + W.id[i] * 0.08), h: 0.2 + dome * 0.32 + f60[i] * 0.04, r: 0.92 };
+    });
+    for (let k = 0; k < 600; k++) p.stroke(r.next() * S, r.next() * S, rnd(r, 1.5, 3), r.next() * 6.28, { c0: L, c1: Y, w0: 0.8, w1: 0.4, h: 0.04, alpha: 0.6 });
+    leaves(p, 12, [0x6a4a2a, 0x8a6a34].map(hex), { l0: 3, l1: 6 });
+    return p;
+  },
+  gravel(p) {
+    const f6 = p.fbm(6, 3, 1);
+    p.base((x, y, i) => ({ c: mulc(hex(0x4c4239), 0.9 + f6[i] * 0.2), h: 0.2, r: 0.9 }));
+    stones(p, 1300, 2.4, 5, { h0: 0.22, h1: 0.38, ao: 0.42 });
+    stones(p, 900, 1.2, 2.6, { h0: 0.12, h1: 0.22, ao: 0.35 });
+    return p;
+  },
+  // dry tussock grass over dusty soil
+  drygrass(p) {
+    const f3 = p.fbm(3, 4, 1), f12 = p.fbm(12, 3, 2), f40 = p.fbm(40, 2, 3);
+    const soil = hex(0x7a6440), A = hex(0x8c7c44), B = hex(0x6e6232);
+    p.base((x, y, i) => {
+      let c = mixc(B, A, sst(0.3, 0.7, f3[i]));
+      c = mixc(c, soil, sst(0.6, 0.8, f12[i]) * 0.6);
+      return { c: mulc(c, 0.9 + (f40[i] - 0.5) * 0.2), h: 0.25 + f12[i] * 0.1, r: 0.93 };
+    });
+    blades(p, 2300, [0xb8a35a, 0xa08c48, 0xc9b66c, 0x8c8a44, 0x9aa04a].map(hex), { l0: 4, l1: 10, root: 0.65 });
+    stones(p, 40, 0.8, 2);
+    return p;
+  },
+  // pine needle litter with cones and twigs
+  needles(p) {
+    const r = p.rng, S = p.S;
+    const f3 = p.fbm(3, 4, 1), f20 = p.fbm(20, 3, 2);
+    p.base((x, y, i) => ({ c: mulc(mixc(hex(0x4e3220), hex(0x684530), sst(0.3, 0.7, f3[i])), 0.9 + f20[i] * 0.2), h: 0.25 + f20[i] * 0.1, r: 0.92 }));
+    const nc = [0x9c5b2f, 0xb06a36, 0x7e4b27, 0xc0874a, 0x5c3820, 0xa47448].map(hex);
+    for (let k = 0; k < 2600; k++) { const c = pick(r, nc); p.stroke(r.next() * S, r.next() * S, rnd(r, 4, 9), r.next() * 6.28, { c0: c, c1: mulc(c, 1.1), w0: 0.9, w1: 0.6, h: 0.05, bend: rnd(r, -0.2, 0.2), ao: 0.1 }); }
+    twigs(p, 10, { c0: 0x3e2a1a, c1: 0x5a3c26 });
+    for (let k = 0; k < 7; k++) p.blob(r.next() * S, r.next() * S, rnd(r, 3, 4.5), 0.65, r.next() * 6, { col: hex(0x6a4628), h: 0.32, ao: 0.4, lumpy: 0.4, shine: 0.3, vary: 0.3 });
+    return p;
+  },
+  redsand(p) {
+    const r = p.rng, S = p.S;
+    const f3 = p.fbm(3, 4, 1), f10 = p.fbm(10, 3, 2), f80 = p.fbm(80, 2, 3);
+    const A = hex(0xc87747), B = hex(0xb3643a);
+    p.base((x, y, i) => {
+      const ripA = Math.sin(((y + (f10[i] - 0.5) * 22) / S) * Math.PI * 2 * 10 + f3[i] * 3);
+      const rip = ripA > 0 ? ripA * 0.6 : ripA;
+      let c = mulc(mixc(A, B, sst(0.35, 0.7, f3[i])), 0.95 + (f80[i] - 0.5) * 0.16 - rip * 0.06);
+      c = mixc(c, hex(0x8e4a2c), sst(0.66, 0.8, f10[i]) * 0.5);
+      return { c, h: 0.3 + rip * 0.05 + f10[i] * 0.06, r: 0.94 };
+    });
+    for (let k = 0; k < 4; k++) p.crack(r.next() * S, r.next() * S, rnd(r, 14, 30), r.next() * 6.28, { w: 0.5, depth: 0.08, col: hex(0x8a4428), wiggle: 0.25 });
+    stones(p, 70, 0.8, 2.6, { cols: [0x9e4d32, 0xd99a6a, 0x7a3a26, 0x5e4a40].map(hex) });
+    return p;
+  },
+  basalt(p) {
+    const r = p.rng, S = p.S;
+    const W = p.worley(5, 1, 1.5), f8 = p.fbm(8, 3, 2), f50 = p.fbm(50, 2, 3), wide = p.fbm(4, 3, 4);
+    p.base((x, y, i) => {
+      const e = W.f2[i] - W.f1[i];
+      let c = mulc(hex(0x48434a), 0.82 + W.id[i] * 0.3 + (f50[i] - 0.5) * 0.2);
+      c = mixc(c, hex(0x5a3a30), sst(0.66, 0.82, f8[i]) * 0.35);
+      const seam = (1 - sst(0.01, 0.03 + wide[i] * 0.06, e)) * sst(0.3, 0.45, wide[i]);
+      c = mulc(c, 1 - seam * 0.55);
+      return { c, h: 0.3 + sst(0.02, 0.15, e) * 0.3 + f8[i] * 0.08, r: 0.72 };
+    });
+    for (let k = 0; k < 220; k++) p.puddle(r.next() * S, r.next() * S, rnd(r, 0.6, 1.4), { col: hex(0x1c1a1e), level: 0.25, rough: 0.9 });
+    return p;
+  },
+  // sun-baked clay: curled plates split by deep cracks
+  clay(p) {
+    const W = p.worley(5, 1, 1.3), W2 = p.worley(13, 2, 1.1), f4 = p.fbm(4, 3, 2), f40 = p.fbm(40, 2, 3);
+    const A = hex(0xa58f74), B = hex(0x94806a), crackC = hex(0x5a4a3a);
+    p.base((x, y, i) => {
+      const e = W.f2[i] - W.f1[i], e2 = W2.f2[i] - W2.f1[i];
+      let c = mulc(mixc(A, B, f4[i]), 0.9 + W.id[i] * 0.14 + (f40[i] - 0.5) * 0.12);
+      const crack = Math.max(1 - sst(0.012, 0.045, e), (1 - sst(0.006, 0.025, e2)) * sst(0.45, 0.6, f4[i]) * 0.8);
+      c = mixc(c, crackC, crack);
+      // plate edges curl up a little
+      const curl = sst(0.12, 0.04, e) * (1 - crack);
+      return { c: mulc(c, 1 + curl * 0.06), h: 0.3 - crack * 0.25 + curl * 0.1 + f40[i] * 0.03, r: 0.92 };
+    });
+    stones(p, 40, 0.8, 2);
+    return p;
+  },
+  // side-projection cliff: wavy bedding planes, joints, ledges with moss and water stains
+  cliff(p) {
+    const r = p.rng;
+    const pal = [0x5c5852, 0x6e6a63, 0x807b73, 0x938d84, 0xa59f95, 0xb8b2a6].map(hex);
     const bounds = [];
     let y = 0;
-    while (y < S - 8) {
-      bounds.push({ y, amp: y === 0 ? 0 : 1 + r.next() * 2.6, cyc: 1 + Math.floor(r.next() * 3), ph: r.next() * 6.283, shade: 1 + Math.floor(r.next() * 3), joints: r.next() < 0.6 });
-      y += 10 + Math.floor(r.next() * 32);
+    while (y < S - 14) {
+      bounds.push({ y, amp: y === 0 ? 0 : 2 + r.next() * 5, cyc: 1 + Math.floor(r.next() * 3), ph: r.next() * 6.283, shade: 1 + Math.floor(r.next() * 3), joints: r.next() < 0.6, out: r.next() });
+      y += 18 + Math.floor(r.next() * 56);
     }
-    bounds.push({ y: S, amp: 0, cyc: 1, ph: 0 });
-    const by = (b, x) => b.y + Math.round(Math.sin((x / S) * Math.PI * 2 * b.cyc + b.ph) * b.amp);
+    bounds.push({ y: S, amp: 0, cyc: 1, ph: 0, shade: 2, out: 0.5 });
     for (const b of bounds) {
       b.js = [];
       if (!b.joints) continue;
-      let x = Math.floor(r.next() * 24);
-      while (x < S - 6) { b.js.push({ x, slant: (r.next() - 0.5) * 0.7 }); x += 20 + Math.floor(r.next() * 40); }
+      let x = Math.floor(r.next() * 40);
+      while (x < S - 10) { b.js.push({ x, slant: (r.next() - 0.5) * 0.6 }); x += 36 + Math.floor(r.next() * 80); }
     }
-    for (let x = 0; x < S; x++) {
-      for (let k = 0; k < bounds.length - 1; k++) {
-        const b = bounds[k], y0 = by(b, x), y1 = by(bounds[k + 1], x);
-        for (let yy = y0; yy < y1; yy++) {
-          const n = tileFbm((x / S) * 8, (yy / S) * 8, 8, 2, seed);
-          const big = tileFbm((x / S) * 2, (yy / S) * 2, 2, 3, seed + 7);
-          let c = pal[Math.max(0, Math.min(5, b.shade + (n > 0.62 ? 1 : n < 0.36 ? -1 : 0) + (big < 0.32 ? -1 : 0)))];
-          if (yy === y0) c = pal[Math.min(5, b.shade + 2)];
-          else if (yy === y0 + 1 && n > 0.4) c = pal[Math.min(5, b.shade + 1)];
-          if (yy >= y1 - 2) c = pal[0];
-          for (const j of b.js) {
-            const jx = Math.round(j.x + (yy - y0) * j.slant + Math.sin(yy * 0.5 + j.x) * 0.7);
-            if (x === jx) c = pal[0];
-            else if (x === jx + 1) c = pal[Math.min(5, b.shade + 1)];
-          }
-          p.set(x, yy, c);
-        }
-      }
-    }
-    // moss and grass along the ledge lips
-    const g = ramp(0x5a8a33, 4);
+    const by = (b, x) => b.y + Math.sin((x / S) * Math.PI * 2 * b.cyc + b.ph) * b.amp;
+    const f8 = p.fbm(8, 3, 1), f2 = p.fbm(2, 3, 2), f40 = p.fbm(40, 2, 3);
+    p.base((x, yy, i) => {
+      let k = 0;
+      while (k < bounds.length - 2 && yy >= by(bounds[k + 1], x)) k++;
+      const b = bounds[k], y0 = by(b, x), y1 = by(bounds[k + 1], x);
+      const t = (yy - y0) / Math.max(1, y1 - y0);
+      let sh = b.shade + (f8[i] > 0.62 ? 0.6 : f8[i] < 0.36 ? -0.6 : 0) + (f2[i] < 0.32 ? -0.8 : 0);
+      if (t < 0.06) sh += 1.4; else if (t > 0.9) sh -= 1.4;
+      let jd = 99;
+      for (const j of b.js) jd = Math.min(jd, Math.abs(x - (j.x + (yy - y0) * j.slant)));
+      if (jd < 1.2) sh -= 1.6; else if (jd < 2.4) sh += 0.6;
+      const si = Math.max(0, Math.min(5, sh));
+      const c = mulc(mixc(pal[Math.floor(si)], pal[Math.min(5, Math.floor(si) + 1)], si % 1), 0.94 + (f40[i] - 0.5) * 0.12);
+      // each bed bulges out, recessed at its seams and joints
+      const hh = 0.3 + b.out * 0.15 + Math.sin(Math.min(1, t) * Math.PI) * 0.12 - (jd < 1.5 ? 0.15 : 0) + f8[i] * 0.06;
+      return { c, h: hh, r: 0.85 };
+    });
+    // moss and grass along the ledge lips, water stains below them
+    const g = [0x34502a, 0x46663a, 0x5a7a40].map(hex);
+    const f6 = p.fbm(6, 2, 7), f24 = p.fbm(24, 2, 8);
     for (let k = 1; k < bounds.length - 1; k++) {
       const b = bounds[k];
       for (let x = 0; x < S; x++) {
-        if (tileNoise(x / 6, k * 3.1, Math.ceil(S / 6), seed + k) < 0.58) continue;
-        const yy = by(b, x);
-        p.set(x, yy, g[2]);
-        if (r.next() < 0.55) p.set(x, yy - 1, g[3]);
-        if (r.next() < 0.3) p.set(x, yy + 1, g[0]);
+        const i0 = p.at(x, by(b, x));
+        if (f6[i0] < 0.6) continue;
+        const depth = 1 + Math.floor(f24[i0] * 4);
+        for (let d = -1; d < depth; d++) { const i = p.at(x, by(b, x) + d); p.blend(i, g[Math.min(2, Math.max(0, 2 - d))], 0.55 * sst(0.6, 0.7, f6[i0])); }
       }
     }
-    // dark water stains running down
-    p.scatter(7, (sx, sy, i, rr) => { const len = 20 + rr.next() * 50; for (let k = 0; k < len; k++) p.mul(sx + Math.round(Math.sin(k * 0.2) * 0.6), sy + k, 0.82); });
-    speckle(p, 200, [pal[1], pal[4]]);
-    const lich = [ramp(0xb9b56c, 3), ramp(0xd59443, 3)];
-    p.scatter(6, (x, yy, i, rr) => { const c = rr.pick(lich); for (let k = 0; k < 6; k++) p.blob(x + rr.int(-3, 3), yy + rr.int(-2, 2), 1.2, 1, c); });
+    for (let k = 0; k < 8; k++) {
+      const sx = r.next() * S, sy = r.next() * S, len = 30 + r.next() * 90;
+      for (let q = 0; q < len; q++) for (let w = -1; w <= 1; w++) { const i = p.at(sx + w + Math.sin(q * 0.2) * 0.8, sy + q); p.shade(i, 0.9 + Math.abs(w) * 0.05); }
+    }
     return p;
   },
-  basaltcols(seed) {
-    // basalt columns: slightly wavy, uneven widths, low contrast between
-    // neighbours, slanted fractures and big weathered patches
-    const p = new PixelPainter(S, S, seed);
-    const pal = ramp(0x4d4849, 6, { light: 0.22, hueShift: 0.2 });
+  basaltcols(p) {
     const r = p.rng;
-    let x = 0;
-    while (x < S) {
-      const w = Math.min(S - x, 6 + Math.floor(r.next() * 9));
-      const shade = 2 + (r.next() < 0.3 ? -1 : r.next() < 0.3 ? 1 : 0);
-      const breaks = [];
-      for (let k = 0; k < 2 + Math.floor(r.next() * 2); k++) breaks.push({ y: Math.floor(r.next() * S), tilt: (r.next() - 0.5) * 0.5 });
-      const ph = r.next() * 6.28;
-      for (let y = 0; y < S; y++) {
-        const wob = Math.round(Math.sin((y / S) * Math.PI * 2 + ph) * 0.8);
-        for (let xx = x; xx < x + w; xx++) {
-          const lx = xx - x;
-          const big = tileFbm((xx / S) * 2, (y / S) * 2, 2, 3, seed + 3);
-          let c = pal[Math.max(0, Math.min(5, shade + (big < 0.35 ? -1 : big > 0.68 ? 1 : 0)))];
-          if (lx === 0 + Math.max(0, wob)) c = pal[0];
-          else if (lx === 1 + Math.max(0, wob)) c = pal[Math.min(5, shade + 2)];
-          else if (lx === w - 1) c = pal[Math.max(0, shade - 1)];
-          for (const b of breaks) {
-            const by = b.y + Math.round(lx * b.tilt);
-            if (y === by) c = pal[0];
-            else if (y === by + 1) c = pal[Math.min(5, shade + 1)];
-          }
-          if (tileNoise(xx / 3, y / 3, Math.ceil(S / 3), seed) > 0.84) c = pal[Math.min(5, shade + 1)];
-          p.set(xx, y, c);
-        }
-      }
-      x += w;
-    }
-    p.scatter(10, (sx, sy) => { p.set(sx, sy, 0x93422a); });
+    const pal = [0x2e2a2c, 0x3c383a, 0x4a4648, 0x58534f, 0x666059].map(hex);
+    const cols = [];
+    for (let x = 0; x < S;) { const w = Math.min(S - x, 12 + Math.floor(r.next() * 18)); cols.push({ x, w, shade: 1.5 + r.next() * 1.5, ph: r.next() * 6.28, breaks: [0, 1, 2].map(() => ({ y: Math.floor(r.next() * S), tilt: (r.next() - 0.5) * 0.5 })) }); x += w; }
+    const f2 = p.fbm(2, 3, 1), f30 = p.fbm(30, 2, 2);
+    p.base((x, y, i) => {
+      let c0 = cols[0];
+      for (const c of cols) if (x >= c.x) c0 = c;
+      const lx = x - c0.x + Math.sin((y / S) * Math.PI * 2 + c0.ph) * 0.8;
+      const u = lx / c0.w;
+      let sh = c0.shade + (f2[i] < 0.35 ? -0.6 : f2[i] > 0.68 ? 0.6 : 0);
+      if (u < 0.08) sh -= 1.5; else if (u < 0.18) sh += 1; else if (u > 0.92) sh -= 0.8;
+      let br = 99;
+      for (const b of c0.breaks) br = Math.min(br, Math.abs(y - (b.y + lx * b.tilt)));
+      if (br < 1.1) sh -= 1.5; else if (br < 2.2) sh += 0.7;
+      const si = Math.max(0, Math.min(4, sh));
+      const c = mulc(mixc(pal[Math.floor(si)], pal[Math.min(4, Math.floor(si) + 1)], si % 1), 0.95 + (f30[i] - 0.5) * 0.12);
+      return { c, h: 0.3 + Math.sin(Math.max(0, Math.min(1, u)) * Math.PI) * 0.25 - (br < 1.2 ? 0.12 : 0), r: 0.7 };
+    });
     return p;
   },
 };
 
+// how strongly each ground type's relief shows in its normal map
+const RELIEF = {
+  grass: 2.2, jungle: 3, dirt: 4, rock: 4, sand: 2.5, mud: 3, snow: 2, ash: 3, sandstone: 3.5, moss: 3.5,
+  gravel: 4.5, drygrass: 2.5, needles: 2.5, redsand: 2.5, basalt: 4, clay: 4, cliff: 4.5, basaltcols: 4,
+};
+// per-material roughness scale (the painted alpha carries the detail)
 export const TERRAIN_ROUGHNESS = {
-  grass: 0.92, jungle: 0.9, dirt: 0.95, rock: 0.82, sand: 0.95, mud: 0.45, snow: 0.6, ash: 0.95,
-  sandstone: 0.88, moss: 0.9, gravel: 0.8, drygrass: 0.95, needles: 0.95, redsand: 0.95, basalt: 0.7, clay: 0.9, cliff: 0.85, basaltcols: 0.7,
+  grass: 0.95, jungle: 0.95, dirt: 1, rock: 0.95, sand: 1, mud: 1, snow: 1, ash: 1,
+  sandstone: 1, moss: 1, gravel: 1, drygrass: 1, needles: 1, redsand: 1, basalt: 1, clay: 1, cliff: 1, basaltcols: 1,
+};
+// close-up grit: how much of the shared detail tile's soil (x) and fibre (y) relief each type gets
+export const TERRAIN_DETAIL = {
+  grass: [0.5, 0.8], jungle: [0.6, 0.5], dirt: [1, 0.3], rock: [0.7, 0.15], sand: [0.35, 0], mud: [0.55, 0.15], snow: [0.2, 0], ash: [0.8, 0],
+  sandstone: [0.6, 0.15], moss: [0.3, 0.6], gravel: [1, 0], drygrass: [0.4, 0.9], needles: [0.4, 0.9], redsand: [0.4, 0], basalt: [0.8, 0.15], clay: [0.5, 0.4], cliff: [0.7, 0.25], basaltcols: [0.7, 0.15],
 };
 
-export function buildTerrainTextures() {
-  const ps = MAT_NAMES.map((name, i) => painters[name](1000 + i * 37));
-  const albedo = makeArrayTexture(ps);
-  // normal maps from luminance
-  const normals = ps.map((p) => {
-    const n = new PixelPainter(S, S);
-    const w = S, h = S;
-    const lum = new Float32Array(w * h);
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const [r, g, b] = p.get(x, y); lum[y * w + x] = (0.3 * r + 0.59 * g + 0.11 * b) / 255; }
-    const L = (x, y) => lum[(((y % h) + h) % h) * w + (((x % w) + w) % w)];
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const dx = (L(x + 1, y) - L(x - 1, y)) * 2.2, dy = (L(x, y + 1) - L(x, y - 1)) * 2.2;
-      const len = Math.hypot(dx, dy, 1);
-      n.set(x, y, [(-dx / len * 0.5 + 0.5) * 255, (-dy / len * 0.5 + 0.5) * 255, (1 / len * 0.5 + 0.5) * 255]);
-    }
-    return n;
-  });
-  const normal = makeArrayTexture(normals, { srgb: false });
-  // smooth magnification: the ground reads as painted texture, not pixels
-  albedo.magFilter = THREE.LinearFilter; normal.magFilter = THREE.LinearFilter;
-  const rough = MAT_NAMES.map((n) => TERRAIN_ROUGHNESS[n]);
-  return { albedo, normal, rough, painters: ps };
+// the shared 1 m detail tile: rg = soil/grit normal, ba = fibre/crack normal
+function detailTile() {
+  const soil = new GroundPainter(S, 7001);
+  const f32 = soil.fbm(32, 3, 1), f96 = soil.fbm(96, 2, 2);
+  soil.base((x, y, i) => ({ c: [0.5, 0.5, 0.5], h: 0.3 + f32[i] * 0.15 + f96[i] * 0.08 }));
+  stones(soil, 900, 0.8, 2.6, { h0: 0.08, h1: 0.2, ao: 0 });
+  stones(soil, 60, 3, 6, { h0: 0.2, h1: 0.3, ao: 0 });
+  const fib = new GroundPainter(S, 7002);
+  const g32 = fib.fbm(32, 3, 1);
+  fib.base((x, y, i) => ({ c: [0.5, 0.5, 0.5], h: 0.3 + g32[i] * 0.08 }));
+  const r = fib.rng;
+  for (let k = 0; k < 1400; k++) fib.stroke(r.next() * S, r.next() * S, 6 + r.next() * 12, r.next() * 6.28, { c0: [0.5, 0.5, 0.5], w0: 1.6, w1: 0.6, h: 0.12, bend: (r.next() - 0.5) * 0.8 });
+  for (let k = 0; k < 14; k++) fib.crack(r.next() * S, r.next() * S, 20 + r.next() * 40, r.next() * 6.28, { w: 0.8, depth: 0.15, wiggle: 0.6 });
+  const a = normalFromHeight(soil, 5), b = normalFromHeight(fib, 4);
+  const data = new Uint8Array(S * S * 4);
+  for (let i = 0; i < S * S; i++) { data[i * 4] = a.data[i * 4]; data[i * 4 + 1] = a.data[i * 4 + 1]; data[i * 4 + 2] = b.data[i * 4]; data[i * 4 + 3] = b.data[i * 4 + 1]; }
+  return data;
 }
 
-export { painters as terrainPainters, mixRgb, tileNoise };
+export function paintTerrainMaterial(name, seed) {
+  return painters[name](new GroundPainter(S, seed)).finish();
+}
+
+// Paints every ground type into plain arrays (works in a worker):
+// albedo (rgb + roughness) and normal (xyz + height) layers back to back, and the detail tile.
+export function paintTerrainData() {
+  const n = MAT_NAMES.length, L = S * S * 4;
+  const albedo = new Uint8Array(L * n), normal = new Uint8Array(L * n);
+  MAT_NAMES.forEach((name, i) => {
+    const p = paintTerrainMaterial(name, 1000 + i * 37);
+    albedo.set(p.data, i * L);
+    normal.set(normalFromHeight(p, RELIEF[name] ?? 3).data, i * L);
+  });
+  return { S, albedo, normal, detail: detailTile() };
+}
+
+// Starts painting in a worker; resolves to the data, or null if workers fail
+// (then the textures are painted on the main thread).
+export function paintTerrainInWorker() {
+  return new Promise((res) => {
+    try {
+      const wk = new Worker(new URL('./terrainTextures.worker.js', import.meta.url), { type: 'module' });
+      wk.onmessage = (e) => { wk.terminate(); res(e.data); };
+      wk.onerror = () => { wk.terminate(); res(null); };
+      wk.postMessage(0);
+    } catch { res(null); }
+  });
+}
+
+function arrayTex(data, layers, srgb) {
+  const tex = new THREE.DataArrayTexture(data, S, S, layers);
+  tex.format = THREE.RGBAFormat;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 8;
+  if (srgb) tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function buildTerrainTextures(data = null) {
+  const d = data ?? paintTerrainData();
+  const n = MAT_NAMES.length;
+  const albedo = arrayTex(d.albedo, n, true);
+  const normal = arrayTex(d.normal, n, false);
+  const detail = new THREE.DataTexture(d.detail, S, S, THREE.RGBAFormat);
+  detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
+  detail.magFilter = THREE.LinearFilter; detail.minFilter = THREE.LinearMipmapLinearFilter;
+  detail.generateMipmaps = true; detail.anisotropy = 8;
+  detail.needsUpdate = true;
+  const rough = MAT_NAMES.map((nm) => TERRAIN_ROUGHNESS[nm] ?? 1);
+  const detailK = MAT_NAMES.map((nm) => new THREE.Vector2(...(TERRAIN_DETAIL[nm] ?? [0.5, 0.2])));
+  return { albedo, normal, rough, detail, detailK };
+}
+
+export { painters as terrainPainters, sst };

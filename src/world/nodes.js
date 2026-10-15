@@ -176,11 +176,14 @@ function tileNoise2(x, y, px, py, seed) {
   const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
-export function rockTextureData(S = 256) {
+export function rockTextureData(S = 256) { return rockTextureSet(S).data; }
+// colour layers (stone, moss) + their normal maps from a painted relief
+export function rockTextureSet(S = 256) {
   const data = new Uint8Array(S * S * 4 * 2);
+  const hgt = new Float32Array(S * S * 2);
   const greyA = rgb(0x8d8a84), greyB = rgb(0x9b9081), greyC = rgb(0x787a7e), dark = rgb(0x47433f), pale = rgb(0xcac5b8);
   const lichens = [rgb(0xbdb67a), rgb(0xcf8f48), rgb(0xd9d7c9), rgb(0x9aad6a)];
-  const moss = rgb(0x56702f), mossL = rgb(0x8e9a3e), mossD = rgb(0x26381a), mossY = rgb(0xb0b04c);
+  const moss = rgb(0x4e6630), mossL = rgb(0x76863e), mossD = rgb(0x24341a), mossY = rgb(0x9a9a4e);
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const u = x / S, v = y / S, i = (y * S + x) * 4;
     // stone: broad tone shifts, weathered mottling, granite grains, sparse cracks,
@@ -201,6 +204,7 @@ export function rockTextureData(S = 256) {
     // dark crack with a slightly lighter lip beside it
     c = mix3(c, mul3(c, 1.12), (1 - sstep(0.022, 0.05, e)) * (1 - core) * crackMask * 0.4);
     c = mix3(c, dark, core * crackMask * 0.75);
+    hgt[y * S + x] = n * 0.5 + n2 * 0.28 + (gr - 0.5) * 0.05 - core * crackMask * 0.3 - sstep(0.62, 0.9, streak) * 0.03;
     const lc = cell(u, v, 7, 7, 13);
     if (lc.id > 0.82) {
       // irregular crusty rosettes of different sizes, broken up by the grain
@@ -217,12 +221,32 @@ export function rockTextureData(S = 256) {
     mc = mix3(mc, mossY, sstep(0.78, 0.95, m1 + (m2 - 0.5) * 0.4) * 0.5);
     mc = mul3(mc, 0.82 + m2 * 0.26 + (m3 - 0.5) * 0.1);
     put(data, S * S * 4 + i, mc);
+    hgt[S * S + y * S + x] = m1 * 0.6 + m2 * 0.3 + (m3 - 0.5) * 0.06;
   }
-  return data;
+  // normal maps (Sobel over the wrapped relief)
+  const nrm = new Uint8Array(S * S * 4 * 2);
+  for (let L = 0; L < 2; L++) {
+    const o = L * S * S, k = L ? 2.2 : 3.2;
+    const H = (x, y) => hgt[o + (((y % S) + S) % S) * S + (((x % S) + S) % S)];
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const dx = ((H(x + 1, y - 1) + 2 * H(x + 1, y) + H(x + 1, y + 1)) - (H(x - 1, y - 1) + 2 * H(x - 1, y) + H(x - 1, y + 1))) * k;
+      const dy = ((H(x - 1, y + 1) + 2 * H(x, y + 1) + H(x + 1, y + 1)) - (H(x - 1, y - 1) + 2 * H(x, y - 1) + H(x + 1, y - 1))) * k;
+      const l = Math.hypot(dx, dy, 1), i = (o + y * S + x) * 4;
+      nrm[i] = (-dx / l * 0.5 + 0.5) * 255; nrm[i + 1] = (-dy / l * 0.5 + 0.5) * 255; nrm[i + 2] = (1 / l * 0.5 + 0.5) * 255; nrm[i + 3] = 255;
+    }
+  }
+  return { data, nrm };
 }
 function rockTextures() {
-  const S = 256, data = rockTextureData(S);
+  const S = 256, { data, nrm } = rockTextureSet(S);
+  const ntex = new THREE.DataArrayTexture(nrm, S, S, 2);
+  ntex.format = THREE.RGBAFormat;
+  ntex.wrapS = ntex.wrapT = THREE.RepeatWrapping;
+  ntex.magFilter = THREE.LinearFilter; ntex.minFilter = THREE.LinearMipmapLinearFilter;
+  ntex.generateMipmaps = true; ntex.anisotropy = 8;
+  ntex.needsUpdate = true;
   const tex = new THREE.DataArrayTexture(data, S, S, 2);
+  tex.userData.normal = ntex;
   tex.format = THREE.RGBAFormat;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter;
@@ -240,7 +264,7 @@ export function makeRockMaterial(tex, opt = {}) {
   patchMaterial(mat, {
     wet: true,
     uniforms: {
-      tRockArr: { value: tex }, uMoss: { value: opt.moss ?? 1 }, uSoak: { value: opt.soak ?? 0 },
+      tRockArr: { value: tex }, tRockN: { value: tex?.userData?.normal ?? null }, uMoss: { value: opt.moss ?? 1 }, uSoak: { value: opt.soak ?? 0 },
       ...(water ? { tWaterLvl: { value: water.tex }, uWHalf: { value: water.half }, uWSize: { value: water.size } } : {}),
     },
     vertex: {
@@ -259,7 +283,7 @@ export function makeRockMaterial(tex, opt = {}) {
         vRN = normalize( mat3( modelMatrix ) * rn );`,
     },
     fragment: {
-      head: `precision highp sampler2DArray;\nuniform sampler2DArray tRockArr;\nuniform float uMoss;\nuniform float uSoak;\nvarying vec3 vRW;\nvarying vec3 vRN;\nvarying float vRLY;\nfloat rH; float rWet;\n${water ? 'uniform sampler2D tWaterLvl;\nuniform float uWHalf;\nuniform float uWSize;\n' : ''}${GLSL_HASH}`,
+      head: `precision highp sampler2DArray;\nuniform sampler2DArray tRockArr;\nuniform sampler2DArray tRockN;\nuniform float uMoss;\nuniform float uSoak;\nvarying vec3 vRW;\nvarying vec3 vRN;\nvarying float vRLY;\nvec3 rNW; float rWet;\n${water ? 'uniform sampler2D tWaterLvl;\nuniform float uWHalf;\nuniform float uWSize;\n' : ''}${GLSL_HASH}`,
       map: `
         vec3 an = abs( vRN );
         vec3 bw = an * an; bw *= bw; bw /= bw.x + bw.y + bw.z;
@@ -271,9 +295,17 @@ export function makeRockMaterial(tex, opt = {}) {
         vec3 mc = texture( tRockArr, vec3( uvy, 1.0 ) ).rgb;
         float pick = smoothstep( 0.4, 0.6, mossAmt + ( vnoise( vRW.xz * 4.5 ) - 0.5 ) * 0.35 );
         vec3 rcol = mix( rc, mc, pick );
-        // relief height from a blurrier mip so the bump follows shapes, not single grains
-        vec3 rcb = texture( tRockArr, vec3( uvx, 0.0 ), 2.5 ).rgb * bw.x + texture( tRockArr, vec3( uvy + 0.37, 0.0 ), 2.5 ).rgb * bw.y + texture( tRockArr, vec3( uvz, 0.0 ), 2.5 ).rgb * bw.z;
-        rH = dot( mix( rcb, mc, pick ), vec3( 0.3, 0.59, 0.11 ) ) * mix( 1.0, 0.5, pick );
+        // triplanar relief (whiteout blend), moss relief on the top projection
+        {
+          vec3 rnF = gl_FrontFacing ? vRN : -vRN;
+          vec3 tnx = texture( tRockN, vec3( uvx, 0.0 ) ).xyz * 2.0 - 1.0;
+          vec3 tny = mix( texture( tRockN, vec3( uvy + 0.37, 0.0 ) ).xyz, texture( tRockN, vec3( uvy, 1.0 ) ).xyz, pick ) * 2.0 - 1.0;
+          vec3 tnz = texture( tRockN, vec3( uvz, 0.0 ) ).xyz * 2.0 - 1.0;
+          tnx = vec3( tnx.xy + rnF.zy, abs( tnx.z ) * rnF.x );
+          tny = vec3( tny.xy + rnF.xz, abs( tny.z ) * rnF.y );
+          tnz = vec3( tnz.xy + rnF.xy, abs( tnz.z ) * rnF.z );
+          rNW = normalize( tnx.zyx * bw.x + tny.xzy * bw.y + tnz.xyz * bw.z );
+        }
         // contact shadow where the rock meets the ground
         rcol *= mix( 0.6, 1.0, smoothstep( -0.05, 0.42, vRLY ) );
         rWet = 0.0;
@@ -288,15 +320,8 @@ export function makeRockMaterial(tex, opt = {}) {
         diffuseColor.rgb *= rcol;`,
       emissive: `
         roughnessFactor = mix( roughnessFactor, 0.26, rWet );
-        {
-          // relief from the painted stone (bump mapping from luminance)
-          vec3 dpdx = dFdx( -vViewPosition ), dpdy = dFdy( -vViewPosition );
-          float hx = dFdx( rH ), hy = dFdy( rH );
-          vec3 r1 = cross( dpdy, normal ), r2 = cross( normal, dpdx );
-          float det = dot( dpdx, r1 );
-          vec3 grad = sign( det ) * ( hx * r1 + hy * r2 );
-          normal = normalize( abs( det ) * normal - grad * 0.9 * ( 1.0 - 0.6 * rWet ) );
-        }`,
+        // painted relief, a little softer where it is wet
+        normal = normalize( mix( ( viewMatrix * vec4( rNW, 0.0 ) ).xyz, normal, 0.25 + 0.3 * rWet ) );`,
       lights: `
         #if NUM_HEMI_LIGHTS > 0
         if ( rWet > 0.01 ) {

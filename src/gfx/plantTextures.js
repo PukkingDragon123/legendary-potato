@@ -399,11 +399,26 @@ function clusterOfFans(p, pal, seed) {
   p.innerOutline(pal[0], 128, true);
 }
 
+// bark relief: dark furrows sink, light ridges and scales stand out
+function reliefFromLuma(p) {
+  const w = p.w, h = p.h, L = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) L[i] = (p.data[i * 4] * 0.3 + p.data[i * 4 + 1] * 0.59 + p.data[i * 4 + 2] * 0.11) / 255;
+  const H = (x, y) => L[(((y % h) + h) % h) * w + (((x % w) + w) % w)];
+  const out = { w, h, data: new Uint8Array(w * h * 4) };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = ((H(x + 1, y - 1) + 2 * H(x + 1, y) + H(x + 1, y + 1)) - (H(x - 1, y - 1) + 2 * H(x - 1, y) + H(x - 1, y + 1))) * 1.1;
+    const dy = ((H(x - 1, y + 1) + 2 * H(x, y + 1) + H(x + 1, y + 1)) - (H(x - 1, y - 1) + 2 * H(x, y - 1) + H(x + 1, y - 1))) * 1.1;
+    const l = Math.hypot(dx, dy, 1), i = (y * w + x) * 4;
+    out.data[i] = (-dx / l * 0.5 + 0.5) * 255; out.data[i + 1] = (-dy / l * 0.5 + 0.5) * 255; out.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; out.data[i + 3] = 255;
+  }
+  return out;
+}
+
 export function buildPlantTextures() {
   const barkOrder = ['araucaria', 'treefern', 'cycad', 'ginkgo', 'redwood', 'palm', 'giant', 'horsetail', 'dead', 'charred', 'cypress', 'conifer', 'rings'];
   const leafOrder = ['rope', 'fern', 'cycad', 'ginkgo', 'spray', 'palm', 'broad', 'whorl', 'swamp', 'twigs', 'moss', 'golden'];
   const bp = barkOrder.map((n, i) => bark[n](500 + i * 13));
   const lp = leafOrder.map((n, i) => foliage[n](700 + i * 17));
-  return { bark: makeArrayTexture(bp), leaves: makeArrayTexture(lp), barkPainters: bp, leafPainters: lp };
+  return { bark: makeArrayTexture(bp), barkNormal: makeArrayTexture(bp.map(reliefFromLuma), { srgb: false }), leaves: makeArrayTexture(lp), barkPainters: bp, leafPainters: lp };
 }
 export { bark as barkPainters, foliage as foliagePainters };

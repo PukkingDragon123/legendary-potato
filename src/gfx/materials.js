@@ -32,6 +32,8 @@ function batchWindFix(shader) {
   );
 }
 
+// opt.normalArr: a matching array of normal maps (relief), applied with a
+// screen-space cotangent frame so the geometry needs no tangents.
 export function makeArrayMaterial(arrTex, opt = {}) {
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff, roughness: opt.roughness ?? 0.9, metalness: 0, vertexColors: true,
@@ -42,12 +44,32 @@ export function makeArrayMaterial(arrTex, opt = {}) {
     wind: opt.wind,
     translucency: opt.translucency,
     wet: opt.wet,
-    uniforms: { tArr: { value: arrTex } },
+    uniforms: { tArr: { value: arrTex }, ...(opt.normalArr ? { tArrN: { value: opt.normalArr }, uArrNK: { value: opt.normalScale ?? 1 } } : {}) },
     vertex: { head: ARRAY_HEAD_V, main: ARRAY_MAIN_V },
-    fragment: { head: ARRAY_HEAD_F, map: ARRAY_MAP },
+    fragment: {
+      head: ARRAY_HEAD_F + (opt.normalArr ? 'uniform sampler2DArray tArrN;\nuniform float uArrNK;\n' : ''),
+      map: ARRAY_MAP,
+      emissive: opt.normalArr ? /* glsl */ `{
+        vec3 mapN = texture( tArrN, vec3( vUvA, floor( vLayer + 0.5 ) ) ).xyz * 2.0 - 1.0;
+        mapN.xy *= uArrNK;
+        vec3 q0 = dFdx( - vViewPosition ), q1 = dFdy( - vViewPosition );
+        vec2 st0 = dFdx( vUvA ), st1 = dFdy( vUvA );
+        vec3 q1p = cross( q1, normal ), q0p = cross( normal, q0 );
+        vec3 T = q1p * st0.x + q0p * st1.x, Bt = q1p * st0.y + q0p * st1.y;
+        float det = max( dot( T, T ), dot( Bt, Bt ) );
+        float sc = det == 0.0 ? 0.0 : inversesqrt( det );
+        normal = normalize( T * ( mapN.x * sc ) + Bt * ( mapN.y * sc ) + normal * mapN.z );
+      }` : undefined,
+    },
   });
   const prev = mat.onBeforeCompile;
-  mat.onBeforeCompile = (shader, r) => { prev(shader, r); batchWindFix(shader); };
+  const twoSided = mat.side === THREE.DoubleSide;
+  mat.onBeforeCompile = (shader, r) => {
+    prev(shader, r); batchWindFix(shader);
+    // foliage keeps its sky-leaning normals on both faces, so the undersides
+    // of fronds and leaves are not lit like the ground under them
+    if (twoSided) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal *= faceDirection;');
+  };
   return mat;
 }
 

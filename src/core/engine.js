@@ -8,10 +8,10 @@ import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { G, patchMaterial } from '../gfx/shaderlib.js';
 
 export const QUALITY = {
-  low: { label: 'Low', pixelRatio: 0.75, shadowSize: 1024, shadowFar: 80, msaa: 0, ao: false, bloom: true, rays: false, grass: 0.35, drawDist: 420, treeDist: 300 },
-  medium: { label: 'Medium', pixelRatio: 1, shadowSize: 1536, shadowFar: 120, msaa: 2, ao: false, bloom: true, rays: true, grass: 0.6, drawDist: 560, treeDist: 420 },
-  high: { label: 'High', pixelRatio: 1, shadowSize: 2048, shadowFar: 170, msaa: 4, ao: true, bloom: true, rays: true, grass: 1, drawDist: 760, treeDist: 560 },
-  ultra: { label: 'Ultra', pixelRatio: 2, shadowSize: 3072, shadowFar: 230, msaa: 4, ao: true, bloom: true, rays: true, grass: 1.5, drawDist: 1000, treeDist: 720 },
+  low: { label: 'Low', pixelRatio: 0.75, shadowSize: 1024, shadowFar: 80, msaa: 0, ao: false, bloom: true, rays: false, grass: 0.35, drawDist: 420, treeDist: 300, groundDetail: false },
+  medium: { label: 'Medium', pixelRatio: 1, shadowSize: 1536, shadowFar: 120, msaa: 2, ao: false, bloom: true, rays: true, grass: 0.6, drawDist: 560, treeDist: 420, groundDetail: true },
+  high: { label: 'High', pixelRatio: 1, shadowSize: 2048, shadowFar: 170, msaa: 4, ao: true, bloom: true, rays: true, grass: 1, drawDist: 760, treeDist: 560, groundDetail: true },
+  ultra: { label: 'Ultra', pixelRatio: 2, shadowSize: 3072, shadowFar: 230, msaa: 4, ao: true, bloom: true, rays: true, grass: 1.5, drawDist: 1000, treeDist: 720, groundDetail: true },
 };
 
 const DEPTH_HELPERS = /* glsl */ `

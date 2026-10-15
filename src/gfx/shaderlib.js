@@ -17,6 +17,8 @@ export const G = {
   uPushers: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -9999, 0, 0)) },
   uNight: { value: 0 },
   uSnowLine: { value: 175 },
+  // drifting cloud shadows: xy = wind offset (m), z = strength, w = cover threshold
+  uCloudSh: { value: new THREE.Vector4(0, 0, 0, 0.5) },
 };
 
 // ---------------------------------------------------------------- global fog override
@@ -124,6 +126,23 @@ vec3 pusherOffset( vec3 wp, float weight ) {
 }
 `;
 
+// ---------------------------------------------------------------- cloud shadows
+const CLOUD_GLSL = /* glsl */ `
+uniform vec4 uCloudSh;
+float pmHash( vec2 p ) { p = fract( p * vec2( 123.34, 456.21 ) ); p += dot( p, p + 45.32 ); return fract( p.x * p.y ); }
+float pmNoise( vec2 p ) {
+  vec2 i = floor( p ), f = fract( p );
+  f = f * f * ( 3.0 - 2.0 * f );
+  return mix( mix( pmHash( i ), pmHash( i + vec2( 1.0, 0.0 ) ), f.x ), mix( pmHash( i + vec2( 0.0, 1.0 ) ), pmHash( i + vec2( 1.0, 1.0 ) ), f.x ), f.y );
+}
+float pmCloud( vec2 xz ) {
+  if ( uCloudSh.z <= 0.001 ) return 1.0;
+  vec2 q = ( xz + uCloudSh.xy ) * 0.0028;
+  float n = pmNoise( q ) * 0.55 + pmNoise( q * 2.03 + 7.1 ) * 0.3 + pmNoise( q * 4.1 + 3.3 ) * 0.15;
+  return 1.0 - uCloudSh.z * smoothstep( uCloudSh.w, uCloudSh.w + 0.18, n );
+}
+`;
+
 // ---------------------------------------------------------------- patcher
 let _patchId = 0;
 // Materials patched the same way share one shader program (colours, textures
@@ -172,6 +191,7 @@ export function patchMaterial(mat, opts = {}) {
     shader.uniforms.uFogHeightDensity = G.uFogHeightDensity;
     shader.uniforms.uWetness = G.uWetness;
     shader.uniforms.uNight = G.uNight;
+    shader.uniforms.uCloudSh = G.uCloudSh;
     if (opts.uniforms) Object.assign(shader.uniforms, opts.uniforms);
 
     let vs = shader.vertexShader;
@@ -208,7 +228,7 @@ export function patchMaterial(mat, opts = {}) {
     if (opts.vertex?.post) vs = vs.replace('#include <fog_vertex>', '#include <fog_vertex>\n' + opts.vertex.post);
 
     // fragment
-    const fhead = '\nuniform float uTime;\nuniform vec3 uSunColor;\nuniform float uWetness;\nuniform float uNight;\n#ifndef USE_FOG\nuniform vec3 uSunDir;\n#endif\n' + (opts.fragment?.head ?? '');
+    const fhead = '\nuniform float uTime;\nuniform vec3 uSunColor;\nuniform float uWetness;\nuniform float uNight;\n#ifndef USE_FOG\nuniform vec3 uSunDir;\n#endif\n' + CLOUD_GLSL + (opts.fragment?.head ?? '');
     fs = fs.replace('#include <common>', '#include <common>\n' + fhead);
     if (opts.fragment?.map) fs = fs.replace('#include <map_fragment>', opts.fragment.map);
     if (opts.fragment?.main) fs = fs.replace('#include <color_fragment>', '#include <color_fragment>\n' + opts.fragment.main);
@@ -230,6 +250,14 @@ export function patchMaterial(mat, opts = {}) {
         }`);
     }
     if (opts.fragment?.lights) fs = fs.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + opts.fragment.lights);
+    // big soft cloud shadows sliding over the land (direct light only)
+    if (!opts.noCloudShadow) fs = fs.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+      #ifdef USE_FOG
+      {
+        float cs = pmCloud( vFogWorldPos.xz );
+        reflectedLight.directDiffuse *= cs; reflectedLight.directSpecular *= cs;
+      }
+      #endif`);
     if (opts.fragment?.post) fs = fs.replace('#include <fog_fragment>', opts.fragment.post + '\n#include <fog_fragment>');
     if (opts.fragment?.emissive) fs = fs.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + opts.fragment.emissive);
     shader.vertexShader = vs;

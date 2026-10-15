@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { Engine } from './core/engine.js';
 import { Input } from './core/input.js';
 import { loadWorld } from './world/worldLoader.js';
+import { paintTerrainInWorker } from './gfx/terrainTextures.js';
 import { Game } from './game.js';
 import { Loading, Title } from './ui/menus.js';
 import { UI } from './ui/ui.js';
@@ -44,8 +45,11 @@ async function boot() {
   const engine = new Engine(app, settings.quality);
   const input = new Input(engine.renderer.domElement);
   const seed = qs.get('seed') || 'prehistoric';
+  // the ground textures paint in a worker while the island loads
+  const terrainTexP = paintTerrainInWorker();
   const world = await loadWorld(seed, (p, m) => loading.set(p * 0.45, m));
-  const game = new Game({ engine, world, input, outfit: profile.outfit, name: profile.name, dayLength: +(qs.get('day') || 1200) });
+  const terrainTex = await terrainTexP;
+  const game = new Game({ engine, world, input, outfit: profile.outfit, name: profile.name, dayLength: +(qs.get('day') || 1200), terrainTex });
   game.settings = settings;
   game.profile = profile;
   window.game = game;
