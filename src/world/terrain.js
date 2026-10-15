@@ -298,10 +298,10 @@ export class Terrain {
             // the 1 m columns of the heightfield do not show up as dark vertical grooves
             vec3 wnL = wn;
             if ( axis != 1 ) {
-              float hx = hAtT( wp.xz + vec2( 3.0, 0.0 ) ) - hAtT( wp.xz - vec2( 3.0, 0.0 ) );
-              float hz = hAtT( wp.xz + vec2( 0.0, 3.0 ) ) - hAtT( wp.xz - vec2( 0.0, 3.0 ) );
-              vec3 wnS = normalize( vec3( -hx / 6.0, 1.0, -hz / 6.0 ) );
-              wnL = normalize( mix( wn, wnS, 0.65 ) );
+              float hx = hAtT( wp.xz + vec2( 2.5, 0.0 ) ) - hAtT( wp.xz - vec2( 2.5, 0.0 ) );
+              float hz = hAtT( wp.xz + vec2( 0.0, 2.5 ) ) - hAtT( wp.xz - vec2( 0.0, 2.5 ) );
+              vec3 wnS = normalize( vec3( -hx / 5.0, 1.0, -hz / 5.0 ) );
+              wnL = normalize( mix( wn, wnS, 0.5 ) );
             }
             vec3 T, B;
             if ( axis == 1 ) { T = vec3( 1.0, 0.0, 0.0 ); B = vec3( 0.0, 0.0, 1.0 ); }
