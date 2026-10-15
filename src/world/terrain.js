@@ -247,15 +247,30 @@ export class Terrain {
             }
             tAlb = cc.rgb;
             tRoughOut = cc.a * rgh;
+            float ledgeTilt = 0.0;
             if ( axis != 1 ) {
               // big rock faces: dark water stains streaking down, paler ledge bands,
               // moss and grass wherever the face leans back
               vec2 fw = vec2( axis == 0 ? wp.z : wp.x, wp.y );
               float streak = vnoise( vec2( fw.x * 0.11, fw.y * 0.012 ) ) * 0.6 + vnoise( vec2( fw.x * 0.37, fw.y * 0.03 + 5.0 ) ) * 0.4;
-              tAlb *= mix( 1.0, 0.7, smoothstep( 0.55, 0.85, streak ) );
+              tAlb *= mix( 1.0, 0.8, smoothstep( 0.55, 0.85, streak ) );
               float ledge = smoothstep( 0.78, 0.96, sin( fw.y * 0.55 + vnoise( fw * 0.05 ) * 5.0 ) * 0.5 + 0.5 );
               tAlb *= 1.0 + ledge * 0.12;
-              float lean = smoothstep( 0.3, 0.62, wn.y ) * smoothstep( 0.35, 0.6, vnoise( fw * 0.21 + 3.0 ) + ledge * 0.3 ) * ( 1.0 - dryRock );
+              // grey cliffs are layered too: beds from world height, each one sticking out
+              // a little (lit lip, shadowed underside) so tall faces read as ledges, not grooves
+              float rockFace = mix( id1 == 16.0 ? 1.0 : 0.0, id2 == 16.0 ? 1.0 : 0.0, hb );
+              float lip = 0.0;
+              if ( rockFace > 0.0 ) {
+                float by = wp.y * 0.42 + vnoise( wp.xz * 0.03 ) * 1.8 + vnoise( fw * 0.11 ) * 0.25;
+                by += sin( by * 0.9 ) * 0.3;
+                float bf = fract( by );
+                float tone = 0.86 + 0.28 * hash21( vec2( floor( by ), 2.7 ) );
+                lip = smoothstep( 0.86, 1.0, bf ) * rockFace;
+                float under = smoothstep( 0.18, 0.0, bf ) * rockFace;
+                tAlb *= mix( 1.0, tone, rockFace ) * ( 1.0 + 0.16 * lip - 0.38 * under );
+                ledgeTilt = lip * 0.55 - under * 0.45;
+              }
+              float lean = clamp( smoothstep( 0.3, 0.62, wn.y ) + lip * 0.7, 0.0, 1.0 ) * smoothstep( 0.35, 0.6, vnoise( fw * 0.21 + 3.0 ) + ledge * 0.3 ) * ( 1.0 - dryRock );
               if ( lean > 0.01 ) {
                 vec3 moss = textureGrad( tAlbedo, vec3( uv, 9.0 ), gx, gy ).rgb;
                 tAlb = mix( tAlb, moss * 0.85, lean * 0.85 );
@@ -282,7 +297,7 @@ export class Terrain {
             else { T = vec3( -sign( wn.z ), 0.0, 0.0 ); B = vec3( 0.0, -1.0, 0.0 ); }
             T = normalize( T - wn * dot( wn, T ) );
             B = normalize( B - wn * dot( wn, B ) - T * dot( T, B ) );
-            tNrmWorld = normalize( T * nm.x + B * nm.y + wn * nm.z );
+            tNrmWorld = normalize( T * nm.x + B * nm.y + wn * nm.z + vec3( 0.0, ledgeTilt, 0.0 ) );
             // macro variation so tiles never look repetitive
             float m1 = vnoise( wp.xz * 0.018 ), m2 = vnoise( wp.xz * 0.07 + 17.0 ), m3 = vnoise( wp.xz * 0.011 + 7.0 );
             tAlb *= 0.9 + 0.17 * m1 + 0.06 * ( m2 - 0.5 );
