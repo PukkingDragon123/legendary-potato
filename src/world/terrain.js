@@ -34,6 +34,9 @@ float bareGround( vec2 xz, float slope ) {
 export const VEGETATED = [1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0];
 // ground types that turn to mud along the water (beaches, rock and snow stay as they are)
 export const MUDDY_BANK = [1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0.6, 1, 1, 0, 0, 1, 0, 0];
+// sandstone bed colours (linear), muted toward one orange
+const _lin = (h) => new THREE.Color(h);
+const STRATA = [0xb9603f, 0xcf8352, 0xdca873, 0xc56f48, 0xa95a3e, 0xe2bb8a].map((h) => _lin(h).lerp(_lin(0xc47a4e), 0.35));
 
 export class Terrain {
   // texData: ground textures already painted in a worker (optional)
@@ -77,6 +80,7 @@ export class Terrain {
       uDetailK: { value: tex.detailK },
       uVeg: { value: VEGETATED },
       uMudOK: { value: MUDDY_BANK },
+      uStrata: { value: STRATA },
       uRough: { value: tex.rough },
       uHalf: { value: world.half },
       uSize: { value: world.size },
@@ -110,6 +114,18 @@ export class Terrain {
           uniform vec2 uDetailK[18];
           uniform float uVeg[18];
           uniform float uMudOK[18];
+          uniform vec3 uStrata[6];
+          // badland sandstone beds from world height: always level, of varied
+          // thickness, gently warped, each with a lit top edge and a dark underside
+          vec3 strataAt( vec3 p ) {
+            float y = p.y * 1.25 + vnoise( p.xz * 0.035 ) * 2.4 + vnoise( p.xz * 0.15 + 9.0 ) * 0.5;
+            y += sin( y * 0.83 ) * 0.35;
+            float L = floor( y ), f = fract( y );
+            float h = hash21( vec2( L, 5.3 ) );
+            vec3 c = uStrata[ int( h * 5.999 ) ];
+            c *= 1.0 + 0.14 * smoothstep( 0.82, 1.0, f ) - 0.32 * smoothstep( 0.14, 0.0, f );
+            return c;
+          }
           uniform float uRough[18];
           uniform float uHalf;
           uniform float uSize;
@@ -174,6 +190,13 @@ export class Terrain {
             float bl = sp.b;
             float sel = vnoise( wp.xz * 0.75 + 5.3 ) * 0.78 + vnoise( wp.xz * 4.3 + 3.0 ) * 0.22;
             vec4 c1 = albedoAT( uv, uv2, id1, mt, gx, gy, g2x, g2y ), c2 = albedoAT( uv, uv2, id2, mt, gx, gy, g2x, g2y );
+            vec3 bed = vec3( 1.0 );
+            if ( id1 == 8.0 || id2 == 8.0 ) {
+              // the painted sandstone is grain only; its colour comes from the beds
+              bed = strataAt( wp ) / vec3( 0.552, 0.195, 0.076 );
+              if ( id1 == 8.0 ) c1.rgb *= bed;
+              if ( id2 == 8.0 ) c2.rgb *= bed;
+            }
             vec4 n1 = textureGrad( tNormalArr, vec3( uv, id1 ), gx, gy ), n2 = textureGrad( tNormalArr, vec3( uv, id2 ), gx, gy );
             // height blend: the higher relief wins at the border (stones poke through
             // grass, soil fills the hollows), ragged and soft further away
@@ -203,6 +226,8 @@ export class Terrain {
               vec2 uvF = uv * 0.21 + vec2( 0.13, 0.71 );
               uvF.x += hash21( vec2( floor( uvF.y ), 3.0 + float( axis ) ) ) * 0.61;
               vec4 cF = mix( textureGrad( tAlbedo, vec3( uvF, id1 ), gx * 0.21, gy * 0.21 ), textureGrad( tAlbedo, vec3( uvF, id2 ), gx * 0.21, gy * 0.21 ), hb );
+              float sandW = mix( id1 == 8.0 ? 1.0 : 0.0, id2 == 8.0 ? 1.0 : 0.0, hb );
+              cF.rgb *= mix( vec3( 1.0 ), bed, sandW );
               cc = mix( cc, cF, farK * 0.6 );
             }
             if ( axis == 1 && ov > 0.002 ) {

@@ -231,23 +231,17 @@ const painters = {
     return p;
   },
   // layered red rock (also the badland cliff faces)
+  // sandstone grain only: the layers themselves are drawn by the terrain shader
+  // from world height, so they stay level on every slope and from every angle
   sandstone(p) {
-    const r = p.rng;
-    // layers in muted earth tones (pulled toward one sandstone orange so the
-    // mesas read as rock, not as a striped cake)
+    const r = p.rng, S = p.S;
     const mean = hex(0xc47a4e);
-    const cols = [0xb9583b, 0xd27d4b, 0xe6a86d, 0xc76c45, 0xab4c36, 0xdd9c64, 0xf0c48c, 0xc0623f].map((c) => mixc(hex(c), mean, 0.4));
-    const bands = [];
-    for (let y = 0; y < S;) { const t = 8 + Math.floor(r.next() * 24); bands.push([y, Math.min(S, y + t), cols[bands.length % cols.length], r.next()]); y += t; }
     const f4 = p.fbm(4, 3, 1), f20 = p.fbm(20, 3, 2), f80 = p.fbm(80, 2, 3);
     p.base((x, y, i) => {
-      const yw = (((y + Math.sin((x / S) * Math.PI * 2) * 2 + (f4[i] - 0.5) * 6) % S) + S) % S;
-      let b = bands[0];
-      for (const bb of bands) if (yw >= bb[0] && yw < bb[1]) b = bb;
-      const tIn = (yw - b[0]) / Math.max(1, b[1] - b[0]);
-      let c = mulc(b[2], 0.88 + 0.2 * f20[i] + (f80[i] - 0.5) * 0.12);
-      if (tIn < 0.12) c = mulc(c, 1.1); else if (tIn > 0.86) c = mulc(c, 0.72);
-      return { c, h: 0.3 + (1 - tIn) * 0.18 * (0.5 + b[3]) + f20[i] * 0.1 + f80[i] * 0.03, r: 0.88 };
+      // faint fine laminations inside a bed, wind-scoured patches
+      const lam = Math.sin(((y + (f4[i] - 0.5) * 10) / S) * Math.PI * 2 * 18) * 0.5 + 0.5;
+      const c = mulc(mean, 0.9 + 0.16 * f20[i] + (f80[i] - 0.5) * 0.12 + (lam - 0.5) * 0.05);
+      return { c, h: 0.3 + f20[i] * 0.12 + f80[i] * 0.04 + lam * 0.02, r: 0.88 };
     });
     for (let k = 0; k < 9; k++) p.crack(r.next() * S, r.next() * S, rnd(r, 8, 22), Math.PI / 2 + rnd(r, -0.3, 0.3), { w: 0.8, depth: 0.15, col: hex(0x6a2c1e), wiggle: 0.25 });
     for (let k = 0; k < 16; k++) { const x = r.next() * S, y = r.next() * S; p.puddle(x, y, rnd(r, 1.5, 3), { col: hex(0x7a3423), level: 0.2, rough: 0.9 }); }
