@@ -35,7 +35,7 @@ export class Flora {
     const tex = buildPlantTextures();
     this.tex = tex;
     tex.bark.anisotropy = engine.maxAniso;
-    this.barkMat = makeArrayMaterial(tex.bark, { roughness: 0.92, wind: { amp: 1.6 }, wet: true, normalArr: tex.barkNormal, normalScale: 1.2 });
+    this.barkMat = makeArrayMaterial(tex.bark, { roughness: 0.92, wind: { amp: 1.6 }, wet: true, normalArr: tex.barkNormal, normalScale: 0.85 });
     this.leafMat = makeArrayMaterial(tex.leaves, { roughness: 0.75, side: THREE.DoubleSide, alphaTest: 0.5, alphaToCoverage: engine.quality.msaa > 0, wind: { amp: 0.5, flutter: 0.035 }, translucency: 0.55 });
     this.leafDepth = makeArrayDepthMaterial(tex.leaves, { wind: { amp: 0.5, flutter: 0.035 } });
     this.trees = [];
