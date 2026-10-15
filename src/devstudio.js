@@ -23,10 +23,15 @@ export function runStudio(qs) {
       ids.forEach((id, i) => { const b = buildStructure(id); if (!b) return; b.g.position.set((i - (ids.length - 1) / 2) * gap, 0, 0); b.g.rotation.y = parseFloat(qs.get('rot') || '0'); b.g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); engine.scene.add(b.g); });
     });
   }
-  const chars = (qs.get('props') ? [] : PRESETS).map((pr, i) => {
+  // ?exprs=happy,derp,angry,... gives each bean its own face (beans face -Z, so turn them to the camera)
+  const exprs = (qs.get('exprs') || '').split(',').filter(Boolean);
+  const crew = qs.get('props') ? [] : exprs.length ? exprs.map((_, i) => PRESETS[i % PRESETS.length]) : PRESETS;
+  const gapX = parseFloat(qs.get('gap') || '0.85');
+  const chars = crew.map((pr, i) => {
     const c = new Character(pr);
-    c.root.position.set((i - 1.5) * 0.85, 0, 0);
-    c.root.rotation.y = (i - 1.5) * -0.18 + parseFloat(qs.get('rot') || '0');
+    c.root.position.set((i - (crew.length - 1) / 2) * gapX, 0, 0);
+    c.root.rotation.y = Math.PI + (i - (crew.length - 1) / 2) * -0.12 + parseFloat(qs.get('rot') || '0');
+    c.studioExpr = exprs[i];
     engine.scene.add(c.root);
     return c;
   });
@@ -40,7 +45,7 @@ export function runStudio(qs) {
     if (maxFrames && frame > maxFrames) { window.__done = true; return; }
     const dt = 1 / 30;
     sky.update(tod, weather, cam.position, dt);
-    chars.forEach((c, i) => c.update(dt, { action: acts[i] && acts[i] !== 'none' && acts[i] !== 'talk' ? { name: acts[i], t: T0 } : null, talk: acts[i] === 'talk' ? 0.8 : 0, speed: parseFloat(qs.get('speed') || '0'), expr: qs.get('expr') || undefined }));
+    chars.forEach((c, i) => c.update(dt, { action: !exprs.length && acts[i] && acts[i] !== 'none' && acts[i] !== 'talk' ? { name: acts[i], t: T0 } : null, talk: !exprs.length && acts[i] === 'talk' ? 0.8 : 0, speed: parseFloat(qs.get('speed') || '0'), expr: c.studioExpr || qs.get('expr') || undefined, yaw: c.root.rotation.y }));
     engine.render(dt);
     requestAnimationFrame(loop);
   }

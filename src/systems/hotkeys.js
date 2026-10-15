@@ -3,7 +3,7 @@ export class Hotkeys {
   constructor(game) {
     this.name = 'hotkeys';
     this.game = game;
-    this.emotes = ['wave', 'dance', 'point', 'cheer', 'scream'];
+    this.emotes = ['wave', 'derp', 'dance', 'laugh', 'point', 'cry', 'cheer', 'rage', 'scream', 'tpose'];
     this.emoteIdx = 0;
   }
   update() {

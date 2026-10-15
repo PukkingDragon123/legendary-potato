@@ -396,3 +396,133 @@ body.touch .pda-screen .pane > * { overflow-y: auto; min-height: 0; overscroll-b
   body.touch .pda-screen { left: 12px; right: 12px; top: 48px; bottom: 16px; }
   body.touch .grid .slot { width: 44px; height: 44px; }
 }
+
+/* ---------------------------------------------------------- the Pocket Prof screen (lined up with the 3D device) */
+body.diegetic #vitals, body.diegetic #hotbar, body.diegetic #heldname, body.diegetic #compass, body.diegetic #clock,
+body.diegetic #biome, body.diegetic #objective, body.diegetic #effects, body.diegetic #toasts, body.diegetic #banner,
+body.diegetic #target, body.diegetic #tamepanel, body.diegetic .scancard, body.diegetic #loot { display: none !important; }
+body.diegetic.touch #hotbar { display: none !important; }
+#pda.dev {
+  --ph-bg: #061208; --ph-bg2: #0b2210; --ph-dim: #2f7a3a; --ph-mid: #56b85a; --ph-hi: #9cf27e; --ph-top: #d6ffc8; --ph-warn: #ffd36a;
+  --lcd: #08190b; --lcd2: #0c2410; --lcd3: #14361a; --lcd-line: #1f5a28; --lcd-text: var(--ph-hi); --lcd-dim: var(--ph-mid); --cream: var(--ph-top); --sun: var(--ph-warn); --ink: #020703;
+  position: fixed; left: 0 !important; top: 0 !important; width: 640px !important; height: 480px !important; transform-origin: 0 0; pointer-events: auto; animation: none !important;
+  background: radial-gradient(ellipse 80% 70% at 50% 45%, #0f2c14 0%, var(--ph-bg) 78%, #030a04 100%);
+  color: var(--ph-hi); font-family: var(--font-term); font-size: 18px; overflow: hidden; text-shadow: 0 0 6px rgba(120, 255, 120, 0.45);
+  border-radius: 14px; opacity: 0; transition: opacity 0.08s;
+}
+#pda.dev .dev-top { position: absolute; left: 10px; right: 10px; top: 8px; height: 30px; display: flex; align-items: center; gap: 8px; }
+#pda.dev .dev-brand { font-family: var(--font-small); font-size: 10px; letter-spacing: 2px; color: var(--ph-mid); white-space: nowrap; }
+#pda.dev .dev-brand b { color: var(--ph-warn); font-weight: normal; }
+#pda.dev .pda-tabs { display: flex; gap: 4px; flex: 1; justify-content: center; }
+#pda.dev .pda-tab { font-family: var(--font-small); font-size: 10px; letter-spacing: 1px; padding: 5px 7px 4px; background: transparent; color: var(--ph-mid); box-shadow: inset 0 0 0 1px var(--ph-dim); transform: none; cursor: pointer; }
+#pda.dev .pda-tab:hover { color: var(--ph-top); box-shadow: inset 0 0 0 1px var(--ph-mid); }
+#pda.dev .pda-tab.on { background: var(--ph-hi); color: var(--ph-bg); box-shadow: 0 0 10px rgba(140, 255, 120, 0.5); text-shadow: none; }
+#pda.dev .dev-sig { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
+#pda.dev .dev-sig i { width: 3px; background: var(--ph-mid); animation: sig 1.6s steps(2) infinite; }
+#pda.dev .dev-sig i:nth-child(1) { height: 5px; } #pda.dev .dev-sig i:nth-child(2) { height: 9px; animation-delay: 0.3s; } #pda.dev .dev-sig i:nth-child(3) { height: 13px; animation-delay: 0.6s; }
+@keyframes sig { 50% { opacity: 0.35; } }
+#pda.dev .pda-screen { position: absolute; left: 10px; right: 10px; top: 44px; bottom: 10px; background: transparent; box-shadow: inset 0 0 0 1px var(--ph-dim); color: var(--ph-hi); }
+#pda.dev .pda-screen::after { display: none; }
+#pda.dev .pda-screen .pane { inset: 8px; gap: 10px; }
+#pda.dev .dev-scan { position: absolute; inset: 0; pointer-events: none; border-radius: 14px;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px), radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  animation: crtflick 4s steps(40) infinite; }
+@keyframes crtflick { 0%, 100% { opacity: 0.95; } 47% { opacity: 1; } 48% { opacity: 0.85; } 49% { opacity: 1; } }
+/* the old HUD widgets re-skinned in phosphor */
+#pda.dev .section-title { color: var(--ph-mid); font-size: 9px; }
+#pda.dev .slot { width: 44px; height: 44px; background: rgba(20, 60, 24, 0.35); box-shadow: inset 0 0 0 1px var(--ph-dim); }
+#pda.dev .slot img { width: 34px; height: 34px; filter: drop-shadow(0 0 3px rgba(140, 255, 120, 0.35)) saturate(0.85); }
+#pda.dev .slot.hot { box-shadow: inset 0 0 0 1px var(--ph-mid); }
+#pda.dev .slot.picked, #pda.dev .slot.sel { box-shadow: inset 0 0 0 2px var(--ph-hi), 0 0 8px rgba(140, 255, 120, 0.45); transform: none; }
+#pda.dev .slot.sel::after { display: none; }
+#pda.dev .slot .n { color: var(--ph-top); text-shadow: 1px 1px 0 #000; font-size: 13px; }
+#pda.dev .grid { gap: 4px; }
+#pda.dev .detail { background: rgba(10, 40, 14, 0.45); box-shadow: inset 0 0 0 1px var(--ph-dim); padding: 8px; }
+#pda.dev .detail h3 { color: var(--ph-top); font-size: 20px; }
+#pda.dev .detail p, #pda.dev .stats { color: var(--ph-hi); font-size: 15px; line-height: 17px; }
+#pda.dev .detail .cat { color: var(--ph-warn); }
+#pda.dev .btn { font-family: var(--font-small); font-size: 10px; padding: 6px 9px 5px; background: transparent; color: var(--ph-hi); box-shadow: inset 0 0 0 1px var(--ph-mid); transform: none; margin: 3px 4px 3px 0; text-shadow: inherit; }
+#pda.dev .btn:hover { background: var(--ph-hi); color: var(--ph-bg); text-shadow: none; }
+#pda.dev .btn.primary { box-shadow: inset 0 0 0 2px var(--ph-hi); color: var(--ph-top); }
+#pda.dev .btn.red { box-shadow: inset 0 0 0 1px #c86a4a; color: #ffb090; }
+#pda.dev .btn[disabled] { opacity: 0.35; }
+#pda.dev .row-card { box-shadow: inset 0 0 0 1px var(--ph-dim); padding: 5px 7px; }
+#pda.dev .row-card.on { box-shadow: inset 0 0 0 1px var(--ph-hi); background: rgba(40, 120, 50, 0.25); }
+#pda.dev .row-card.unread { color: var(--ph-warn); }
+#pda.dev .row-card.unread::before { content: '!'; color: var(--ph-warn); margin-right: 2px; }
+#pda.dev .row-card .meta { color: var(--ph-mid); font-size: 12px; }
+#pda.dev .cats { width: 86px; }
+#pda.dev .cats .c { font-size: 13px; padding: 3px 6px; color: var(--ph-mid); box-shadow: inset 0 0 0 1px var(--ph-dim); }
+#pda.dev .cats .c.on { background: var(--ph-hi); color: var(--ph-bg); text-shadow: none; }
+#pda.dev .req { font-size: 14px; } #pda.dev .req img { width: 24px; height: 24px; } #pda.dev .req.no { color: #ffb090; }
+#pda.dev .bar { background: #031005; box-shadow: inset 0 0 0 1px var(--ph-dim); }
+#pda.dev .bar > i { background: var(--ph-hi) !important; }
+#pda.dev .progress { background: #031005; box-shadow: inset 0 0 0 1px var(--ph-dim); }
+#pda.dev .progress i { background: repeating-linear-gradient(90deg, var(--ph-hi) 0 5px, var(--ph-mid) 5px 7px); }
+#pda.dev .map-wrap { background: #031005; box-shadow: inset 0 0 0 1px var(--ph-dim); }
+#pda.dev .map-wrap canvas { filter: sepia(1) hue-rotate(60deg) saturate(2.2) brightness(0.9); }
+#pda.dev .map-wrap canvas + canvas { filter: none; }
+#pda.dev .map-legend { width: 150px; font-size: 13px; }
+#pda.dev .todo { padding: 6px 7px; box-shadow: inset 0 0 0 1px var(--ph-mid); margin-bottom: 6px; }
+#pda.dev .todo-title { color: var(--ph-top); font-size: 17px; margin: 2px 0 4px; }
+#pda.dev .todo-item { font-size: 14px; line-height: 16px; color: var(--ph-hi); }
+#pda.dev .todo-item.done { color: var(--ph-dim); text-decoration: line-through; }
+#pda.dev .prof { display: flex; gap: 10px; align-items: center; }
+#pda.dev .prof img { width: 64px; height: 64px; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--ph-mid), 0 0 12px rgba(120, 255, 120, 0.35); }
+#pda.dev pre.msg { white-space: pre-wrap; font-family: var(--font-term); font-size: 17px; line-height: 19px; margin: 8px 0 0; color: var(--ph-hi); overflow-y: auto; max-height: 300px; }
+#pda.dev .list { scrollbar-width: thin; scrollbar-color: var(--ph-dim) transparent; }
+/* no hands to hold it (van seat and friends): a flat device face around the screen */
+#pda.dev.flat { border-radius: 26px; box-shadow: 0 0 0 14px #e9dcb8, 0 0 0 18px #6fbf9e, 0 0 0 22px #4a8e74, 0 18px 40px rgba(0, 0, 0, 0.6); }
+/* the tooltip and dragged icon above it all */
+.tooltip, img.drag { z-index: 50; }
+
+/* ---------------------------------------------------------- touch controls: chunky retro bakelite */
+#touch .tbtn {
+  --bk: #f1e6c6; --bk2: #d6c79e; --bkd: #8a7a52;
+  width: 62px; height: 62px; border-radius: 50%; padding: 0; color: #2a2016;
+  background: radial-gradient(circle at 35% 28%, #fffaf0 0%, var(--bk) 38%, var(--bk2) 78%, var(--bkd) 100%);
+  box-shadow: 0 5px 0 #4a3e28, 0 7px 10px rgba(0, 0, 0, 0.45), inset 0 -3px 5px rgba(0, 0, 0, 0.18), inset 0 2px 2px rgba(255, 255, 255, 0.7);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; transition: transform 0.05s;
+  opacity: 0.94; font-family: var(--font-small); text-shadow: none;
+}
+#touch .tbtn .ti { width: 26px; height: 26px; display: block; }
+#touch .tbtn .ti svg { width: 100%; height: 100%; display: block; }
+#touch .tbtn .tl { font-size: 7px; letter-spacing: 1px; line-height: 8px; max-width: 64px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#touch .tbtn.down, #touch .tbtn.lit { transform: translateY(4px); background: radial-gradient(circle at 35% 28%, #fff4c0 0%, #f2c84a 45%, #c8962a 100%); box-shadow: 0 1px 0 #4a3e28, 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 2px 6px rgba(0, 0, 0, 0.3); }
+#touch .tbtn.dim { opacity: 0.45; }
+/* the big red USE button and a mint interact plate */
+#touch .tb-use { width: 92px; height: 92px; --bk: #e8604a; --bk2: #c43c2a; --bkd: #7a1e14; color: #fff2e6; }
+#touch .tb-use .ti { width: 38px; height: 38px; }
+#touch .tb-use .tl { font-size: 9px; }
+#touch .tb-interact { width: 78px; height: 78px; border-radius: 26px; --bk: #a8dcc4; --bk2: #6fbf9e; --bkd: #2f6a52; color: #0e2a1e; }
+#touch .tb-interact.ready { --bk: #d8ffb8; --bk2: #8fe06a; --bkd: #3a7a22; animation: tready 1s ease-in-out infinite; }
+@keyframes tready { 50% { box-shadow: 0 5px 0 #24461a, 0 0 18px rgba(170, 255, 120, 0.8), inset 0 -3px 5px rgba(0, 0, 0, 0.18); } }
+#touch .tb-jump { width: 66px; height: 66px; }
+#touch .tb-aim, #touch .tb-crouch, #touch .tb-ride { --bk: #e8dcbc; }
+#touch .tb-crouch { width: 54px; height: 54px; } #touch .tb-ride { width: 54px; height: 54px; }
+#touch .tb-crouch .ti, #touch .tb-ride .ti { width: 22px; height: 22px; }
+/* top bar: smaller rounded-square keys on a chrome rail */
+#touch .tc-top { gap: 9px; padding: 6px 9px; border-radius: 16px; background: linear-gradient(#cfd5d8, #8e979c); box-shadow: 0 3px 0 #4c5458, 0 5px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.8); }
+#touch .tc-top .tbtn { width: 46px; height: 46px; border-radius: 12px; box-shadow: 0 4px 0 #4a3e28, 0 5px 6px rgba(0, 0, 0, 0.35), inset 0 2px 2px rgba(255, 255, 255, 0.7); }
+#touch .tc-top .tbtn .ti { width: 20px; height: 20px; }
+#touch .tc-top .tbtn .tl { font-size: 6px; }
+#touch .tb-bag { --bk: #a8e8c8 !important; --bk2: #6fbf9e !important; --bkd: #2f6a52 !important; width: 56px !important; }
+#touch .tb-bag .ti { width: 26px !important; height: 26px !important; }
+/* the item switcher bottom-left of the thumb cluster */
+#touch .tc-item { right: calc(270px + env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); align-items: center; gap: 6px; display: flex; }
+#touch .tc-item .tbtn { width: 42px; height: 42px; }
+#touch .tc-item .tbtn .ti { width: 18px; height: 18px; }
+#touch .titem { width: 54px; height: 54px; border-radius: 12px; background: radial-gradient(circle at 50% 40%, #12301a, #061208); box-shadow: 0 0 0 3px #c8ccce, 0 0 0 5px #5a6266, 0 4px 8px rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; position: relative; pointer-events: none; }
+#touch .titem img { width: 40px; height: 40px; image-rendering: pixelated; filter: drop-shadow(0 0 4px rgba(140, 255, 120, 0.5)); }
+#touch .titem b { position: absolute; right: 4px; bottom: 1px; font-family: var(--font-small); font-size: 8px; color: #d6ffc8; font-weight: normal; }
+#touch .tc-build { right: calc(270px + env(safe-area-inset-right, 0px)); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); gap: 8px; }
+#touch .tc-build .tbtn, #touch .tc-veh .tbtn { width: 50px; height: 50px; }
+#touch .tclose { width: 52px; height: 52px; border-radius: 14px; --bk: #f0a090; --bk2: #d8604a; --bkd: #7a2014; color: #fff; }
+/* the move stick: a chrome ring with a bakelite knob */
+#touch .tstick { background: radial-gradient(circle, rgba(10, 30, 14, 0.25) 55%, rgba(10, 30, 14, 0.45) 100%); box-shadow: inset 0 0 0 3px rgba(220, 228, 232, 0.8), 0 0 0 2px rgba(60, 66, 70, 0.6); }
+#touch .tknob { background: radial-gradient(circle at 35% 30%, #fffaf0, #e8dcbc 50%, #9a8a62); box-shadow: 0 4px 0 #4a3e28, 0 6px 10px rgba(0, 0, 0, 0.45); }
+#touch.t-screen .tc-item { display: none !important; }
+@media (max-width: 900px) {
+  #touch .tc-item { right: calc(250px + env(safe-area-inset-right, 0px)); }
+}
+#touch:not(.t-screen) .tclose { display: none !important; }

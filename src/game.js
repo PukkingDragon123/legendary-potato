@@ -126,8 +126,8 @@ export class Game {
     const head = this.local.headPos(_h);
     const vehicleCam = this.cameraOverride?.();
     this.rig.update(dt, vehicleCam?.pos ?? head, { sprint: this.local.sprint, aim: this.aiming, firstPerson: this.forceFirstPerson, vehicleDist: vehicleCam?.dist });
-    this.local.char.headMesh.visible = !(this.rig.firstPerson || this.forceFirstPerson) || !!vehicleCam;
-    if (this.local.char.hat) this.local.char.hat.visible = this.local.char.headMesh.visible;
+    // in first person you are the camera: your own bean is hidden (the viewmodel shows your hands)
+    this.local.char.root.visible = !(this.rig.firstPerson || this.forceFirstPerson) || !!vehicleCam || !!this.rig.override;
     const cam = e.camera.position;
     const ws = this.weather.state();
     this.sky.update(this.time.tod, ws, cam, dt);

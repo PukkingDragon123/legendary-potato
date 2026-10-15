@@ -12,7 +12,7 @@ export class CameraRig {
     this.dist = 3.4; this.curDist = 3.4;
     this.minDist = 1.4; this.maxDist = 9;
     this.shoulder = 0.42;
-    this.firstPerson = false;
+    this.firstPerson = true; // you are the bean (P switches to the shoulder camera)
     this.trauma = 0;
     this.baseFov = 70;
     this.fovKick = 0;

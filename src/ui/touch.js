@@ -4,26 +4,50 @@
 // buttons, tappable hotbar slots, and a close button while a screen is open.
 // Buttons fire the same key codes as the keyboard, so every system (and
 // every menu that listens for keys) works without knowing about touch.
+// chunky icons (24x24, stroked) for the bakelite buttons
+const I = {
+  fist: '<path d="M6 10.5V8a2 2 0 0 1 4 0v-.5a2 2 0 0 1 4 0V8a2 2 0 0 1 4 0v6a6 6 0 0 1-6 6h-1a5 5 0 0 1-5-5v-1.5a2 2 0 0 1 4 0"/><path d="M10 8v3M14 8v3"/>',
+  jump: '<path d="M5 14l7-7 7 7"/><path d="M5 19l7-7 7 7"/>',
+  hand: '<path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 10.5V9a1.5 1.5 0 0 1 3 0v2"/><path d="M15 10.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.5a5 5 0 0 1-4.3-2.5L5 14.5a1.6 1.6 0 0 1 2.6-1.8L9 14"/>',
+  aim: '<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
+  duck: '<path d="M5 10l7 7 7-7"/><path d="M5 4h14"/>',
+  paw: '<circle cx="7" cy="9" r="2"/><circle cx="12" cy="6.5" r="2"/><circle cx="17" cy="9" r="2"/><path d="M8 17c0-3 2-5 4-5s4 2 4 5c0 2-2 2.5-4 2.5S8 19 8 17z"/>',
+  light: '<path d="M8 3h8l-1.5 5h-5z"/><rect x="9.5" y="8" width="5" height="12" rx="1"/><path d="M4 2l2 2M20 2l-2 2"/>',
+  eye: '<path d="M2 12s4-6.5 10-6.5S22 12 22 12s-4 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  hammer: '<path d="M14 4l6 6-2.5 2.5-6-6z"/><path d="M12.5 7.5L3 17l3 3 9.5-9.5"/>',
+  map: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>',
+  prof: '<path d="M12 2.5c4.6 0 7.5 4.2 7.5 9.5s-3 9.5-7.5 9.5S4.5 17.3 4.5 12 7.4 2.5 12 2.5z"/><rect x="8" y="7.5" width="8" height="6" rx="1"/><circle cx="9" cy="17" r="0.8" fill="currentColor"/><circle cx="12" cy="17.5" r="0.8" fill="currentColor"/><circle cx="15" cy="17" r="0.8" fill="currentColor"/>',
+  menu: '<path d="M5 7h14M5 12h14M5 17h14"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  left: '<path d="M15 5l-7 7 7 7"/>',
+  right: '<path d="M9 5l7 7-7 7"/>',
+  mat: '<rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/>',
+  rot: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>',
+  horn: '<path d="M3 10v4h3l6 4V6L6 10z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+};
+const svg = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${I[k] ?? ''}</svg>`;
 const BTN = {
-  use: { label: 'USE', mouse: 'Mouse0', hold: true },
-  jump: { label: 'JUMP', code: 'Space', hold: true },
-  interact: { label: 'E', code: 'KeyE', hold: true },
-  aim: { label: 'AIM', mouse: 'Mouse2', hold: true },
-  crouch: { label: 'DUCK', code: 'KeyC', toggle: true },
-  ride: { label: 'RIDE', code: 'KeyZ' },
-  bag: { label: 'BAG', code: 'Tab' },
-  map: { label: 'MAP', code: 'KeyM' },
-  log: { label: 'LOG', code: 'KeyJ' },
-  build: { label: 'BUILD', code: 'KeyB' },
-  light: { label: 'LIGHT', code: 'KeyL' },
-  cam: { label: 'CAM', code: 'KeyP' },
-  menu: { label: '☰', code: 'Escape' },
-  close: { label: '✕', code: 'Escape' },
-  prev: { label: '◀', wheel: -1 },
-  next: { label: '▶', wheel: 1 },
-  mat: { label: 'MAT', code: 'KeyF' },
-  rot: { label: 'ROT', code: 'KeyR' },
-  horn: { label: 'HORN', code: 'KeyH', hold: true },
+  use: { label: 'USE', icon: 'fist', mouse: 'Mouse0', hold: true },
+  jump: { label: 'JUMP', icon: 'jump', code: 'Space', hold: true },
+  interact: { label: 'E', icon: 'hand', code: 'KeyE', hold: true },
+  aim: { label: 'AIM', icon: 'aim', mouse: 'Mouse2', hold: true },
+  crouch: { label: 'DUCK', icon: 'duck', code: 'KeyC', toggle: true },
+  ride: { label: 'RIDE', icon: 'paw', code: 'KeyZ' },
+  bag: { label: 'PROF', icon: 'prof', code: 'Tab' },
+  map: { label: 'MAP', icon: 'map', code: 'KeyM' },
+  log: { label: 'LOG', icon: 'menu', code: 'KeyJ' },
+  build: { label: 'BUILD', icon: 'hammer', code: 'KeyB' },
+  light: { label: 'LIGHT', icon: 'light', code: 'KeyL' },
+  cam: { label: 'VIEW', icon: 'eye', code: 'KeyP' },
+  menu: { label: 'MENU', icon: 'menu', code: 'Escape' },
+  close: { label: 'CLOSE', icon: 'close', code: 'Escape' },
+  prev: { label: '', icon: 'left', wheel: -1 },
+  next: { label: '', icon: 'right', wheel: 1 },
+  iprev: { label: '', icon: 'left', wheel: -1 },
+  inext: { label: '', icon: 'right', wheel: 1 },
+  mat: { label: 'MAT', icon: 'mat', code: 'KeyF' },
+  rot: { label: 'ROT', icon: 'rot', code: 'KeyR' },
+  horn: { label: 'HORN', icon: 'horn', code: 'KeyH', hold: true },
 };
 
 export function isTouchDevice() {
@@ -62,7 +86,13 @@ export class TouchControls {
     const thumb = this.el('div', 'tcluster tc-thumb'); R.appendChild(thumb);
     for (const k of ['aim', 'interact', 'crouch', 'jump', 'ride', 'use']) thumb.appendChild(this.button(k));
     const top = this.el('div', 'tcluster tc-top'); R.appendChild(top);
-    for (const k of ['light', 'cam', 'build', 'log', 'map', 'bag', 'menu']) top.appendChild(this.button(k));
+    for (const k of ['light', 'cam', 'build', 'map', 'bag', 'menu']) top.appendChild(this.button(k));
+    // what is in your hand (there is no hotbar on screen any more): flick through it here
+    const item = this.el('div', 'tcluster tc-item'); R.appendChild(item);
+    item.appendChild(this.button('iprev'));
+    this.itemSlot = this.el('div', 'titem'); item.appendChild(this.itemSlot);
+    item.appendChild(this.button('inext'));
+    this.clusters_item = item;
     const bld = this.el('div', 'tcluster tc-build'); R.appendChild(bld);
     for (const k of ['prev', 'next', 'mat', 'rot']) bld.appendChild(this.button(k));
     const veh = this.el('div', 'tcluster tc-veh'); R.appendChild(veh);
@@ -125,8 +155,8 @@ export class TouchControls {
     const def = BTN[k];
     const b = this.el('button', 'tbtn tb-' + k);
     b.type = 'button';
-    b.textContent = def.label;
-    b.setAttribute('aria-label', k);
+    b.innerHTML = `<span class="ti">${svg(def.icon)}</span>${def.label ? `<span class="tl">${def.label}</span>` : ''}`;
+    b.setAttribute('aria-label', def.label || k);
     const press = (on) => {
       if (def.wheel) { if (on) this.inp.wheel += def.wheel; return; }
       if (def.mouse) { if (on) { this.inp.keys.add(def.mouse); this.inp.tap(def.mouse); } else this.inp.keys.delete(def.mouse); return; }
@@ -183,12 +213,18 @@ export class TouchControls {
       this._lt = 6;
       const t = g.interaction?.target;
       const txt = t?.prompt?.text ?? (t?.interact ? `${t.interact}` : null);
-      const lab = txt ? (txt.length > 14 ? txt.slice(0, 13) + '…' : txt) : 'E';
-      if (this.btns.interact.textContent !== lab) this.btns.interact.textContent = lab;
+      const lab = txt ? (txt.length > 12 ? txt.slice(0, 11) + '…' : txt) : '';
+      const tl = this.btns.interact.querySelector('.tl');
+      if (tl && tl.textContent !== lab) tl.textContent = lab;
       this.btns.interact.classList.toggle('ready', !!txt);
       const use = t?.use ?? (g.inventory?.heldDef?.()?.tool?.kind === 'scanner' ? 'Scan' : null);
       const ul = use ? use.toUpperCase().slice(0, 6) : 'USE';
-      if (this.btns.use.textContent !== ul) this.btns.use.textContent = ul;
+      const ut = this.btns.use.querySelector('.tl');
+      if (ut && ut.textContent !== ul) ut.textContent = ul;
+      // the item in your hand
+      const held = g.inventory?.held?.();
+      const hk = held ? held.id + ':' + held.n : '';
+      if (hk !== this._hk) { this._hk = hk; this.itemSlot.innerHTML = held && g.icons?.[held.id] ? `<img src="${g.icons[held.id]}">${held.n > 1 ? `<b>${held.n}</b>` : ''}` : ''; }
       this.btns.ride.classList.toggle('dim', !t?.alt && !g.local?.sitting?.dino);
     }
   }

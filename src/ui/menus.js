@@ -1,5 +1,5 @@
 // Loading screen + title screen + character customiser.
-import { PRESETS, OPTIONS, SKIN_TONES } from '../entities/character.js';
+import { PRESETS, OPTIONS, SKIN_TONES, LEATHER_NAMES, MOUTHS, normalizeOutfit } from '../entities/character.js';
 
 const TIPS = [
   'Tip: Punching trees works. It just takes a while and hurts a bit.',
@@ -77,7 +77,7 @@ export class Title {
     if (this.opt.hasSave) this.btn('Continue Expedition', () => this.opt.onStart({ mode: 'continue', host: !!this.opt.serverAvailable }), 'primary');
     this.btn(this.opt.hasSave ? 'New Expedition' : 'Start Expedition', () => this.newGame(), this.opt.hasSave ? '' : 'primary');
     this.btn('Join Friends', () => this.join());
-    this.btn('Customise Explorer', () => this.customise());
+    this.btn('Customise Your Bean', () => this.customise());
     this.btn('How to Play', () => this.help());
   }
   newGame() {
@@ -100,7 +100,7 @@ export class Title {
   }
   field(label, val) { const l = document.createElement('label'); l.innerHTML = `<span>${label}</span>`; const i = document.createElement('input'); i.type = 'text'; i.value = val ?? ''; i.maxLength = 16; l.appendChild(i); this.menu.appendChild(l); return i; }
   customise() {
-    this.clear('Customise Explorer');
+    this.clear('Customise Your Bean');
     const prof = this.opt.profile;
     const row = (label, key, opts, fmt = (v) => v) => {
       const l = document.createElement('label'); l.innerHTML = `<span>${label}</span>`;
@@ -117,14 +117,15 @@ export class Title {
     PRESETS.forEach((p) => { const b = document.createElement('button'); b.className = 'btn'; b.style.cssText = 'width:auto;font-size:15px;padding:5px 9px'; b.textContent = p.name; b.onclick = () => { prof.outfit = { ...p }; this.customise(); this.opt.onPreview?.(prof.outfit); }; presetRow.appendChild(b); });
     this.menu.appendChild(presetRow);
     const nice = (s) => (s ?? 'none').replace(/^./, (c) => c.toUpperCase());
+    prof.outfit = normalizeOutfit(prof.outfit);
+    row('Leather', 'skin', SKIN_TONES.map((_, i) => i), (v) => LEATHER_NAMES[v] ?? `Tone ${v + 1}`);
+    row('Pattern', 'top', OPTIONS.top, nice);
+    row('Eyes', 'overlay', OPTIONS.overlay, nice);
+    row('Mouth', 'nose', MOUTHS.map((_, i) => i), (v) => MOUTHS[v]);
     row('Hat', 'hat', OPTIONS.hat, nice);
-    row('Shirt', 'top', OPTIONS.top, nice);
-    row('Over', 'overlay', OPTIONS.overlay, nice);
-    row('Legs', 'bottom', OPTIONS.bottom, nice);
+    row('Feet', 'bottom', OPTIONS.bottom, nice);
     row('Pack', 'pack', OPTIONS.pack, nice);
     row('Extra', 'extra', OPTIONS.extra, nice);
-    row('Skin', 'skin', SKIN_TONES.map((_, i) => i), (v) => `Tone ${v + 1}`);
-    row('Nose', 'nose', [0, 1, 2, 3], (v) => ['Rosy', 'Button', 'Pink', 'Sunburnt'][v]);
     this.btn('Done', () => { this.opt.onSaveProfile?.(prof); this.main(); this.opt.onPreview?.(null); }, 'primary');
     this.opt.onPreview?.(prof.outfit);
   }

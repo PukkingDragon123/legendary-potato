@@ -17,6 +17,7 @@ export class Player {
     this.local = !!opt.local;
     this.outfit = opt.outfit ?? PRESETS[0];
     this.char = new Character(this.outfit, { local: this.local });
+    this.char.fx = game.fx;
     this.root = this.char.root;
     game.engine.scene.add(this.root);
     this.pos = new THREE.Vector3();
@@ -49,6 +50,7 @@ export class Player {
     const p = this.root.position.clone(), r = this.root.rotation.y;
     this.root.removeFromParent();
     this.char = new Character(o, { local: this.local });
+    this.char.fx = this.game.fx;
     this.root = this.char.root;
     this.root.position.copy(p); this.root.rotation.y = r;
     this.game.engine.scene.add(this.root);
@@ -57,7 +59,8 @@ export class Player {
 
   teleport(x, y, z) { this.pos.set(x, y, z); this.vel.set(0, 0, 0); this.root.position.copy(this.pos); }
 
-  headPos(out = new THREE.Vector3()) { return out.copy(this.pos).add(_v.set(0, this.crouch ? 0.8 : 0.98, 0)); }
+  // eyes of a 1 m bean: the world feels big from down here (higher while swimming so you see over the water)
+  headPos(out = new THREE.Vector3()) { return out.copy(this.pos).add(_v.set(0, this.swim ? 1.02 : this.crouch ? 0.6 : 0.84, 0)); }
 
   setHeld(id) {
     if (id === this.heldId) return;
@@ -222,7 +225,7 @@ export class Player {
       grounded: this.grounded || this.swim, vy: this.vel.y, crouch: this.crouch, sprint: this.sprint, swim: this.swim,
       action: this.action ? { name: this.action.name, t: Math.min(1, this.action.t), side: this.action.side } : this.emote ? { name: this.emote, t: 0.5 } : this.carrying ? { name: 'carry', t: 0.5 } : null,
       talk: this.talk, expr: this.expr, downed: this.downed, carried: !!this.carriedBy, sitting: !!this.sitting, ride: this.sitting?.ride, drive: this.sitting?.drive ?? null,
-      sleeping: this.sleeping, lookPitch: this.lookPitch, lookYaw: this.lookYaw, yaw: this.yaw, holding: !!this.heldId, panic: panickingFor(this, panicking),
+      sleeping: this.sleeping, lookPitch: this.lookPitch, lookYaw: this.lookYaw, yaw: this.yaw, holding: !!this.heldId, panic: panickingFor(this, panicking), underwater: this.underwater,
     });
   }
   setExpr(e, t = 1.5) { this.expr = e; this.exprT = t; }

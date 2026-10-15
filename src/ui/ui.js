@@ -1,5 +1,7 @@
-// HUD + the CHRONO-PAL 2000 handheld (backpack, crafting, dinos, map, log),
-// toasts, banners, loot popups, name tags, chat and pause menu.
+// The screens inside the Pocket Prof (comms, backpack, crafting, pals, map,
+// log and whatever crate you opened), plus the few bits of HUD that are left
+// (crosshair, prompt, name tags, chat) and the pause menu. Floating HUD panels
+// still exist for tests and old code paths but the device hides them.
 import * as THREE from 'three';
 import { ITEMS } from '../data/items.js';
 import { RECIPES, STATIONS } from '../data/recipes.js';
@@ -22,7 +24,7 @@ export class UI {
     this.drag = null;
     this.consumesClick = false;
     game.ui = this;
-    game.inventory.onChange(() => { this.renderHotbar(); if (this.pda && this.pdaTab === 'bag') this.renderBag(); if (this.pda && this.pdaTab === 'craft') this.renderCraft(); if (this.container) this.renderContainer(); });
+    game.inventory.onChange(() => { this.renderHotbar(); if (this.pda && this.pdaTab === 'bag') this.renderBag(); if (this.pda && this.pdaTab === 'craft') this.renderCraft(); if (this.pda && this.pdaTab === 'box') this.renderContainer(); });
     this.renderHotbar();
     game.events.on('loot', ({ id, n }) => { if (n > 0) this.loot(id, n); });
     game.events.on('effect', (name) => { const e = EFFECTS[name]; if (e && !['wet', 'cold', 'hot', 'warm', 'sleepy'].includes(name)) this.toast(e.name + '!', name === 'wellfed' || name === 'caffeinated' ? '' : 'warn'); });
@@ -344,25 +346,28 @@ export class UI {
   }
 
   // ---------------------------------------------------------------- PDA
-  isOpen() { return !!(this.pda || this.container || this.menuOpen || this.crtOpen); }
+  isOpen() { return !!(this.pda || this.menuOpen || this.crtOpen); }
   togglePDA(tab) { if (this.pda) { if (tab && tab !== this.pdaTab) this.showTab(tab); else this.closePDA(); } else this.openPDA(tab ?? 'bag'); }
   openPDA(tab = 'bag') {
-    if (this.pda) return;
+    if (this.pda) { if (tab) this.showTab(tab); return; }
     const g = this.game;
     g.uiOpen = true;
     g.input.unlock();
-    const P = h('div', 'px opening'); P.id = 'pda';
-    P.innerHTML = `<div class="pda-body"><div class="pda-top"><div class="pda-brand">CHRONO-PAL <b>2000</b> · <span class="pda-sub">PERSONAL FIELD ASSISTANT</span></div><div class="pda-tabs"></div><div class="pda-led"></div></div><div class="pda-screen"></div><div class="pda-foot">PROPERTY OF THE CHRONO-VAN EXPEDITION · IF FOUND RETURN TO 1987</div></div>`;
-    for (const [x, y] of [[8, 8], [8, 'b'], ['r', 8], ['r', 'b']]) { const s = h('div', 'screw'); s.style[x === 'r' ? 'right' : 'left'] = '8px'; s.style[y === 'b' ? 'bottom' : 'top'] = '8px'; P.firstChild.appendChild(s); }
+    // the device comes up in front of you (third person snaps into your eyes while it is up)
+    if (g.device) { g.device.raised = true; g.device.peek = false; this._fpWas = g.forceFirstPerson; g.forceFirstPerson = true; }
+    const P = h('div', 'dev'); P.id = 'pda';
+    P.innerHTML = `<div class="dev-top"><div class="dev-brand">POCKET PROF <b>3000</b></div><div class="pda-tabs"></div><div class="dev-sig"><i></i><i></i><i></i></div></div><div class="pda-screen"></div><div class="dev-scan"></div>`;
     this.root.appendChild(P);
     this.pda = P;
     const tabs = P.querySelector('.pda-tabs');
-    for (const [k, label] of [['bag', 'BAG'], ['craft', 'CRAFT'], ['dinos', 'DINOS'], ['map', 'MAP'], ['log', 'LOG']]) {
+    const list = [['comms', 'COMMS'], ['bag', 'PACK'], ['craft', 'CRAFT'], ['dinos', 'PALS'], ['map', 'MAP'], ['log', 'LOG']];
+    if (this.container) list.unshift(['box', (this.container.title ?? 'BOX').toUpperCase().slice(0, 10)]);
+    for (const [k, label] of list) {
       const b = h('div', 'pda-tab', label); b.dataset.tab = k;
       b.onclick = () => { this.showTab(k); g.audio?.play('ui_click'); };
       tabs.appendChild(b);
     }
-    this.showTab(tab);
+    this.showTab(this.container ? 'box' : tab ?? (g.device?.unread ? 'comms' : 'bag'));
     g.audio?.play('pda_open');
   }
   closePDA() {
@@ -370,15 +375,50 @@ export class UI {
     this.pda.remove(); this.pda = null;
     this.hideTooltip();
     if (this.drag) this.cancelDrag();
-    if (!this.container && !this.menuOpen && !this.crtOpen) { this.game.uiOpen = false; this.game.input.lock(); }
-    this.game.audio?.play('pda_close');
+    const g = this.game;
+    if (g.device) { g.device.raised = false; g.forceFirstPerson = !!this._fpWas; }
+    if (this.container) { const c = this.container; this.container = null; c.opt.onClose?.(); this.game.audio?.play('box_close'); }
+    if (!this.menuOpen && !this.crtOpen) { g.uiOpen = false; g.input.lock(); }
+    g.audio?.play('pda_close');
   }
   showTab(tab) {
+    if (!this.pda) return;
     this.pdaTab = tab;
     for (const b of this.pda.querySelectorAll('.pda-tab')) b.classList.toggle('on', b.dataset.tab === tab);
     this.screen = this.pda.querySelector('.pda-screen');
     this.screen.innerHTML = '';
-    ({ bag: () => this.renderBag(), craft: () => this.renderCraft(), dinos: () => this.renderDinos(), map: () => this.renderMap(), log: () => this.renderLog() })[tab]();
+    ({ comms: () => this.renderComms(), box: () => this.renderContainer(), bag: () => this.renderBag(), craft: () => this.renderCraft(), dinos: () => this.renderDinos(), map: () => this.renderMap(), log: () => this.renderLog() })[tab]?.();
+  }
+
+  // --- comms: Professor Nubbins' messages and the current to-do list
+  renderComms() {
+    const S = this.screen, g = this.game, D = g.device;
+    S.innerHTML = '';
+    const pane = h('div', 'pane');
+    const list = h('div', 'list'); list.style.width = '230px';
+    const T = D?.tasks;
+    if (T) {
+      const todo = h('div', 'todo');
+      todo.innerHTML = `<div class="section-title">${esc(T.chapter ?? '')} · TO DO</div><div class="todo-title">${esc(T.title)}</div>` + (T.items ?? []).map((it) => `<div class="todo-item${it.done ? ' done' : ''}">${it.done ? '[X]' : '[ ]'} ${esc(it.text)}${it.count ? ` (${esc(it.count)})` : ''}</div>`).join('');
+      list.appendChild(todo);
+    }
+    const msgs = D?.msgs ?? [];
+    this.commSel = this.commSel && msgs.find((m) => m.id === this.commSel) ? this.commSel : msgs[0]?.id;
+    for (const m of msgs) {
+      const c = h('div', 'row-card' + (this.commSel === m.id ? ' on' : '') + (m.read ? '' : ' unread'), `<div><div>${esc(m.title)}</div><div class="meta">DAY ${m.day} · ${esc(m.from)}</div></div>`);
+      c.onclick = () => { this.commSel = m.id; m.read = true; this.renderComms(); g.audio?.play('ui_tick'); };
+      list.appendChild(c);
+    }
+    pane.appendChild(list);
+    const det = h('div', 'detail');
+    const m = msgs.find((x) => x.id === this.commSel);
+    if (m) {
+      m.read = true;
+      det.innerHTML = `<div class="prof"><img src="${D.portrait}"><div><div class="cat">${esc(m.from)}</div><h3>${esc(m.title)}</h3></div></div><pre class="msg">${esc(m.body)}</pre>`;
+    } else det.innerHTML = '<p class="stats">No messages yet. The professor calls when he has something to say. Which is often.</p>';
+    pane.appendChild(det);
+    S.appendChild(pane);
+    if (D) { D.unread = 0; D.alert = false; }
   }
 
   // --- backpack
@@ -389,10 +429,10 @@ export class UI {
     const pane = h('div', 'pane');
     const left = h('div');
     left.appendChild(h('div', 'section-title', 'HOTBAR'));
-    const hot = h('div', 'grid'); hot.style.gridTemplateColumns = 'repeat(8, 50px)';
+    const hot = h('div', 'grid'); hot.style.gridTemplateColumns = 'repeat(8, 44px)';
     left.appendChild(hot);
     left.appendChild(h('div', 'section-title', 'BACKPACK'));
-    const bag = h('div', 'grid'); bag.style.gridTemplateColumns = 'repeat(8, 50px)';
+    const bag = h('div', 'grid'); bag.style.gridTemplateColumns = 'repeat(8, 44px)';
     left.appendChild(bag);
     for (let i = 0; i < inv.size; i++) {
       const el = h('div', 'slot' + (i < 8 ? ' hot' : ''));
@@ -468,7 +508,7 @@ export class UI {
     if (!d) return;
     this.drag = null;
     if (d.el) d.el.remove();
-    if (!d.moved) { if (this.pda && this.pdaTab === 'bag') this.renderBag(); if (this.container) this.renderContainer(); return; }
+    if (!d.moved) { if (this.pda && this.pdaTab === 'bag') this.renderBag(); if (this.pda && this.pdaTab === 'box') this.renderContainer(); return; }
     const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.slot');
     if (target && target._inv) {
       const ti = +target.dataset.slot, tinv = target._inv;
@@ -482,7 +522,7 @@ export class UI {
         d.inv.changed(); tinv.changed();
       }
       this.game.audio?.play('ui_click');
-    } else if (!e.target.closest('#pda') && !e.target.closest('.container-ui')) {
+    } else if (!e.target.closest('#pda')) {
       const out = d.inv.removeAt(d.i, d.inv.slots[d.i]?.n ?? 1);
       if (out && this.game.drops) this.game.drops.throwFromPlayer(out);
     }
@@ -503,10 +543,10 @@ export class UI {
     this.craftCat = this.craftCat ?? 'all';
     for (const [k, label] of catList) { const c = h('div', 'c' + (this.craftCat === k ? ' on' : ''), label); c.onclick = () => { this.craftCat = k; this.renderCraft(); }; cats.appendChild(c); }
     pane.appendChild(cats);
-    const mid = h('div'); mid.style.cssText = 'width:340px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;';
+    const mid = h('div'); mid.style.cssText = 'width:236px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;';
     const near = C.nearStations();
     mid.appendChild(h('div', 'section-title', 'NEARBY: ' + [...near].map((s) => STATIONS[s]?.name ?? s).join(', ').toUpperCase()));
-    const grid = h('div', 'grid'); grid.style.gridTemplateColumns = 'repeat(6, 50px)';
+    const grid = h('div', 'grid'); grid.style.gridTemplateColumns = 'repeat(5, 44px)';
     const list = RECIPES.filter((r) => !r.hidden && (this.craftCat === 'all' || r.cat === this.craftCat));
     // sort: craftable first, then available, then locked
     const score = (r) => (C.isUnlocked(r) ? (C.canCraft(r) ? 0 : near.has(r.station) ? 1 : 2) : 3);
@@ -580,7 +620,7 @@ export class UI {
     const S = this.screen, g = this.game;
     S.innerHTML = '';
     const pane = h('div', 'pane');
-    const list = h('div', 'list'); list.style.width = '330px';
+    const list = h('div', 'list'); list.style.width = '220px';
     const tames = g.dinos ? g.dinos.tamed() : [];
     if (!tames.length) list.innerHTML = '<p class="stats" style="padding:8px">No tamed dinosaurs yet.<br><br>Find one, study it with binoculars or the scanner, knock it out (or befriend it) and feed it what it likes.</p>';
     for (const d of tames) {
@@ -676,7 +716,7 @@ export class UI {
     const S = this.screen, g = this.game;
     S.innerHTML = '';
     const pane = h('div', 'pane');
-    const list = h('div', 'list'); list.style.width = '300px';
+    const list = h('div', 'list'); list.style.width = '210px';
     const entries = g.journal?.entries() ?? [];
     this.logSel = this.logSel ?? entries[0]?.id;
     for (const e of entries) {
@@ -697,49 +737,42 @@ export class UI {
   openContainer(cont, title, opt = {}) {
     const g = this.game;
     if (this.container) this.closeContainer();
-    g.uiOpen = true; g.input.unlock();
-    const el = h('div', 'px container-ui');
-    el.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:860px;padding:16px 18px;pointer-events:auto;';
-    this.root.appendChild(el);
-    this.container = { cont, title, el, opt };
-    this.renderContainer();
+    if (this.pda) this.closePDA();
+    this.container = { cont, title, opt };
+    this.openPDA('box');
     g.audio?.play('box_open');
   }
   renderContainer() {
     const C = this.container;
-    if (!C) return;
-    const g = this.game, inv = g.inventory;
-    const el = C.el;
-    el.innerHTML = '';
-    const top = h('div', '', `<div class="pda-brand" style="margin-bottom:10px">${esc(C.title.toUpperCase())}</div>`);
-    el.appendChild(top);
-    const row = h('div'); row.style.cssText = 'display:flex;gap:18px;';
-    const scr = h('div', 'pda-screen'); scr.style.cssText = 'position:relative;inset:auto;padding:10px;flex:1;';
-    scr.appendChild(h('div', 'section-title', 'YOUR BACKPACK'));
-    const g1 = h('div', 'grid'); g1.style.gridTemplateColumns = 'repeat(8, 50px)';
-    for (let i = 0; i < inv.size; i++) { const s = h('div', 'slot' + (i < 8 ? ' hot' : '')); this.fillSlot(s, inv.slots[i], null, false); this.bindSlot(s, inv, i, { other: C.cont.inv }); g1.appendChild(s); }
-    scr.appendChild(g1);
-    row.appendChild(scr);
-    const scr2 = h('div', 'pda-screen'); scr2.style.cssText = 'position:relative;inset:auto;padding:10px;width:320px;';
+    if (!C || !this.pda || this.pdaTab !== 'box') return;
+    const inv = this.game.inventory;
+    const S = this.screen;
+    S.innerHTML = '';
+    const pane = h('div', 'pane');
+    const left = h('div');
+    left.appendChild(h('div', 'section-title', 'YOUR PACK'));
+    const g1 = h('div', 'grid'); g1.style.gridTemplateColumns = 'repeat(8, 44px)';
+    for (let i = 0; i < inv.size; i++) { const s2 = h('div', 'slot' + (i < 8 ? ' hot' : '')); this.fillSlot(s2, inv.slots[i], null, false); this.bindSlot(s2, inv, i, { other: C.cont.inv }); g1.appendChild(s2); }
+    left.appendChild(g1);
+    pane.appendChild(left);
+    const right = h('div', 'detail');
     if (C.cont.inv) {
-      scr2.appendChild(h('div', 'section-title', (C.opt.label ?? 'CONTENTS').toUpperCase()));
-      const g2 = h('div', 'grid'); g2.style.gridTemplateColumns = `repeat(${C.opt.cols ?? 5}, 50px)`;
-      for (let i = 0; i < C.cont.inv.size; i++) { const s = h('div', 'slot'); this.fillSlot(s, C.cont.inv.slots[i], null, false); this.bindSlot(s, C.cont.inv, i, { other: inv }); g2.appendChild(s); }
-      scr2.appendChild(g2);
+      right.appendChild(h('div', 'section-title', (C.opt.label ?? C.title ?? 'CONTENTS').toUpperCase()));
+      const g2 = h('div', 'grid'); g2.style.gridTemplateColumns = `repeat(${Math.min(4, C.opt.cols ?? 4)}, 44px)`;
+      for (let i = 0; i < C.cont.inv.size; i++) { const s2 = h('div', 'slot'); this.fillSlot(s2, C.cont.inv.slots[i], null, false); this.bindSlot(s2, C.cont.inv, i, { other: inv }); g2.appendChild(s2); }
+      right.appendChild(g2);
     }
-    if (C.opt.extra) scr2.appendChild(C.opt.extra(C));
-    row.appendChild(scr2);
-    el.appendChild(row);
-    el.appendChild(h('div', 'small', 'Shift-click to quick-move · drag to swap · Esc / Tab to close'));
+    if (C.opt.extra) right.appendChild(C.opt.extra(C));
+    right.appendChild(h('div', 'stats', 'Shift-click to quick-move · drag to swap'));
+    pane.appendChild(right);
+    S.appendChild(pane);
   }
   closeContainer() {
     if (!this.container) return;
+    if (this.pda) { this.closePDA(); return; }
     const c = this.container;
     this.container = null;
-    c.el.remove();
-    if (c.opt.onClose) c.opt.onClose();
-    this.hideTooltip();
-    if (!this.pda && !this.menuOpen && !this.crtOpen) { this.game.uiOpen = false; this.game.input.lock(); }
+    c.opt.onClose?.();
     this.game.audio?.play('box_close');
   }
 
@@ -768,7 +801,7 @@ export class UI {
     this.menuOpen = false;
     this.pauseEl.remove();
     this.game.paused = false;
-    if (!this.pda && !this.container && !this.crtOpen) { this.game.uiOpen = false; this.game.input.lock(); }
+    if (!this.pda && !this.crtOpen) { this.game.uiOpen = false; this.game.input.lock(); }
   }
   openSettings(m) {
     const g = this.game, st = g.settings;

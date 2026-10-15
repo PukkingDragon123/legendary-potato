@@ -55,7 +55,8 @@ export class Vitals {
     this.regenDelay = 6;
     this.damageFlash = Math.min(1, this.damageFlash + amount / 25 + 0.25);
     this.game.rig.addTrauma(Math.min(0.6, amount / 40));
-    p.setExpr('hurt', 0.8);
+    p.setExpr(amount > 20 ? 'shock' : 'hurt', 0.9);
+    p.char?.hit?.(Math.min(2, 0.5 + amount / 20));
     this.game.audio?.play('hurt', { pos: p.pos, vol: 0.8 });
     this.game.events.emit('damage', { amount, ...src });
     if (src.bleed && Math.random() < src.bleed) this.add('bleeding', 40);
