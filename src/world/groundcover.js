@@ -355,7 +355,10 @@ void main() {
   float R = uGridN * uCellSize * 0.5;
   float fade = 1.0 - smoothstep( R * uFade.x, R * uFade.y, d );
   if ( uInner > 0.0 ) fade *= smoothstep( uInner * 0.8, uInner * 1.1, d );
-  float sc = mix( uScale.x, uScale.y, hash21( cellIdx * 5.3 + uLayerSeed ) ) * keep * fade;
+  // plants thin out individually at the edge of their ring instead of all shrinking
+  // into a carpet of dots
+  float vis = step( hash21( cellIdx * 11.3 + uLayerSeed + 5.0 ), fade );
+  float sc = mix( uScale.x, uScale.y, hash21( cellIdx * 5.3 + uLayerSeed ) ) * keep * vis * mix( 0.65, 1.0, fade );
   float ang = hash21( cellIdx * 7.7 + uLayerSeed ) * 6.2831;
   // colours, with the same large-scale tints the terrain uses so plants and ground agree
   int mi = int( mid );
