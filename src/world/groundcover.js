@@ -59,28 +59,37 @@ function fernGeo(fronds = 7) {
 
 function reedGeo() {
   const g = new GeoBuilder(['aWind', 'aLayer']);
-  const n = new THREE.Vector3(0, 1, 0);
-  for (let b = 0; b < 7; b++) {
-    const a = Math.random() * Math.PI * 2, r = Math.random() * 0.2;
-    const x = Math.cos(a) * r, z = Math.sin(a) * r, h = 0.6 + Math.random() * 1.1, w = 0.02;
-    const face = Math.random() * Math.PI;
-    const fx = Math.cos(face) * w, fz = Math.sin(face) * w;
-    const lean = (Math.random() - 0.5) * 0.3;
-    const p0 = g.vert(new THREE.Vector3(x - fx, 0, z - fz), n, 0, 0, { aWind: 0, aLayer: 0 });
-    const p1 = g.vert(new THREE.Vector3(x + fx, 0, z + fz), n, 1, 0, { aWind: 0, aLayer: 0 });
-    const p2 = g.vert(new THREE.Vector3(x - fx + lean, h, z - fz), n, 0, 1, { aWind: 1, aLayer: 1 });
-    const p3 = g.vert(new THREE.Vector3(x + fx + lean, h, z + fz), n, 1, 1, { aWind: 1, aLayer: 1 });
-    g.idx.push(p0, p1, p3, p0, p3, p2);
-    if (b % 2 === 0) {
-      // cattail head
-      const c = new THREE.Vector3(x + lean * 0.9, h * 0.88, z);
-      const hd = 0.045;
-      const q0 = g.vert(c.clone().add(new THREE.Vector3(-hd, -0.1, 0)), n, 0, 0, { aWind: 0.9, aLayer: 2 });
-      const q1 = g.vert(c.clone().add(new THREE.Vector3(hd, -0.1, 0)), n, 1, 0, { aWind: 0.9, aLayer: 2 });
-      const q2 = g.vert(c.clone().add(new THREE.Vector3(hd, 0.1, 0)), n, 1, 1, { aWind: 0.95, aLayer: 2 });
-      const q3 = g.vert(c.clone().add(new THREE.Vector3(-hd, 0.1, 0)), n, 0, 1, { aWind: 0.95, aLayer: 2 });
-      g.idx.push(q0, q1, q2, q0, q2, q3);
+  const up = new THREE.Vector3(0, 1, 0);
+  const v = new THREE.Vector3(), nn = new THREE.Vector3();
+  // tapered leaves arching out of the clump (aLayer runs 0 at the root to 1 at the tip)
+  for (let b = 0; b < 10; b++) {
+    const a = Math.random() * Math.PI * 2, r = Math.random() * 0.14;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const h = 0.75 + Math.random() * 0.95, w = 0.024 + Math.random() * 0.016;
+    const face = a + Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+    const fx = Math.cos(face), fz = Math.sin(face);
+    const lean = 0.12 + Math.random() * 0.32;
+    const SEG = 4, base = g.count;
+    for (let k = 0; k <= SEG; k++) {
+      const t = k / SEG;
+      const px = x + Math.cos(a) * lean * h * t * t, pz = z + Math.sin(a) * lean * h * t * t, py = h * t * (1 - 0.12 * t * t);
+      const ww = w * (1 - t * 0.92);
+      // normal: across the blade face, bent toward the sky so the clump is not dark
+      nn.set(-fz, 0, fx).lerp(up, 0.65).normalize();
+      g.vert(v.set(px - fx * ww, py, pz - fz * ww), nn, 0, t, { aWind: t * t, aLayer: t });
+      g.vert(v.set(px + fx * ww, py, pz + fz * ww), nn, 1, t, { aWind: t * t, aLayer: t });
     }
+    for (let k = 0; k < SEG; k++) { const q = base + k * 2; g.idx.push(q, q + 1, q + 3, q, q + 3, q + 2); }
+  }
+  // a few cattails: thin stalk with a velvety brown head
+  for (let c = 0; c < 3; c++) {
+    const a = Math.random() * Math.PI * 2, r = Math.random() * 0.1;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r, h = 1.15 + Math.random() * 0.6;
+    const lean = (Math.random() - 0.5) * 0.12;
+    const pts = [new THREE.Vector3(x, 0, z), new THREE.Vector3(x + lean * 0.5, h * 0.5, z), new THREE.Vector3(x + lean, h, z)];
+    g.tube(pts, [0.008, 0.007, 0.005], { segs: 4, layer: 0.7, wind: (t) => t * t * 0.9 });
+    const head = [new THREE.Vector3(x + lean * 0.8, h * 0.72, z), new THREE.Vector3(x + lean * 0.86, h * 0.8, z), new THREE.Vector3(x + lean * 0.93, h * 0.9, z)];
+    g.tube(head, [0.024, 0.03, 0.022], { segs: 7, layer: 2, wind: () => 0.75, capTop: true });
   }
   return g.build();
 }
@@ -187,7 +196,7 @@ const LAYERS = [
   {
     name: 'reeds', geo: reedGeo, cell: 1.1, N: 76, mode: 'reed', density: 0.55, clump: 0.45,
     biome: table(BIOME_N, 0.6, { [B.SWAMP]: 1, [B.RIVER]: 1, [B.OCEAN]: 0, [B.BEACH]: 0.15, [B.SNOW]: 0, [B.VOLCANIC]: 0 }),
-    mat: table(MAT_N, 1, {}), shore: true, scale: [0.8, 1.3], wind: { amp: 0.16, push: true }, fade: [0.8, 0.98],
+    mat: table(MAT_N, 1, {}), shore: true, calm: true, scale: [0.8, 1.3], wind: { amp: 0.16, push: true }, fade: [0.8, 0.98],
   },
   {
     name: 'flowers', geo: flowerGeo, cell: 1.3, N: 70, mode: 'flower', density: 1,
@@ -231,6 +240,7 @@ uniform float uDensityMul;
 uniform float uClump;
 uniform float uUseGrass;
 uniform float uShore;
+uniform float uCalm;
 uniform float uLayerSeed;
 uniform float uBiomeD[14];
 uniform float uMatD[18];
@@ -278,8 +288,9 @@ function gcVertexMain(mode) {
     } else {
       if ( wl > h - 0.08 ) dens = 0.0;
     }
-    float mask = texture2D( tMask, suv ).r;
-    dens *= 1.0 - mask;
+    vec2 mask = texture2D( tMask, suv ).rg;
+    dens *= 1.0 - mask.r;
+    if ( uCalm > 0.5 ) dens *= 1.0 - mask.g;
     float keep = step( hash21( cellIdx * 3.71 + uLayerSeed + 17.0 ), dens );
     float d = distance( wxz, cameraPosition.xz );
     float R = uGridN * uCellSize * 0.5;
@@ -306,7 +317,9 @@ function gcVertexMain(mode) {
       vGCol = mix( vec3( 0.42, 0.66, 0.26 ), vec3( 0.6, 0.72, 0.28 ), var ) * macro * 1.15;
       if ( var > 0.93 ) vGCol = vec3( 0.62, 0.42, 0.2 );
     ` : mode === 'reed' ? `
-      vGCol = aLayer > 1.5 ? vec3( 0.36, 0.2, 0.1 ) : mix( vec3( 0.24, 0.36, 0.14 ), vec3( 0.48, 0.6, 0.26 ), aLayer ) * macro;
+      float var = hash21( cellIdx * 9.1 + uLayerSeed );
+      vec3 tipc = mix( vec3( 0.5, 0.6, 0.27 ), vec3( 0.62, 0.6, 0.32 ), var );
+      vGCol = aLayer > 1.5 ? vec3( 0.3, 0.17, 0.09 ) * ( 0.9 + 0.2 * var ) : mix( vec3( 0.2, 0.3, 0.12 ), tipc, aLayer ) * macro;
     ` : mode === 'flower' ? `
       float var = hash21( cellIdx * 4.1 + uLayerSeed );
       vec3 petal = var < 0.25 ? vec3( 0.95, 0.85, 0.3 ) : var < 0.5 ? vec3( 0.95, 0.95, 0.9 ) : var < 0.7 ? vec3( 0.75, 0.45, 0.9 ) : var < 0.85 ? vec3( 0.95, 0.5, 0.35 ) : vec3( 0.45, 0.6, 0.95 );
@@ -337,8 +350,9 @@ export class GroundCover {
     this.biomeTex = new THREE.DataTexture(world.biome, M, M, THREE.RedFormat, THREE.UnsignedByteType);
     this.biomeTex.magFilter = this.biomeTex.minFilter = THREE.NearestFilter;
     this.biomeTex.needsUpdate = true;
-    this.maskData = new Uint8Array(M * M);
-    this.maskTex = new THREE.DataTexture(this.maskData, M, M, THREE.RedFormat, THREE.UnsignedByteType);
+    // r: cleared under buildings, g: white water (no calm-water plants there)
+    this.maskData = new Uint8Array(M * M * 2);
+    this.maskTex = new THREE.DataTexture(this.maskData, M, M, THREE.RGFormat, THREE.UnsignedByteType);
     this.maskTex.magFilter = this.maskTex.minFilter = THREE.NearestFilter;
     this.maskTex.needsUpdate = true;
     const frond = fernFrondTex();
@@ -363,7 +377,7 @@ export class GroundCover {
       const uniforms = {
         uCamCell: { value: new THREE.Vector2() }, uCellSize: { value: cell }, uGridN: { value: N }, uInner: { value: def.inner ?? 0 },
         uFade: { value: new THREE.Vector2(...def.fade) }, uScale: { value: new THREE.Vector2(...def.scale) }, uDensityMul: { value: def.density },
-        uClump: { value: def.clump ?? 0 }, uUseGrass: { value: def.useGrass ? 1 : 0 }, uShore: { value: def.shore ? 1 : 0 }, uLayerSeed: { value: this.layers.length * 13.7 + 1 },
+        uClump: { value: def.clump ?? 0 }, uUseGrass: { value: def.useGrass ? 1 : 0 }, uShore: { value: def.shore ? 1 : 0 }, uCalm: { value: def.calm ? 1 : 0 }, uLayerSeed: { value: this.layers.length * 13.7 + 1 },
         uBiomeD: { value: def.biome }, uMatD: { value: def.mat }, uBaseCol: { value: baseCols }, uTipCol: { value: tipCols },
         tHeight: { value: terrain.heightTex }, tSplat: { value: terrain.splatTex }, tBiome: { value: this.biomeTex }, tWaterLvl: { value: terrain.waterTex }, tMask: { value: this.maskTex },
         uHalf: { value: world.half }, uSize: { value: world.size },
@@ -409,7 +423,7 @@ export class GroundCover {
     const { M, half } = this.world;
     const i0 = Math.max(0, Math.floor((x0 + half) / 2)), i1 = Math.min(M - 1, Math.floor((x1 + half) / 2));
     const j0 = Math.max(0, Math.floor((z0 + half) / 2)), j1 = Math.min(M - 1, Math.floor((z1 + half) / 2));
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.maskData[j * M + i] = v;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.maskData[(j * M + i) * 2] = v;
     this.maskTex.needsUpdate = true;
   }
   clearCircle(x, z, r) {
@@ -418,7 +432,18 @@ export class GroundCover {
       for (let i = Math.floor((x - r + half) / 2); i <= Math.floor((x + r + half) / 2); i++) {
         if (i < 0 || j < 0 || i >= M || j >= M) continue;
         const cx = -half + (i + 0.5) * 2, cz = -half + (j + 0.5) * 2;
-        if ((cx - x) ** 2 + (cz - z) ** 2 < r * r) this.maskData[j * M + i] = 255;
+        if ((cx - x) ** 2 + (cz - z) ** 2 < r * r) this.maskData[(j * M + i) * 2] = 255;
+      }
+    this.maskTex.needsUpdate = true;
+  }
+  // mark fast water (rapids, falls) where reeds and lilies cannot root
+  markWild(x, z, r) {
+    const { M, half } = this.world;
+    for (let j = Math.floor((z - r + half) / 2); j <= Math.floor((z + r + half) / 2); j++)
+      for (let i = Math.floor((x - r + half) / 2); i <= Math.floor((x + r + half) / 2); i++) {
+        if (i < 0 || j < 0 || i >= M || j >= M) continue;
+        const cx = -half + (i + 0.5) * 2, cz = -half + (j + 0.5) * 2;
+        if ((cx - x) ** 2 + (cz - z) ** 2 < r * r) this.maskData[(j * M + i) * 2 + 1] = 255;
       }
     this.maskTex.needsUpdate = true;
   }

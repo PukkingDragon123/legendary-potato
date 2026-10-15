@@ -34,6 +34,7 @@ async function boot() {
   if (qs.get('harness')) { (await import('./devharness.js')).runHarness(qs); return; }
   if (qs.get('studio')) { (await import('./devstudio.js')).runStudio(qs); return; }
   if (qs.get('dinos')) { (await import('./devdinos.js')).runDinoStudio(qs); return; }
+  if (qs.get('env')) { (await import('./devenv.js')).runEnvStudio(qs); return; }
   const touch = isTouchDevice();
   const settings = loadJSON('prehistoric-settings', { ...DEFAULT_SETTINGS, quality: touch ? 'low' : DEFAULT_SETTINGS.quality });
   if (qs.get('q')) settings.quality = qs.get('q');

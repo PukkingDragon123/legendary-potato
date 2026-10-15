@@ -44,6 +44,7 @@ const ICONS = {
   heart: '0101011111111110111000100', food: '0011001110111110111001110', drop: '0010001110011101111101110', bolt: '0001000110011100011001000',
   zzz: '1111100010001000100011111', mail: '1111111011101011000111111', skull: '0111011111101010111001010', star: '0010001110111110111010001',
   sun: '1010101110110110111010101', moon: '0111011000110001100001111', target: '0111010001101011000101110',
+  o2: '0110010010100101001001100',
 };
 function icon(ctx, name, x, y, col) { const g = ICONS[name]; if (!g) return; ctx.fillStyle = col; for (let i = 0; i < 25; i++) if (g[i] === '1') ctx.fillRect(x + (i % 5), y + Math.floor(i / 5), 1, 1); }
 
@@ -196,7 +197,7 @@ export class Device {
       if (T.torpor !== undefined) bar(T.torpor, 'ZZZ', P.top);
       if (T.tame !== undefined) bar(T.tame, 'TAME', P.warn);
     } else if (v) {
-      const rows = [['heart', v.hp / v.max.hp], ['food', v.hunger / v.max.hunger], ['drop', v.thirst / v.max.thirst], ['bolt', v.stamina / v.max.stamina], ['zzz', v.energy / v.max.energy]];
+      const rows = [['heart', v.hp / v.max.hp], ['food', v.hunger / v.max.hunger], ['drop', v.thirst / v.max.thirst], ['bolt', v.stamina / v.max.stamina], (v.breath ?? 100) < 99 ? ['o2', v.breath / 100] : ['zzz', v.energy / v.max.energy]];
       rows.forEach(([ic, k], i) => {
         const yy = 15 + i * 9;
         const low = k < 0.2;

@@ -256,6 +256,30 @@ export function generateWorld(seed = 'prehistoric', onProgress = () => {}) {
       if (a - c < 2.5) riverPts[i].level = Math.min(a, Math.max(c, (a + 2 * b + c) / 4));
     }
   }
+  // ------------------------------------------------------------------ rapids
+  // Two whitewater runs: a gorge above Thunder Falls and a canyon below the
+  // plunge pool. The river steps down over rock ledges there, runs shallow
+  // over boulders, and the current is strong enough to sweep you away.
+  {
+    let iF = 1, best = 0;
+    for (let i = 1; i < riverPts.length; i++) { const d = riverPts[i - 1].level - riverPts[i].level; if (d > best) { best = d; iF = i; } }
+    const sF = riverPts[iF].s;
+    const runs = [[sF - 165, sF - 16, 3.0, true], [sF + 36, sF + 196, 2.0, false]];
+    const STEP = 0.36;
+    for (const p of riverPts) {
+      let drop = 0, rapid = 0;
+      for (const [s0, s1, D, aboveFalls] of runs) {
+        if (p.s <= s0 || (aboveFalls && p.s >= sF)) continue;
+        const u = Math.min(1, (p.s - s0) / (s1 - s0));
+        // stair-stepped descent: flat pools that spill over rock ledges
+        const k = (u * D) / STEP;
+        drop += Math.min(D, (Math.floor(k) + smoothstep(0.72, 1.0, k - Math.floor(k))) * STEP);
+        rapid = Math.max(rapid, smoothstep(s0, s0 + 18, p.s) * (1 - smoothstep(s1 - 6, s1 + 16, p.s)));
+      }
+      p.level = Math.max(WORLD.SEA + 0.2, p.level - drop);
+      p.rapid = rapid;
+    }
+  }
   const waterfalls = [];
   for (let i = 1; i < riverPts.length; i++) {
     const drop = riverPts[i - 1].level - riverPts[i].level;
@@ -293,7 +317,7 @@ export function generateWorld(seed = 'prehistoric', onProgress = () => {}) {
     const i = clamp(Math.floor(idx), 0, riverPts.length - 2);
     const t = clamp(idx - i, 0, 1);
     const a = riverPts[i], b = riverPts[i + 1];
-    return { level: lerp(a.level, b.level, t), w: lerp(a.w, b.w, t), fall: !!(a.fall || b.fall || a.fallTop) };
+    return { level: lerp(a.level, b.level, t), w: lerp(a.w, b.w, t), fall: !!(a.fall || b.fall || a.fallTop), rapid: lerp(a.rapid ?? 0, b.rapid ?? 0, t) };
   };
 
   // ------------------------------------------------------------------ trails
@@ -317,8 +341,9 @@ export function generateWorld(seed = 'prehistoric', onProgress = () => {}) {
         const hw = r.w * 0.5;
         if (rd < hw) {
           const t = rd / hw;
-          const depth = r.fall ? 3.2 : 1.3 + r.w * 0.07;
-          h = Math.min(h, r.level - 0.25 - depth * (1 - t * t));
+          // rapids run shallow over a lumpy rock bed
+          const depth = r.fall ? 3.2 : (1.3 + r.w * 0.07) * (1 - 0.42 * r.rapid);
+          h = Math.min(h, r.level - 0.25 - depth * (1 - t * t) + r.rapid * (nD.noise2(x * 0.32, z * 0.32) * 0.3 + 0.1));
         } else {
           // broad natural valley: cut the terrain down toward a concave profile
           const hi = r.level > 30;
@@ -495,6 +520,30 @@ export function generateWorld(seed = 'prehistoric', onProgress = () => {}) {
     if ((j & 31) === 0) onProgress(0.74 + 0.24 * (j / M), 'Painting biomes');
   }
 
+  // ------------------------------------------------------------------ boulders in the rapids
+  const boulders = [];
+  {
+    const br = new RNG(seed + ':rapids');
+    for (let i = 1; i < riverPts.length - 1; i++) {
+      const p = riverPts[i];
+      if (!(p.rapid > 0.15) || p.fall) continue;
+      const a = riverPts[i - 1], b = riverPts[i + 1];
+      let dx = b.x - a.x, dz = b.z - a.z;
+      const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+      const px = -dz, pz = dx;
+      // a ledge where the river spills down a step: a broken line of rocks across it
+      const ledge = a.level - p.level > 0.1;
+      const n = ledge ? 3 + br.int(0, 2) : (br.next() < 0.6 * p.rapid ? 1 : 0) + (br.next() < 0.35 * p.rapid ? 1 : 0);
+      for (let k = 0; k < n; k++) {
+        const off = ledge ? ((k + 0.5) / n - 0.5) * p.w * 0.98 + (br.next() - 0.5) * 1.4 : (br.next() - 0.5) * p.w * 1.0;
+        const edge = Math.min(1, Math.abs(off) / (p.w * 0.5));
+        const r = 0.45 + br.next() * 0.75 + edge * 0.7 + (ledge ? 0.2 : 0);
+        const top = p.level + 0.08 + br.next() * 0.5 + edge * 0.45;
+        boulders.push([+(p.x + px * off).toFixed(2), +top.toFixed(2), +(p.z + pz * off).toFixed(2), +r.toFixed(2), +(br.next() * 6.28).toFixed(2), ledge ? 1 : 0]);
+      }
+    }
+  }
+
   // ------------------------------------------------------------------ POIs
   const onLand = (x, z) => hAt(x, z) > 1.5 && !ocean[clamp(Math.floor((z + HALF) / SS), 0, M - 1) * M + clamp(Math.floor((x + HALF) / SS), 0, M - 1)];
   const pois = buildPOIs(L, hAt, onLand, rng, mainFall);
@@ -503,7 +552,8 @@ export function generateWorld(seed = 'prehistoric', onProgress = () => {}) {
   return {
     seed, N, M, size: WORLD.SIZE, half: HALF,
     height, splat, biome, water,
-    river: riverPts.map((p) => [p.x, p.z, p.level, p.w, p.fall ? 1 : 0]),
+    river: riverPts.map((p) => [p.x, p.z, p.level, p.w, p.fall ? 1 : 0, +(p.rapid ?? 0).toFixed(2)]),
+    boulders,
     waterfalls,
     pool: mainFall ? { x: poolX, z: poolZ, level: poolLevel, r: 20 } : null,
     lake: { x: L.lake.x, z: L.lake.z, r: L.lake.r, level: L.lake.level },

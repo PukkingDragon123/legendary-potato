@@ -3,7 +3,7 @@
 // around the players, rendered with one InstancedMesh per node type, with
 // colliders and persistent depletion state (networked by id).
 import * as THREE from 'three';
-import { RNG, Simplex, tileFbm } from '../core/rng.js';
+import { RNG, Simplex, tileFbm, tileNoise, hash2i } from '../core/rng.js';
 import { BIOME } from './gen.js';
 import { patchMaterial } from '../gfx/shaderlib.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -66,26 +66,43 @@ const SPAWN = {
 };
 
 // ------------------------------------------------------------------ geometry
-// Rounded, weathered boulders: a subdivided icosahedron (shared vertices so
-// it shades smooth) pushed around by noise, with softened ledges and a flat
-// bottom that sinks into the ground.
-function rockGeo(seed, detail = 1, squash = 0.7, lumps = 0.35) {
+// Weathered boulders: a subdivided icosahedron (shared vertices so it shades
+// smooth) pushed around by noise, then broken along a few fracture planes,
+// the flat faces real rocks split on, with rounded edges. The flattened
+// bottom sinks into the ground.
+export function rockGeo(seed, detail = 1, squash = 0.7, lumps = 0.35) {
   const r = new RNG(seed);
   const n = new Simplex(seed);
-  let g = new THREE.IcosahedronGeometry(1, detail + 1);
+  let g = new THREE.IcosahedronGeometry(1, detail + 2);
   g.deleteAttribute('normal'); g.deleteAttribute('uv');
   g = mergeVertices(g);
   const p = g.attributes.position;
-  const ox = r.next() * 10, oz = r.next() * 10, sx = 0.85 + r.next() * 0.3;
+  const ox = r.next() * 10, oz = r.next() * 10, sx = 0.85 + r.next() * 0.3, sz = 0.85 + 0.1 * Math.sin(seed);
+  // fracture planes, mostly on the sides and the top
+  const cuts = [];
+  const nc = 3 + Math.floor(r.next() * 4);
+  for (let k = 0; k < nc; k++) {
+    const a = r.next() * Math.PI * 2, el = r.next() * 1.15 - 0.2;
+    cuts.push([Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el), 0.62 + r.next() * 0.26]);
+  }
+  const K = 0.06; // how round the broken edges are
   for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    let f = 1 + lumps * n.noise3(x * 1.3 + ox, y * 1.3, z * 1.3 + oz) + 0.1 * n.noise3(x * 3 + oz, y * 3, z * 3) + 0.035 * n.noise3(x * 7, y * 7 + ox, z * 7);
-    // soft ledges: quantise the radius a little, like weathered strata
-    const ledge = Math.round(f * 6) / 6;
-    f = f * 0.7 + ledge * 0.3;
+    const x0 = p.getX(i), y0 = p.getY(i), z0 = p.getZ(i);
+    const f = 1 + lumps * n.noise3(x0 * 1.3 + ox, y0 * 1.3, z0 * 1.3 + oz) + 0.09 * n.noise3(x0 * 3 + oz, y0 * 3, z0 * 3);
+    let x = x0 * f, y = y0 * f, z = z0 * f;
+    for (const [cx, cy, cz, d] of cuts) {
+      const s0 = x * cx + y * cy + z * cz - d;
+      if (s0 < -4 * K) continue;
+      // soft clamp onto the plane: min(s, 0) with a rounded corner
+      const s1 = -K * Math.log1p(Math.exp(-s0 / K)) - s0;
+      x += cx * s1; y += cy * s1; z += cz * s1;
+    }
+    // fine grain so the split faces do not look machined
+    const fine = 1 + 0.028 * n.noise3(x0 * 7, y0 * 7 + ox, z0 * 7) + 0.012 * n.noise3(x0 * 15 + oz, y0 * 15, z0 * 15);
+    x *= fine; y *= fine; z *= fine;
     let yy = y * squash;
-    if (yy < -0.2) yy = -0.2 - (yy + 0.2) * 0.3; // flatter bottom sinks into ground
-    p.setXYZ(i, x * f * sx, yy * f + 0.35 * squash, z * f * (0.85 + 0.1 * Math.sin(seed)));
+    if (yy < -0.2) yy = -0.2 + (yy + 0.2) * 0.3; // flatter bottom sinks into the ground
+    p.setXYZ(i, x * sx, yy + 0.35 * squash, z * sz);
   }
   g.computeVertexNormals();
   return g;
@@ -148,31 +165,63 @@ function tuftGeo(seed, h = 0.9, blades = 14, w = 0.035) {
   return b.build();
 }
 
-// rock material: triplanar painted texture + moss on top + per-instance tint
-function rockTextures() {
-  const S = 256, data = new Uint8Array(S * S * 4 * 2);
-  const stone = rgb(0x8e8a82), warm = rgb(0x9a8c78), dark = rgb(0x5e5a54), lich = rgb(0xb8b48a);
-  const moss = rgb(0x4e6a30), mossL = rgb(0x6e8a3c), mossD = rgb(0x2c4219);
+// rock material: triplanar painted stone + moss on top, relief from the
+// painted detail, contact shadow at the ground and a wet band at the waterline
+// noise that tiles with separate periods along u and v (for streaks)
+function tileNoise2(x, y, px, py, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const wx = (v) => ((v % px) + px) % px, wy = (v) => ((v % py) + py) % py;
+  const a = hash2i(wx(xi), wy(yi), seed), b = hash2i(wx(xi + 1), wy(yi), seed);
+  const c = hash2i(wx(xi), wy(yi + 1), seed), d = hash2i(wx(xi + 1), wy(yi + 1), seed);
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+export function rockTextureData(S = 256) {
+  const data = new Uint8Array(S * S * 4 * 2);
+  const greyA = rgb(0x8d8a84), greyB = rgb(0x9b9081), greyC = rgb(0x787a7e), dark = rgb(0x47433f), pale = rgb(0xcac5b8);
+  const lichens = [rgb(0xbdb67a), rgb(0xcf8f48), rgb(0xd9d7c9), rgb(0x9aad6a)];
+  const moss = rgb(0x56702f), mossL = rgb(0x8e9a3e), mossD = rgb(0x26381a), mossY = rgb(0xb0b04c);
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const u = x / S, v = y / S, i = (y * S + x) * 4;
-    // rock: strata bands, blotches, crack network, lichen speckles
-    const n = tileFbm(u * 4, v * 4, 4, 5, 3), n2 = tileFbm(u * 16, v * 16, 16, 3, 5);
-    const strata = 0.5 + 0.5 * Math.sin((v + n * 0.12) * Math.PI * 2 * 7);
-    let c = mix3(stone, warm, sstep(0.4, 0.7, n));
-    c = mul3(c, 0.8 + strata * 0.12 + (n2 - 0.5) * 0.22);
-    const cr = cell(u, v, 6, 6, 9), e = cr.f2 - cr.f1;
-    const crack = (1 - sstep(0.0, 0.035, e)) * sstep(0.45, 0.6, tileFbm(u * 3, v * 3, 3, 2, 11));
-    c = mix3(c, dark, crack * 0.8);
-    const lc = cell(u, v, 22, 22, 13);
-    if (lc.id > 0.8) c = mix3(c, lich, sstep(0.3, 0.15, lc.f1) * 0.55);
+    // stone: broad tone shifts, weathered mottling, granite grains, sparse cracks,
+    // streaks where rain runs down, lichen rosettes
+    const n = tileFbm(u * 3, v * 3, 3, 5, 3), n2 = tileFbm(u * 12, v * 12, 12, 4, 5), n3 = tileFbm(u * 40, v * 40, 40, 2, 7);
+    let c = mix3(greyA, greyB, sstep(0.35, 0.68, n));
+    c = mix3(c, greyC, sstep(0.5, 0.78, tileFbm(u * 2 + 0.3, v * 2, 2, 3, 17)) * 0.7);
+    c = mul3(c, 0.8 + 0.34 * n2 + (n3 - 0.5) * 0.14);
+    // granite grain: a soft salt-and-pepper, never hard dots
+    const gr = tileNoise(u * 110, v * 110, 110, 31);
+    c = mul3(c, 0.94 + (gr - 0.5) * 0.14);
+    if (gr > 0.9) c = mix3(c, pale, (gr - 0.9) * 2.5);
+    const streak = tileNoise2(u * 30, v * 3, 30, 3, 41) * 0.7 + tileNoise2(u * 60, v * 5, 60, 5, 43) * 0.3;
+    c = mul3(c, 1 - sstep(0.62, 0.9, streak) * 0.16);
+    const cr = cell(u, v, 4, 4, 9), e = cr.f2 - cr.f1;
+    const crackMask = sstep(0.56, 0.68, tileFbm(u * 2, v * 2, 2, 2, 11));
+    const core = 1 - sstep(0.0, 0.022, e);
+    // dark crack with a slightly lighter lip beside it
+    c = mix3(c, mul3(c, 1.12), (1 - sstep(0.022, 0.05, e)) * (1 - core) * crackMask * 0.4);
+    c = mix3(c, dark, core * crackMask * 0.75);
+    const lc = cell(u, v, 7, 7, 13);
+    if (lc.id > 0.82) {
+      // irregular crusty rosettes of different sizes, broken up by the grain
+      const k = (lc.id - 0.82) / 0.18;
+      const edge = lc.f1 + (tileNoise(u * 70, v * 70, 70, 19) - 0.5) * 0.22 + (tileNoise(u * 160, v * 160, 160, 23) - 0.5) * 0.1;
+      const lich = lichens[Math.floor(k * 3.999)];
+      c = mix3(c, mul3(lich, 0.88 + n3 * 0.24), sstep(0.16 + k * 0.2, 0.08 + k * 0.14, edge) * 0.6);
+    }
     put(data, i, c);
-    // moss: soft clumps with bright tips and dark hollows
-    const m1 = tileFbm(u * 8, v * 8, 8, 4, 21), m2 = tileFbm(u * 32, v * 32, 32, 2, 23);
-    let mc = mix3(mossD, moss, sstep(0.3, 0.6, m1));
-    mc = mix3(mc, mossL, sstep(0.62, 0.8, m1 + m2 * 0.25));
-    mc = mul3(mc, 0.85 + m2 * 0.3);
+    // moss: soft cushions, sunlit yellow tips, dark hollows, tiny sprigs
+    const m1 = tileFbm(u * 6, v * 6, 6, 4, 21), m2 = tileFbm(u * 28, v * 28, 28, 3, 23), m3 = tileNoise(u * 110, v * 110, 110, 29);
+    let mc = mix3(mossD, moss, sstep(0.2, 0.5, m1 + (m2 - 0.5) * 0.4));
+    mc = mix3(mc, mossL, sstep(0.5, 0.75, m1 + (m2 - 0.5) * 0.5));
+    mc = mix3(mc, mossY, sstep(0.78, 0.95, m1 + (m2 - 0.5) * 0.4) * 0.5);
+    mc = mul3(mc, 0.82 + m2 * 0.26 + (m3 - 0.5) * 0.1);
     put(data, S * S * 4 + i, mc);
   }
+  return data;
+}
+function rockTextures() {
+  const S = 256, data = rockTextureData(S);
   const tex = new THREE.DataArrayTexture(data, S, S, 2);
   tex.format = THREE.RGBAFormat;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -183,15 +232,22 @@ function rockTextures() {
   return tex;
 }
 
+// opt.water = { tex, half, size }: the world water-level texture, for the wet
+// band at the waterline; opt.soak raises it (spray in the rapids)
 export function makeRockMaterial(tex, opt = {}) {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, side: opt.side ?? THREE.FrontSide });
+  const water = opt.water;
   patchMaterial(mat, {
     wet: true,
-    uniforms: { tRockArr: { value: tex }, uMoss: { value: opt.moss ?? 1 } },
+    uniforms: {
+      tRockArr: { value: tex }, uMoss: { value: opt.moss ?? 1 }, uSoak: { value: opt.soak ?? 0 },
+      ...(water ? { tWaterLvl: { value: water.tex }, uWHalf: { value: water.half }, uWSize: { value: water.size } } : {}),
+    },
     vertex: {
-      head: 'varying vec3 vRW;\nvarying vec3 vRN;',
+      head: 'varying vec3 vRW;\nvarying vec3 vRN;\nvarying float vRLY;',
       main: `
         vec4 rwp = vec4( transformed, 1.0 );
+        vRLY = transformed.y;
         #ifdef USE_INSTANCING
           rwp = instanceMatrix * rwp;
         #endif
@@ -203,18 +259,56 @@ export function makeRockMaterial(tex, opt = {}) {
         vRN = normalize( mat3( modelMatrix ) * rn );`,
     },
     fragment: {
-      head: `precision highp sampler2DArray;\nuniform sampler2DArray tRockArr;\nuniform float uMoss;\nvarying vec3 vRW;\nvarying vec3 vRN;\n${GLSL_HASH}`,
+      head: `precision highp sampler2DArray;\nuniform sampler2DArray tRockArr;\nuniform float uMoss;\nuniform float uSoak;\nvarying vec3 vRW;\nvarying vec3 vRN;\nvarying float vRLY;\nfloat rH; float rWet;\n${water ? 'uniform sampler2D tWaterLvl;\nuniform float uWHalf;\nuniform float uWSize;\n' : ''}${GLSL_HASH}`,
       map: `
         vec3 an = abs( vRN );
-        vec2 ruv = an.y > max( an.x, an.z ) ? vRW.xz : an.x > an.z ? vRW.zy : vRW.xy;
-        ruv *= 0.5;
-        vec3 rc = texture( tRockArr, vec3( ruv, 0.0 ) ).rgb;
+        vec3 bw = an * an; bw *= bw; bw /= bw.x + bw.y + bw.z;
+        vec2 uvx = vRW.zy * 0.5, uvy = vRW.xz * 0.5, uvz = vRW.xy * 0.5;
+        vec3 rc = texture( tRockArr, vec3( uvx, 0.0 ) ).rgb * bw.x + texture( tRockArr, vec3( uvy + 0.37, 0.0 ) ).rgb * bw.y + texture( tRockArr, vec3( uvz, 0.0 ) ).rgb * bw.z;
         // inside a cave we see back faces: moss belongs on the floor side, not the ceiling
         float upY = gl_FrontFacing ? vRN.y : -vRN.y;
-        float mossAmt = smoothstep( 0.62, 0.95, upY + ( vnoise( vRW.xz * 1.3 ) - 0.5 ) * 0.6 ) * uMoss;
-        vec3 mc = texture( tRockArr, vec3( vRW.xz * 0.5, 1.0 ) ).rgb;
-        float pick = smoothstep( 0.4, 0.6, mossAmt + ( vnoise( ruv * 9.0 ) - 0.5 ) * 0.35 );
-        diffuseColor.rgb *= mix( rc, mc, pick );`,
+        float mossAmt = smoothstep( 0.55, 0.95, upY + ( vnoise( vRW.xz * 1.3 ) - 0.5 ) * 0.6 ) * uMoss;
+        vec3 mc = texture( tRockArr, vec3( uvy, 1.0 ) ).rgb;
+        float pick = smoothstep( 0.4, 0.6, mossAmt + ( vnoise( vRW.xz * 4.5 ) - 0.5 ) * 0.35 );
+        vec3 rcol = mix( rc, mc, pick );
+        // relief height from a blurrier mip so the bump follows shapes, not single grains
+        vec3 rcb = texture( tRockArr, vec3( uvx, 0.0 ), 2.5 ).rgb * bw.x + texture( tRockArr, vec3( uvy + 0.37, 0.0 ), 2.5 ).rgb * bw.y + texture( tRockArr, vec3( uvz, 0.0 ), 2.5 ).rgb * bw.z;
+        rH = dot( mix( rcb, mc, pick ), vec3( 0.3, 0.59, 0.11 ) ) * mix( 1.0, 0.5, pick );
+        // contact shadow where the rock meets the ground
+        rcol *= mix( 0.6, 1.0, smoothstep( -0.05, 0.42, vRLY ) );
+        rWet = 0.0;
+        ${water ? `{
+          // wet below the waterline (higher where the rapids throw spray)
+          vec2 wuv = ( vRW.xz + uWHalf ) / uWSize, o = vec2( 1.5 / uWSize, 0.0 );
+          float wl = max( max( texture2D( tWaterLvl, wuv ).r, texture2D( tWaterLvl, wuv + o ).r ), max( texture2D( tWaterLvl, wuv - o ).r, max( texture2D( tWaterLvl, wuv + o.yx ).r, texture2D( tWaterLvl, wuv - o.yx ).r ) ) );
+          float top = wl + 0.22 + uSoak * ( 0.55 + vnoise( vRW.xz * 2.3 + vRW.y * 1.7 ) * 0.7 );
+          if ( wl > -999.0 ) rWet = 1.0 - smoothstep( top - 0.18, top, vRW.y );
+        }` : ''}
+        rcol *= 1.0 - 0.38 * rWet;
+        diffuseColor.rgb *= rcol;`,
+      emissive: `
+        roughnessFactor = mix( roughnessFactor, 0.26, rWet );
+        {
+          // relief from the painted stone (bump mapping from luminance)
+          vec3 dpdx = dFdx( -vViewPosition ), dpdy = dFdy( -vViewPosition );
+          float hx = dFdx( rH ), hy = dFdy( rH );
+          vec3 r1 = cross( dpdy, normal ), r2 = cross( normal, dpdx );
+          float det = dot( dpdx, r1 );
+          vec3 grad = sign( det ) * ( hx * r1 + hy * r2 );
+          normal = normalize( abs( det ) * normal - grad * 0.9 * ( 1.0 - 0.6 * rWet ) );
+        }`,
+      lights: `
+        #if NUM_HEMI_LIGHTS > 0
+        if ( rWet > 0.01 ) {
+          // wet stone mirrors the sky
+          vec3 rvd = normalize( vViewPosition );
+          vec3 rrv = reflect( -rvd, normal );
+          float rup = dot( rrv, hemisphereLights[ 0 ].direction );
+          vec3 rsky = mix( hemisphereLights[ 0 ].groundColor, hemisphereLights[ 0 ].skyColor, smoothstep( -0.2, 0.6, rup ) );
+          float rfr = 0.04 + 0.96 * pow( 1.0 - max( dot( normal, rvd ), 0.0 ), 5.0 );
+          reflectedLight.indirectSpecular += rsky * rfr * rWet * 0.8;
+        }
+        #endif`,
     },
   });
   return mat;
@@ -259,7 +353,9 @@ export class Nodes {
       this.group.add(im);
       V[key] = { im, cap, list: [] };
     };
-    const rockMat = makeRockMaterial(rockTex);
+    const ter = this.game.terrain;
+    this.waterOpt = ter ? { tex: ter.waterTex, half: this.world.half, size: this.world.size } : undefined;
+    const rockMat = makeRockMaterial(rockTex, { water: this.waterOpt });
     this.rockTex = rockTex; // shared with the caves
     const rockGeos = [rockGeo(11), rockGeo(23, 1, 0.6), rockGeo(37, 1, 0.8, 0.4), rockGeo(51, 1, 0.55, 0.3)];
     rockGeos.forEach((g, i) => mk('rock' + i, g, rockMat, 1200));

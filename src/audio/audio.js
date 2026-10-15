@@ -150,6 +150,7 @@ export class Audio {
     bed('wind', (g) => { const a = noiseLoop(g, 'pink', 'bandpass', 420, 0.6, 0.9); const b = noiseLoop(g, 'pink', 'bandpass', 1400, 2, 0.25); return { a, b }; });
     bed('rain', (g) => { const a = noiseLoop(g, 'white', 'lowpass', 2800, 0.5, 0.5); const b = noiseLoop(g, 'pink', 'highpass', 5000, 0.5, 0.25); return { a, b }; });
     bed('river', (g) => { const a = noiseLoop(g, 'brown', 'lowpass', 700, 0.7, 1.2); const b = noiseLoop(g, 'white', 'bandpass', 2200, 0.8, 0.12); return { a, b }; });
+    bed('rapids', (g) => { const a = noiseLoop(g, 'white', 'bandpass', 1700, 0.7, 0.55); const b = noiseLoop(g, 'brown', 'lowpass', 600, 0.6, 1.1); const lfo = c.createOscillator(); lfo.frequency.value = 0.7; const lg = c.createGain(); lg.gain.value = 0.18; lfo.connect(lg).connect(a.g.gain); lfo.start(); return { a, b, lfo }; });
     bed('falls', (g) => { const a = noiseLoop(g, 'brown', 'lowpass', 900, 0.4, 1.8); const b = noiseLoop(g, 'pink', 'bandpass', 1500, 0.4, 0.5); return { a, b }; });
     bed('ocean', (g) => { const a = noiseLoop(g, 'brown', 'lowpass', 500, 0.6, 1.2); const lfo = c.createOscillator(); lfo.frequency.value = 0.09; const lg = c.createGain(); lg.gain.value = 0.5; lfo.connect(lg).connect(a.g.gain); lfo.start(); return { a, lfo }; });
     bed('insects', (g) => {
@@ -218,6 +219,7 @@ export class Audio {
     }
     this.setBed('river', this._river < 99 ? 0.5 * (1 - this._river / 40) : 0);
     this.setBed('falls', Math.max(0, 1 - this._fall / 160) ** 1.6 * 1.1);
+    this.setBed('rapids', g.rapids?.loud ?? 0);
     this.setBed('ocean', this._sea < 99 ? 0.6 * (1 - this._sea / 40) : 0);
     for (const l of this.loops.values()) l.g.gain.setTargetAtTime(l.target, t, 0.6);
     // random critters + distant dino calls
@@ -363,6 +365,7 @@ S.time_charge = (A, o, t) => { A.osc(o, 'sawtooth', 60, 900, t, 3, 0.25, { a: 0.
 S.time_boom = (A, o, t) => { A.noise(o, t, 2.5, 1.5, { color: 'brown', type: 'lowpass', f: 800, f1: 100 }); A.osc(o, 'sine', 400, 30, t, 2, 1.2); for (const f of [523, 659, 784, 1046]) A.osc(o, 'triangle', f, f * 2, t, 1.5, 0.15); };
 // creatures
 S.roar = (A, o, t, r) => { const d = 1.6; A.osc(o, 'sawtooth', 95 * r, 62 * r, t, d, 0.6, { a: 0.12, filter: { type: 'bandpass', f: 420, q: 1.8 }, vibrato: [9, 6] }); A.osc(o, 'sawtooth', 142 * r, 88 * r, t, d, 0.35, { a: 0.15, filter: { type: 'bandpass', f: 1100, q: 3 }, vibrato: [7, 9] }); A.noise(o, t, d, 0.7, { color: 'pink', f: 700, q: 0.8, a: 0.15 }); A.osc(o, 'sine', 45, 35, t, d, 0.6, { a: 0.2 }); };
+S.gasp = (A, o, t, r) => { A.noise(o, t, 0.45, 0.6, { color: 'pink', f: 900 * r, f1: 2600 * r, q: 1.6, a: 0.04 }); A.noise(o, t + 0.5, 0.3, 0.3, { color: 'pink', f: 1400 * r, f1: 700 * r, q: 1.2 }); };
 S.baa = (A, o, t, r) => { const d = 0.75; A.osc(o, 'sawtooth', 360 * r, 330 * r, t, d, 0.32, { a: 0.04, filter: { type: 'bandpass', f: 1100, q: 2.4 }, vibrato: [7.5, 22] }); A.osc(o, 'square', 720 * r, 660 * r, t, d, 0.06, { a: 0.04, filter: { type: 'bandpass', f: 2400, q: 3 }, vibrato: [7.5, 40] }); };
 S.puff = (A, o, t, r) => { A.noise(o, t, 0.35, 0.7, { color: 'pink', f: 400 * r, f1: 2400 * r, q: 0.8, a: 0.02 }); A.osc(o, 'sine', 140 * r, 320 * r, t, 0.25, 0.35); };
 S.howl = (A, o, t, r) => { A.osc(o, 'sine', 420 * r, 760 * r, t, 0.7, 0.3, { a: 0.15, vibrato: [5, 12], sweepFrac: 0.6 }); A.osc(o, 'sine', 760 * r, 520 * r, t + 0.7, 0.9, 0.3, { vibrato: [5, 14] }); A.osc(o, 'triangle', 840 * r, 1500 * r, t, 0.7, 0.06, { a: 0.15 }); };

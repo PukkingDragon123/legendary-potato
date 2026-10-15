@@ -20,7 +20,7 @@ export async function installExtras(game) {
   g.addSystem({ name: 'lights', lateUpdate: (dt) => g.lightPool.update(dt, g.engine.camera.position) });
   // ---------------------------------------------------------------- optional big systems (loaded lazily)
   const mods = await Promise.allSettled([
-    import('../entities/viewmodel.js'), import('../ui/device.js'),
+    import('../entities/viewmodel.js'), import('../ui/device.js'), import('../world/rapids.js'),
     import('./caves.js'), import('./structures.js'), import('./building.js'), import('../entities/van.js'), import('./research.js'),
     import('../ui/computer.js'), import('./journal.js'), import('./story.js'), import('./coop.js'), import('../entities/dinos.js'), import('./bosses.js'), import('./tracks.js'), import('./volcano.js'), import('./save.js'), import('../net/net.js'), import('./taming.js'), import('./weapons.js'), import('../ui/touch.js'),
   ]);

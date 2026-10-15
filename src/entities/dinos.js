@@ -669,6 +669,11 @@ export class Dinos {
       } });
       d.pos.x = p.x; d.pos.z = p.z;
     }
+    // the river carries anything that is not a strong swimmer
+    if (d.swim && !sp.behaviour.swimmer && g.riverFlow) {
+      const f = g.riverFlow(d.pos.x, d.pos.z, this._flow ?? (this._flow = {}));
+      if (f) { const k = Math.min(1, 1.4 / Math.max(0.5, sp.size)) * 0.8; d.pos.x += f.vx * k * dt; d.pos.z += f.vz * k * dt; }
+    }
     // vertical: terrain / water / flight
     const h = s.heightAt(d.pos.x, d.pos.z), wl = s.waterAt(d.pos.x, d.pos.z);
     d.swim = wl > -999 && wl - h > d.rig.height * d.sizeK * 0.55 && !d.flying;

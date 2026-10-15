@@ -38,6 +38,8 @@ export class Vitals {
     this.god = false;
     this.warmth = 0; // from fires
     this.sleepyT = 0;
+    this.breath = 100; // held while your head is under water
+    this.wasUnder = false;
   }
 
   add(name, secs) { const cur = this.effects.get(name) ?? 0; this.effects.set(name, Math.max(cur, secs)); this.game.events.emit('effect', name); }
@@ -156,6 +158,23 @@ export class Vitals {
     if (this.effects.has('hot') && this.temp > 0.9) this.damage(dt * 0.4, { kind: 'heat' });
     if (this.effects.has('bleeding')) this.damage(dt * 0.8, { kind: 'bleed' });
     if (this.effects.has('poison')) this.damage(dt * 0.5, { kind: 'poison' });
+    // ---- breath: rapids knock the wind out of you faster
+    const under = p.underwater && !p.sitting && !p.downed;
+    if (under) {
+      this.breath = Math.max(0, this.breath - dt * ((p.current?.rapid ?? 0) > 0.3 ? 12 : 7.5));
+      if (this.breath <= 0) { this.damage(dt * 9, { kind: 'drown' }); if (!this.toldDrown) { this.toldDrown = true; g.ui?.toast('You are drowning! Swim UP (Space) or grab a rock!', 'warn', 'drop', 4000); } }
+      else if (this.breath < 30 && Math.random() < dt * 2) p.setExpr?.('scared', 0.5);
+      else p.setExpr?.('puff', 0.3);
+      if (Math.random() < dt * (this.breath < 30 ? 9 : 3)) {
+        const cam = g.engine.camera, f = cam.getWorldDirection(this._bf ?? (this._bf = cam.position.clone()));
+        g.fx?.sprite?.('bubble', cam.position.x + f.x * 0.45 + (Math.random() - 0.5) * 0.2, cam.position.y - 0.12, cam.position.z + f.z * 0.45 + (Math.random() - 0.5) * 0.2, { vy: 0.9 + Math.random() * 0.5, life: 1.2, size: 0.03 + Math.random() * 0.03, color: 0xd8f4ff, alpha: 0.8, wobble: 2, drag: 0.6 });
+      }
+    } else {
+      if (this.wasUnder && this.breath < 70) { g.audio?.play('gasp', { pos: p.pos, vol: 0.8 }); if (this.breath < 25) p.setExpr?.('shock', 0.8); }
+      this.breath = Math.min(100, this.breath + dt * (this.breath < 30 ? 20 : 38));
+      if (this.breath > 90) this.toldDrown = false;
+    }
+    this.wasUnder = under;
     this.regenDelay -= dt;
     if (this.regenDelay <= 0 && this.hunger > 25 && this.thirst > 25 && !p.downed) this.heal(dt * (fed ? 0.9 : 0.25));
     // ---- effects tick
@@ -172,7 +191,11 @@ export class Vitals {
     this.damageFlash = Math.max(0, this.damageFlash - dt * 1.5);
     const low = this.hp < 25 ? (1 - this.hp / 25) * (0.25 + 0.15 * Math.sin(performance.now() / 300)) : 0;
     post.uDamage.value = Math.max(this.damageFlash, low);
-    post.uDesat.value = p.downed ? 0.8 : this.hp < 20 ? 0.35 : 0;
+    // running out of air: the world closes in and drains of colour
+    const air = 1 - this.breath / 100;
+    const gasp = air > 0.55 ? ((air - 0.55) / 0.45) ** 1.5 : 0;
+    post.uVignette.value = 0.55 + gasp * 3.2;
+    post.uDesat.value = Math.max(p.downed ? 0.8 : this.hp < 20 ? 0.35 : 0, gasp * 0.7);
     post.uBlur.value = this.effects.has('blind') ? 1 : this.effects.has('sleepy') ? 0.6 : this.effects.has('trippy') ? 0.4 : 0;
     if (this.effects.has('trippy')) { const t = performance.now() / 1000; post.uSaturation.value = 1.6 + Math.sin(t * 2) * 0.5; post.uLift.value.set(0.04 * Math.sin(t), 0.02 * Math.sin(t * 1.3 + 2), 0.04 * Math.sin(t * 0.7 + 4)); }
     else { post.uSaturation.value = 1.12; post.uLift.value.set(0.012, 0.014, 0.022); }

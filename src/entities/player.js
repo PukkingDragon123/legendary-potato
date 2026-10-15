@@ -115,7 +115,18 @@ export class Player {
     if (this.action && this.action.slow) speed *= this.action.slow;
     if (this.panic > 0) { this.panic -= dt; }
     const accel = this.grounded || this.swim ? 14 : 3.5;
-    const tx = wish.x * speed, tz = wish.z * speed;
+    let tx = wish.x * speed, tz = wish.z * speed;
+    // the river carries you: wading tugs at your legs, swimming you go where it goes
+    const flow = depth > 0.25 ? g.riverFlow?.(this.pos.x, this.pos.z, this._flow ?? (this._flow = {})) : null;
+    this.current = flow;
+    if (flow) {
+      const k = this.swim ? 0.95 : Math.min(0.55, (depth - 0.25) * 0.9);
+      tx += flow.vx * k; tz += flow.vz * k;
+      // whitewater rolls you under now and then
+      if (this.swim && flow.rapid > 0.35 && Math.random() < dt * flow.rapid * 0.55) { this.vel.y -= 3.5 + Math.random() * 3; this.tumble = 0.6; g.audio?.play('splash', { pos: this.pos, vol: 0.6 }); }
+      if (flow.fall && this.swim) this.vel.y -= 14 * dt;
+    }
+    if (this.tumble > 0) this.tumble -= dt;
     this.vel.x += (tx - this.vel.x) * Math.min(1, dt * accel);
     this.vel.z += (tz - this.vel.z) * Math.min(1, dt * accel);
     if (this.swim) {
