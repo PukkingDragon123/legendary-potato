@@ -45,10 +45,10 @@ const painters = {
   grass(p) {
     const r = p.rng;
     const f2 = p.fbm(2, 4, 1), f6 = p.fbm(6, 4, 2), f20 = p.fbm(20, 3, 3), f48 = p.fbm(48, 2, 4);
-    const soil = hex(0x4a3a26), dark = hex(0x2b4419), mid = hex(0x426a26), lite = hex(0x6c9636), yel = hex(0x93a23e);
+    const soil = hex(0x4a3a26), dark = hex(0x2b4419), mid = hex(0x3e6024), lite = hex(0x628a34), yel = hex(0x8a9a3e);
     p.base((x, y, i) => {
       let c = mixc(dark, mid, sst(0.3, 0.72, f6[i]));
-      c = mixc(c, soil, sst(0.66, 0.8, f20[i]) * 0.55);
+      c = mixc(c, soil, sst(0.58, 0.76, f20[i]) * 0.65);
       c = mulc(c, 0.9 + (f48[i] - 0.5) * 0.2);
       return { c, h: 0.25 + f6[i] * 0.1 + f48[i] * 0.04, r: 0.88 };
     });
