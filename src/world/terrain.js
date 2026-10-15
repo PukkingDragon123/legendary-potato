@@ -115,6 +115,12 @@ export class Terrain {
           uniform float uVeg[18];
           uniform float uMudOK[18];
           uniform vec3 uStrata[6];
+          uniform float uRough[18];
+          uniform float uHalf;
+          uniform float uSize;
+          uniform float uDitherDist;
+          ${GLSL_HASH}
+          ${GLSL_BARE}
           // badland sandstone beds from world height: always level, of varied
           // thickness, gently warped, each with a lit top edge and a dark underside
           vec3 strataAt( vec3 p ) {
@@ -126,12 +132,6 @@ export class Terrain {
             c *= 1.0 + 0.14 * smoothstep( 0.82, 1.0, f ) - 0.32 * smoothstep( 0.14, 0.0, f );
             return c;
           }
-          uniform float uRough[18];
-          uniform float uHalf;
-          uniform float uSize;
-          uniform float uDitherDist;
-          ${GLSL_HASH}
-          ${GLSL_BARE}
           float tPick; float tRoughOut; vec3 tNrmWorld;
           vec3 tAlb;
           vec4 splatAt( vec2 xz ) {
