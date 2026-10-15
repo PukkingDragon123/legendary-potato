@@ -191,15 +191,32 @@ function pebbleGeo() {
 }
 
 // ------------------------------------------------------------------ textures
+// a fern frond: solid, overlapping tapered leaflets along a midrib (thick
+// enough that the alpha cut-out stays a leaf at a distance, not a dotted line)
 function fernFrondTex() {
-  const p = new PixelPainter(32, 64, 77).clear();
+  const W = 64, H = 128;
+  const p = new PixelPainter(W, H, 77).clear();
   const pal = ramp(0x4f8a30, 5, { light: 0.24 });
-  for (let y = 0; y < 64; y++) p.set(16, y, pal[0]);
-  for (let y = 2; y < 62; y += 3) {
-    const t = 1 - y / 64;
-    const len = Math.max(2, 14 * (t < 0.3 ? 0.3 + t * 2.3 : 1 - (t - 0.3) * 0.7));
-    for (const s of [-1, 1]) for (let k = 1; k < len; k++) p.set(16 + s * k, y - k * 0.45, pal[k > len - 2 ? 4 : s < 0 ? 3 : 2]);
+  const cx = W / 2;
+  for (let y = 4; y < H - 2; y += 4) {
+    const t = 1 - y / H; // 1 at the base, 0 at the tip
+    const len = Math.max(3, 28 * (t < 0.25 ? 0.35 + t * 2.6 : 1 - (t - 0.25) * 0.75));
+    const wid = 2.2 + t * 2.2;
+    for (const sd of [-1, 1]) {
+      // leaflet: a capsule from the midrib out and slightly up, tapering to a point
+      for (let k = 0; k <= len; k++) {
+        const u = k / len;
+        const px = cx + sd * k, py = y - k * 0.5;
+        const half = wid * (1 - u * u) + 0.6;
+        for (let d = -Math.ceil(half); d <= Math.ceil(half); d++) {
+          if (Math.abs(d) > half) continue;
+          const lit = d < 0 ? (sd < 0 ? 3 : 2) : (sd < 0 ? 2 : 1);
+          p.set(px, py + d, pal[u > 0.85 ? Math.min(4, lit + 1) : lit]);
+        }
+      }
+    }
   }
+  for (let y = 0; y < H; y++) { p.set(cx, y, pal[0]); p.set(cx - 1, y, pal[1]); }
   return p;
 }
 
@@ -516,7 +533,6 @@ export class GroundCover {
       const mat = def.mode === 'rock' || def.mode === 'mush'
         ? new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: def.mode === 'rock' ? 0.75 : 0.85 })
         : new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, side: THREE.DoubleSide, alphaTest: isFern ? 0.5 : 0 });
-      if (isFern && engine.quality.msaa > 0) mat.alphaToCoverage = true;
       const drawUniforms = { tP0: { value: rt.textures[0] }, tP1: { value: rt.textures[1] }, tP2: { value: rt.textures[2] }, uRef };
       const twoSided = mat.side === THREE.DoubleSide;
       patchMaterial(mat, {
