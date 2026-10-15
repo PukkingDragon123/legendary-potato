@@ -198,10 +198,10 @@ function fernFrondTex() {
   const p = new PixelPainter(W, H, 77).clear();
   const pal = ramp(0x4f8a30, 5, { light: 0.24 });
   const cx = W / 2;
-  for (let y = 4; y < H - 2; y += 4) {
+  for (let y = 4; y < H - 2; y += 5) {
     const t = 1 - y / H; // 1 at the base, 0 at the tip
     const len = Math.max(3, 28 * (t < 0.25 ? 0.35 + t * 2.6 : 1 - (t - 0.25) * 0.75));
-    const wid = 2.2 + t * 2.2;
+    const wid = 1.5 + t * 1.6;
     for (const sd of [-1, 1]) {
       // leaflet: a capsule from the midrib out and slightly up, tapering to a point
       for (let k = 0; k <= len; k++) {
@@ -542,7 +542,7 @@ export class GroundCover {
         vertex: { head: GC_VERTEX_HEAD, main: '' },
         fragment: {
           head: 'varying vec3 vGCol;\nvarying float vGTip;\nvarying float vGLayer;\nvarying vec2 vGUv;\n' + (isFern ? 'precision highp sampler2DArray;\nuniform sampler2DArray tFern;\n' : ''),
-          map: isFern ? 'vec4 fc = texture( tFern, vec3( vGUv, 0.0 ) );\ndiffuseColor *= vec4( fc.rgb * vGCol * 1.9, fc.a );' : 'diffuseColor.rgb *= vGCol;',
+          map: isFern ? 'vec4 fc = texture( tFern, vec3( vGUv, 0.0 ) );\ndiffuseColor *= vec4( fc.rgb * vGCol * 1.5, fc.a );' : 'diffuseColor.rgb *= vGCol;',
         },
       });
       const prev = mat.onBeforeCompile;
