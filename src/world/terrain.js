@@ -77,6 +77,7 @@ export class Terrain {
       tAlbedo: { value: tex.albedo },
       tNormalArr: { value: tex.normal },
       tDetail: { value: tex.detail },
+      tHeightT: { value: this.heightTex },
       uDetailK: { value: tex.detailK },
       uVeg: { value: VEGETATED },
       uMudOK: { value: MUDDY_BANK },
@@ -111,6 +112,7 @@ export class Terrain {
           uniform sampler2DArray tAlbedo;
           uniform sampler2DArray tNormalArr;
           uniform sampler2D tDetail;
+          uniform sampler2D tHeightT;
           uniform vec2 uDetailK[18];
           uniform float uVeg[18];
           uniform float uMudOK[18];
@@ -121,6 +123,7 @@ export class Terrain {
           uniform float uDitherDist;
           ${GLSL_HASH}
           ${GLSL_BARE}
+          float hAtT( vec2 xz ) { return texture2D( tHeightT, ( xz + uHalf + 0.5 ) / ( uSize + 1.0 ) ).r; }
           // badland sandstone beds from world height: always level, of varied
           // thickness, gently warped, each with a lit top edge and a dark underside
           vec3 strataAt( vec3 p ) {
@@ -291,13 +294,22 @@ export class Terrain {
             // far ground keeps its colour but drops most of its fine relief (no shimmer)
             nm.xy *= 1.0 - smoothstep( 120.0, 420.0, dist ) * 0.7;
             nm = normalize( nm );
+            // tall faces are shaded with a smoother normal from a wider height kernel, so
+            // the 1 m columns of the heightfield do not show up as dark vertical grooves
+            vec3 wnL = wn;
+            if ( axis != 1 ) {
+              float hx = hAtT( wp.xz + vec2( 3.0, 0.0 ) ) - hAtT( wp.xz - vec2( 3.0, 0.0 ) );
+              float hz = hAtT( wp.xz + vec2( 0.0, 3.0 ) ) - hAtT( wp.xz - vec2( 0.0, 3.0 ) );
+              vec3 wnS = normalize( vec3( -hx / 6.0, 1.0, -hz / 6.0 ) );
+              wnL = normalize( mix( wn, wnS, 0.65 ) );
+            }
             vec3 T, B;
             if ( axis == 1 ) { T = vec3( 1.0, 0.0, 0.0 ); B = vec3( 0.0, 0.0, 1.0 ); }
             else if ( axis == 0 ) { T = vec3( 0.0, 0.0, sign( wn.x ) ); B = vec3( 0.0, -1.0, 0.0 ); }
             else { T = vec3( -sign( wn.z ), 0.0, 0.0 ); B = vec3( 0.0, -1.0, 0.0 ); }
-            T = normalize( T - wn * dot( wn, T ) );
-            B = normalize( B - wn * dot( wn, B ) - T * dot( T, B ) );
-            tNrmWorld = normalize( T * nm.x + B * nm.y + wn * nm.z + vec3( 0.0, ledgeTilt, 0.0 ) );
+            T = normalize( T - wnL * dot( wnL, T ) );
+            B = normalize( B - wnL * dot( wnL, B ) - T * dot( T, B ) );
+            tNrmWorld = normalize( T * nm.x + B * nm.y + wnL * nm.z + vec3( 0.0, ledgeTilt, 0.0 ) );
             // macro variation so tiles never look repetitive
             float m1 = vnoise( wp.xz * 0.018 ), m2 = vnoise( wp.xz * 0.07 + 17.0 ), m3 = vnoise( wp.xz * 0.011 + 7.0 );
             tAlb *= 0.9 + 0.17 * m1 + 0.06 * ( m2 - 0.5 );
