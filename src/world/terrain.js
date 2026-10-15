@@ -132,10 +132,10 @@ export class Terrain {
           }
           // one ground type: colour+roughness, with a rotated second lookup mixed in
           // patches so the 4 m tile never repeats visibly
-          vec4 albedoAT( vec2 uv, vec2 uv2, float id, float mt ) {
-            vec4 a = texture( tAlbedo, vec3( uv, id ) );
+          vec4 albedoAT( vec2 uv, vec2 uv2, float id, float mt, vec2 gx, vec2 gy, vec2 g2x, vec2 g2y ) {
+            vec4 a = textureGrad( tAlbedo, vec3( uv, id ), gx, gy );
             #ifdef GROUND_DETAIL
-              vec4 b = texture( tAlbedo, vec3( uv2, id ) );
+              vec4 b = textureGrad( tAlbedo, vec3( uv2, id ), g2x, g2y );
               a = mix( a, b, mt );
             #endif
             return a;
@@ -151,12 +151,20 @@ export class Terrain {
             vec4 sp = splatAt( wp.xz + jit * mix( 0.35, 1.0, near ) );
             float id1 = floor( sp.r * 255.0 + 0.5 );
             float id2 = floor( sp.g * 255.0 + 0.5 );
+            // dry or frozen ground never grows moss on its rock faces
+            float dryRock = ( id1 == 8.0 || id1 == 13.0 || id1 == 7.0 || id1 == 14.0 || id1 == 6.0 || id1 == 4.0 ) ? 1.0 : 0.0;
             // layered sandstone keeps its strata level: side projection on any real slope
             int axis;
             vec2 uv = projUV( wp, wn, ( id1 == 8.0 || id2 == 8.0 ) ? 0.96 : 0.72, axis );
-            vec2 uv2 = mat2( 0.8, -0.6, 0.6, 0.8 ) * uv * 0.73 + vec2( 0.37, 0.61 );
-            // (explicit gradients for the lookups that sit inside branches)
+            // gradients from the continuous projection (lookups use them explicitly, so
+            // the per-row shifts below and the branches never upset the mip level)
             vec2 gx = dFdx( uv ), gy = dFdy( uv );
+            // rock faces: every 4 m row of the tile slides sideways by a random amount,
+            // so joints and stains never line up into stripes down a whole cliff
+            if ( axis != 1 ) uv.x += hash21( vec2( floor( uv.y ), 7.0 + float( axis ) ) ) * 0.73;
+            mat2 rot2 = mat2( 0.8, -0.6, 0.6, 0.8 );
+            vec2 uv2 = rot2 * uv * 0.73 + vec2( 0.37, 0.61 );
+            vec2 g2x = rot2 * gx * 0.73, g2y = rot2 * gy * 0.73;
             float mt = smoothstep( 0.42, 0.58, vnoise( wp.xz * 0.045 + 3.7 ) * 0.75 + vnoise( wp.xz * 0.2 ) * 0.25 );
             if ( axis != 1 ) {
               // dedicated cliff faces for side projections
@@ -165,8 +173,8 @@ export class Terrain {
             }
             float bl = sp.b;
             float sel = vnoise( wp.xz * 0.75 + 5.3 ) * 0.78 + vnoise( wp.xz * 4.3 + 3.0 ) * 0.22;
-            vec4 c1 = albedoAT( uv, uv2, id1, mt ), c2 = albedoAT( uv, uv2, id2, mt );
-            vec4 n1 = texture( tNormalArr, vec3( uv, id1 ) ), n2 = texture( tNormalArr, vec3( uv, id2 ) );
+            vec4 c1 = albedoAT( uv, uv2, id1, mt, gx, gy, g2x, g2y ), c2 = albedoAT( uv, uv2, id2, mt, gx, gy, g2x, g2y );
+            vec4 n1 = textureGrad( tNormalArr, vec3( uv, id1 ), gx, gy ), n2 = textureGrad( tNormalArr, vec3( uv, id2 ), gx, gy );
             // height blend: the higher relief wins at the border (stones poke through
             // grass, soil fills the hollows), ragged and soft further away
             float pickB = mix( bl, smoothstep( sel - 0.12, sel + 0.12, bl ), near );
@@ -193,6 +201,7 @@ export class Terrain {
             float farK = smoothstep( 60.0, 220.0, dist );
             if ( axis != 1 && farK > 0.0 ) {
               vec2 uvF = uv * 0.21 + vec2( 0.13, 0.71 );
+              uvF.x += hash21( vec2( floor( uvF.y ), 3.0 + float( axis ) ) ) * 0.61;
               vec4 cF = mix( textureGrad( tAlbedo, vec3( uvF, id1 ), gx * 0.21, gy * 0.21 ), textureGrad( tAlbedo, vec3( uvF, id2 ), gx * 0.21, gy * 0.21 ), hb );
               cc = mix( cc, cF, farK * 0.6 );
             }
@@ -200,7 +209,7 @@ export class Terrain {
               float idO = bank > 0.35 ? 5.0 : 2.0;
               vec4 c3 = textureGrad( tAlbedo, vec3( uv, idO ), gx, gy );
               #ifdef GROUND_DETAIL
-                c3 = mix( c3, textureGrad( tAlbedo, vec3( uv2, idO ), gx * 0.73, gy * 0.73 ), mt );
+                c3 = mix( c3, textureGrad( tAlbedo, vec3( uv2, idO ), g2x, g2y ), mt );
               #endif
               vec4 n3 = textureGrad( tNormalArr, vec3( uv, idO ), gx, gy );
               float ob = clamp( ( n3.a - nn.a ) * 0.8 + ( ov * 2.0 - 1.0 ) * 1.4 + 0.5, 0.0, 1.0 );
@@ -213,6 +222,21 @@ export class Terrain {
             }
             tAlb = cc.rgb;
             tRoughOut = cc.a * rgh;
+            if ( axis != 1 ) {
+              // big rock faces: dark water stains streaking down, paler ledge bands,
+              // moss and grass wherever the face leans back
+              vec2 fw = vec2( axis == 0 ? wp.z : wp.x, wp.y );
+              float streak = vnoise( vec2( fw.x * 0.11, fw.y * 0.012 ) ) * 0.6 + vnoise( vec2( fw.x * 0.37, fw.y * 0.03 + 5.0 ) ) * 0.4;
+              tAlb *= mix( 1.0, 0.7, smoothstep( 0.55, 0.85, streak ) );
+              float ledge = smoothstep( 0.78, 0.96, sin( fw.y * 0.55 + vnoise( fw * 0.05 ) * 5.0 ) * 0.5 + 0.5 );
+              tAlb *= 1.0 + ledge * 0.12;
+              float lean = smoothstep( 0.3, 0.62, wn.y ) * smoothstep( 0.35, 0.6, vnoise( fw * 0.21 + 3.0 ) + ledge * 0.3 ) * ( 1.0 - dryRock );
+              if ( lean > 0.01 ) {
+                vec3 moss = textureGrad( tAlbedo, vec3( uv, 9.0 ), gx, gy ).rgb;
+                tAlb = mix( tAlb, moss * 0.85, lean * 0.85 );
+                tRoughOut = mix( tRoughOut, 0.9, lean );
+              }
+            }
             // relief: hollows a little darker
             tAlb *= mix( 0.8, 1.04, smoothstep( 0.05, 0.6, nn.a ) );
             vec3 nm = nn.xyz * 2.0 - 1.0;

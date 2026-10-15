@@ -9,9 +9,9 @@ const KEYS = [
   { e: -0.12, zen: 0x162252, hor: 0x5b4a6e, gnd: 0x10121c, sun: 0x9ab0e8, si: 0.35, hs: 0x48588e, hg: 0x1c1e2a, hi: 0.75, fog: 0.0022 },
   { e: -0.02, zen: 0x2a3b78, hor: 0xd8735a, gnd: 0x1a1414, sun: 0xff8a50, si: 0.6, hs: 0x6c6a96, hg: 0x2a2018, hi: 0.6, fog: 0.0022 },
   { e: 0.06, zen: 0x3a5ea8, hor: 0xffa66a, gnd: 0x2a2018, sun: 0xffb27a, si: 2.0, hs: 0x8fa2c8, hg: 0x3c3220, hi: 0.75, fog: 0.002 },
-  { e: 0.22, zen: 0x4a82d0, hor: 0xc8d8e4, gnd: 0x3a3428, sun: 0xffe6c4, si: 3.0, hs: 0xa8c4ec, hg: 0x5a5236, hi: 1.25, fog: 0.0017 },
-  { e: 0.6, zen: 0x3d7ad6, hor: 0xb6d6ee, gnd: 0x40402e, sun: 0xfff6ea, si: 3.4, hs: 0xb0ccf0, hg: 0x5e563a, hi: 1.35, fog: 0.0015 },
-  { e: 1.0, zen: 0x3a76d4, hor: 0xb0d4ef, gnd: 0x40402e, sun: 0xfffaf2, si: 3.5, hs: 0xb0ccf0, hg: 0x5e563a, hi: 1.35, fog: 0.0015 },
+  { e: 0.22, zen: 0x4a82d0, hor: 0xc8d8e4, gnd: 0x3a3428, sun: 0xffe6c4, si: 3.0, hs: 0xaec4e4, hg: 0x6a5f3e, hi: 1.25, fog: 0.0017 },
+  { e: 0.6, zen: 0x3d7ad6, hor: 0xb6d6ee, gnd: 0x40402e, sun: 0xfff6ea, si: 3.4, hs: 0xb4cae8, hg: 0x6e6442, hi: 1.35, fog: 0.0015 },
+  { e: 1.0, zen: 0x3a76d4, hor: 0xb0d4ef, gnd: 0x40402e, sun: 0xfffaf2, si: 3.5, hs: 0xb4cae8, hg: 0x6e6442, hi: 1.35, fog: 0.0015 },
 ];
 const _c1 = new THREE.Color(), _c2 = new THREE.Color();
 function lerpKey(e, prop, out) {
