@@ -233,9 +233,12 @@ const painters = {
   // layered red rock (also the badland cliff faces)
   sandstone(p) {
     const r = p.rng;
-    const cols = [0xb9583b, 0xd27d4b, 0xe6a86d, 0xc76c45, 0xab4c36, 0xdd9c64, 0xf0c48c, 0xc0623f].map(hex);
+    // layers in muted earth tones (pulled toward one sandstone orange so the
+    // mesas read as rock, not as a striped cake)
+    const mean = hex(0xc47a4e);
+    const cols = [0xb9583b, 0xd27d4b, 0xe6a86d, 0xc76c45, 0xab4c36, 0xdd9c64, 0xf0c48c, 0xc0623f].map((c) => mixc(hex(c), mean, 0.4));
     const bands = [];
-    for (let y = 0; y < S;) { const t = 5 + Math.floor(r.next() * 14); bands.push([y, Math.min(S, y + t), cols[bands.length % cols.length], r.next()]); y += t; }
+    for (let y = 0; y < S;) { const t = 8 + Math.floor(r.next() * 24); bands.push([y, Math.min(S, y + t), cols[bands.length % cols.length], r.next()]); y += t; }
     const f4 = p.fbm(4, 3, 1), f20 = p.fbm(20, 3, 2), f80 = p.fbm(80, 2, 3);
     p.base((x, y, i) => {
       const yw = (((y + Math.sin((x / S) * Math.PI * 2) * 2 + (f4[i] - 0.5) * 6) % S) + S) % S;

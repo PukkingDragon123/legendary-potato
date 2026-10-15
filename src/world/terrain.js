@@ -124,9 +124,9 @@ export class Terrain {
           }
           float waterAt( vec2 xz ) { return texture2D( tWaterLvl, ( xz + uHalf ) / uSize ).r; }
           // projection uv (4 m tiles) for a world position + normal; returns layer-space uv and axis
-          vec2 projUV( vec3 p, vec3 n, out int axis ) {
+          vec2 projUV( vec3 p, vec3 n, float topT, out int axis ) {
             vec3 an = abs( n );
-            if ( an.y > 0.72 ) { axis = 1; return p.xz * 0.25; }
+            if ( an.y > topT ) { axis = 1; return p.xz * 0.25; }
             if ( an.x > an.z ) { axis = 0; return vec2( p.z * sign( n.x ), -p.y ) * 0.25; }
             axis = 2; return vec2( -p.x * sign( n.z ), -p.y ) * 0.25;
           }
@@ -144,12 +144,6 @@ export class Terrain {
             vec3 wp = vTWorld;
             vec3 wn = normalize( vTNrm );
             float dist = distance( wp, cameraPosition );
-            int axis;
-            vec2 uv = projUV( wp, wn, axis );
-            vec2 uv2 = mat2( 0.8, -0.6, 0.6, 0.8 ) * uv * 0.73 + vec2( 0.37, 0.61 );
-            // (explicit gradients for the lookups that sit inside branches)
-            vec2 gx = dFdx( uv ), gy = dFdy( uv );
-            float mt = smoothstep( 0.42, 0.58, vnoise( wp.xz * 0.045 + 3.7 ) * 0.75 + vnoise( wp.xz * 0.2 ) * 0.25 );
             // organic jitter of the splat lookup, fades with distance
             float near = 1.0 - smoothstep( uDitherDist * 0.6, uDitherDist, dist );
             vec2 jit = ( vec2( vnoise( wp.xz * 0.9 ), vnoise( wp.xz * 0.9 + 31.7 ) ) - 0.5 ) * 2.6;
@@ -157,6 +151,13 @@ export class Terrain {
             vec4 sp = splatAt( wp.xz + jit * mix( 0.35, 1.0, near ) );
             float id1 = floor( sp.r * 255.0 + 0.5 );
             float id2 = floor( sp.g * 255.0 + 0.5 );
+            // layered sandstone keeps its strata level: side projection on any real slope
+            int axis;
+            vec2 uv = projUV( wp, wn, ( id1 == 8.0 || id2 == 8.0 ) ? 0.96 : 0.72, axis );
+            vec2 uv2 = mat2( 0.8, -0.6, 0.6, 0.8 ) * uv * 0.73 + vec2( 0.37, 0.61 );
+            // (explicit gradients for the lookups that sit inside branches)
+            vec2 gx = dFdx( uv ), gy = dFdy( uv );
+            float mt = smoothstep( 0.42, 0.58, vnoise( wp.xz * 0.045 + 3.7 ) * 0.75 + vnoise( wp.xz * 0.2 ) * 0.25 );
             if ( axis != 1 ) {
               // dedicated cliff faces for side projections
               if ( id1 == 3.0 || id1 == 6.0 ) id1 = 16.0; else if ( id1 == 14.0 ) id1 = 17.0;

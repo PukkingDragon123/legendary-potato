@@ -96,6 +96,22 @@ void main() {
     float fade = smoothstep( -0.02, 0.18, h );
     col = mix( col, cc, dens * fade * ( 0.92 ) );
   }
+  // distant cumulus banks along the horizon give the sky depth (seamless around the compass)
+  if ( h > -0.03 && h < 0.32 ) {
+    vec2 ring = normalize( d.xz + vec2( 1e-5 ) );
+    float big = fbm( ring * 2.6 + vec2( uWindOff.x * 0.15, 3.0 ) );
+    float top = ( 0.025 + 0.15 * smoothstep( 0.42, 0.8, big ) ) * ( 0.55 + uCover * 0.9 );
+    float puff = fbm( ring * 11.0 + vec2( h * 26.0, uWindOff.y * 0.5 ) );
+    float edge = h - ( puff - 0.5 ) * 0.045;
+    float m = smoothstep( top + 0.012, top - 0.012, edge ) * smoothstep( -0.03, 0.005, h );
+    vec2 sunH = normalize( uSunDir.xz + vec2( 1e-5 ) );
+    float lit = clamp( 0.35 + ( edge / max( top, 0.01 ) ) * 0.55 + dot( ring, sunH ) * 0.22 + ( puff - 0.5 ) * 0.6, 0.0, 1.0 );
+    vec3 cb = mix( uCloudShade, uCloudLit, lit );
+    cb += uSunColor * pow( sd, 6.0 ) * 0.35 * day;
+    // far banks sink into the haze
+    cb = mix( cb, uHorizon, 0.38 );
+    col = mix( col, cb, m * 0.88 );
+  }
   col = mix( col, col * 0.45 + vec3( 0.05 ), uStorm * 0.6 );
   col += vec3( 0.7, 0.75, 0.9 ) * uFlash;
   gl_FragColor = vec4( col, 1.0 );
