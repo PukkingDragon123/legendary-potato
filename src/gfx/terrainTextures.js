@@ -251,7 +251,7 @@ const painters = {
   moss(p) {
     const r = p.rng, S = p.S;
     const W = p.worley(9, 1, 1.4), W2 = p.worley(23, 2, 1.0), f5 = p.fbm(5, 4, 2), f60 = p.fbm(60, 2, 3);
-    const D = hex(0x2a3e1c), M = hex(0x4c7a2a), L = hex(0x7ea83e), Y = hex(0xa6b244);
+    const D = hex(0x26381a), M = hex(0x41632a), L = hex(0x62823a), Y = hex(0x82913e);
     p.base((x, y, i) => {
       const d1 = Math.max(0, 1 - W.f1[i] * 0.95), d2 = Math.max(0, 1 - W2.f1[i] * 1.05);
       const dome = Math.min(1, d1 * 0.6 + d2 * 0.55 + f5[i] * 0.2);
